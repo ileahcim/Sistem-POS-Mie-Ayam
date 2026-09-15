@@ -59,7 +59,7 @@ export function OrderDetail({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
+      <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
         <div>
           <h1 className="text-lg font-bold text-ink">
             {order.queueNumber != null ? `#${order.queueNumber}` : "Pre-order"} · {CHANNEL_LABEL[order.channel]}
@@ -80,11 +80,11 @@ export function OrderDetail({
         </Link>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-3">
         <Card>
           <div className="divide-border flex flex-col divide-y">
             {order.items.map((item) => (
-              <div key={item.id} className="flex flex-col gap-1 p-4">
+              <div key={item.id} className="flex flex-col gap-0.5 p-3">
                 <div className="flex justify-between gap-3">
                   <span className="text-base font-semibold text-ink">
                     {item.qty}x {item.productName}
@@ -99,14 +99,14 @@ export function OrderDetail({
               </div>
             ))}
           </div>
-          <div className="border-border bg-canvas flex items-center justify-between rounded-b-card border-t px-4 py-3">
+          <div className="border-border bg-canvas flex items-center justify-between rounded-b-card border-t px-3 py-2">
             <span className="text-base font-bold text-ink">Subtotal</span>
             <PriceText amount={order.subtotal} weight="total" />
           </div>
         </Card>
 
         {canPrintPackingList && (
-          <div className="mt-4">
+          <div className="mt-3">
             <Button variant="secondary" size="large" fullWidth onClick={handlePrintDaftar}>
               Print Daftar
             </Button>
@@ -114,19 +114,19 @@ export function OrderDetail({
         )}
 
         {canAddItems && (
-          <div className="mt-4">
+          <div className="mt-3">
             <AddItemsPanel orderId={order.id} menu={menu} onAdded={() => router.refresh()} />
           </div>
         )}
 
         {order.status === "PAID" && (
-          <div className="mt-4 flex justify-center">
+          <div className="mt-3 flex justify-center">
             <Badge variant="success">Sudah dibayar ({order.paymentMethod})</Badge>
           </div>
         )}
       </div>
 
-      <div className="border-border bg-surface flex gap-2 border-t p-4">
+      <div className="border-border bg-surface flex gap-2 border-t p-3">
         {needsServing && (
           <Button
             variant={canPay ? "secondary" : "primary"}

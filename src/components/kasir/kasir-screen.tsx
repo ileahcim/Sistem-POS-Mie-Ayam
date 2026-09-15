@@ -179,7 +179,7 @@ export function KasirScreen({
           />
           <ComboShortcutRow shortcuts={comboShortcuts} categories={categories} onTap={handleTapCombo} />
           {savedNotice && (
-            <div className="bg-primary-soft text-primary-strong px-4 py-2 text-sm font-medium">{savedNotice}</div>
+            <div className="bg-primary-soft text-primary-strong px-3 py-1.5 text-sm font-medium">{savedNotice}</div>
           )}
           <ProductGrid
             products={activeCategory?.products ?? []}

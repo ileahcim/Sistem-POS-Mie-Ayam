@@ -40,7 +40,7 @@ export function CartPanel({
 
   return (
     <div className="border-border bg-surface flex h-full w-full flex-col border-l">
-      <div className="border-border border-b px-4 py-3">
+      <div className="border-border border-b px-3 py-2">
         <h2 className="text-base font-bold text-ink">Keranjang</h2>
       </div>
 
@@ -63,14 +63,14 @@ export function CartPanel({
         )}
       </div>
 
-      <div className="border-border border-t p-4">
+      <div className="border-border border-t p-3">
         {items.length > 0 && (
           <input
             type="text"
             value={customerName}
             onChange={(e) => onCustomerNameChange(e.target.value)}
             placeholder="Nama (opsional)"
-            className="rounded-input border-border mb-3 h-11 w-full border px-3 text-sm"
+            className="rounded-input border-border mb-2 h-11 w-full border px-3 text-sm"
           />
         )}
 
@@ -84,20 +84,20 @@ export function CartPanel({
             <PriceText amount={totals.deliveryFee} weight="secondary" />
           </div>
         )}
-        <div className="border-border mt-2 flex items-center justify-between border-t pt-2">
+        <div className="border-border mt-1.5 flex items-center justify-between border-t pt-1.5">
           <span className="text-base font-bold text-ink">Total</span>
           <PriceText amount={totals.total} weight="total" />
         </div>
 
-        {saveError && <p className="text-danger mt-2 text-sm">{saveError}</p>}
+        {saveError && <p className="text-danger mt-1.5 text-sm">{saveError}</p>}
         {!saveError && !channel && items.length > 0 && (
-          <p className="text-warning mt-2 text-sm">Pilih channel dulu di atas.</p>
+          <p className="text-warning mt-1.5 text-sm">Pilih channel dulu di atas.</p>
         )}
         {!saveError && channel === "DINE_IN" && !tableLabel && items.length > 0 && (
-          <p className="text-warning mt-2 text-sm">Pilih meja dulu di atas.</p>
+          <p className="text-warning mt-1.5 text-sm">Pilih meja dulu di atas.</p>
         )}
 
-        <Button variant="primary" size="large" fullWidth disabled={!canSave} onClick={onSave} className="mt-3">
+        <Button variant="primary" size="large" fullWidth disabled={!canSave} onClick={onSave} className="mt-2">
           {saving ? "Menyimpan..." : saveLabel}
         </Button>
       </div>

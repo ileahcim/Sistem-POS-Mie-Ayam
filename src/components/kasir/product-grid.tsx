@@ -11,7 +11,7 @@ export function ProductGrid({
   onTapProduct: (product: MenuProduct) => void;
 }) {
   return (
-    <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto p-3 sm:grid-cols-3">
+    <div className="grid flex-1 auto-rows-min grid-cols-2 gap-2 overflow-y-auto p-2 sm:grid-cols-3">
       {products.map((product) => (
         <ProductButton
           key={product.id}

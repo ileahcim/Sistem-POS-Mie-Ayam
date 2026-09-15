@@ -31,9 +31,9 @@ export function ComboShortcutRow({
   if (resolved.length === 0) return null;
 
   return (
-    <div className="border-border bg-surface border-b px-3 py-2">
-      <p className="text-ink-muted mb-1.5 text-xs font-semibold uppercase tracking-wide">Menu Populer</p>
-      <div className="flex gap-2 overflow-x-auto">
+    <div className="border-border bg-surface border-b px-3 py-1.5">
+      <p className="text-ink-muted mb-1 text-xs font-semibold uppercase tracking-wide">Menu Populer</p>
+      <div className="flex gap-1.5 overflow-x-auto">
         {resolved.map(({ shortcut, item }) => (
           <motion.button
             key={shortcut.comboKey}
@@ -41,7 +41,7 @@ export function ComboShortcutRow({
             onClick={() => onTap(item)}
             whileTap={{ scale: 0.97 }}
             transition={{ duration: 0.12 }}
-            className="rounded-card bg-primary-soft flex min-h-14 shrink-0 flex-col items-start justify-center gap-0.5 px-4 py-2 text-left"
+            className="rounded-card bg-primary-soft flex min-h-14 shrink-0 flex-col items-start justify-center gap-0.5 px-3 py-1.5 text-left"
           >
             <span className="text-primary-strong text-sm font-bold leading-tight">{shortcut.displayName}</span>
             <PriceText amount={cartItemUnitTotal(item)} weight="secondary" />

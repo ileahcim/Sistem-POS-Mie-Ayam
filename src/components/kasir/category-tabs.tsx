@@ -10,7 +10,7 @@ export function CategoryTabs({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto border-b border-border bg-surface px-3 py-2">
+    <div className="flex gap-1.5 overflow-x-auto border-b border-border bg-surface px-3 py-1.5">
       {categories.map((cat) => (
         <button
           key={cat.id}

@@ -48,7 +48,7 @@ export function OrderRow({
     .join(", ");
 
   return (
-    <ListRow onClick={onTap} className={cn(isBulk && "bg-info-soft")}>
+    <ListRow onClick={onTap} dense className={cn(isBulk && "bg-info-soft")}>
       <span className="w-12 shrink-0 text-lg font-bold text-ink">
         {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
       </span>

@@ -14,7 +14,7 @@ export function CartItemRow({
   const hasDetail = item.addons.length > 0 || !!item.notes;
 
   return (
-    <div className="flex flex-col gap-1 border-b border-border py-4 last:border-b-0">
+    <div className="flex flex-col gap-0.5 border-b border-border py-2 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <span className="text-base font-semibold text-ink">
           {item.qty}x {item.productName}
@@ -28,7 +28,7 @@ export function CartItemRow({
         </span>
       )}
 
-      <div className="mt-1 flex justify-end gap-4 text-sm font-medium">
+      <div className="mt-0.5 flex justify-end gap-4 text-sm font-medium">
         <button type="button" onClick={onEdit} className="text-primary-strong">
           Edit
         </button>

@@ -19,6 +19,8 @@ Yang menjaga warung adalah **karyawan berusia lanjut yang kurang terbiasa teknol
 
 Buka/tutup shift dikerjakan **pemilik**, bukan karyawan — jadi layar shift boleh sedikit lebih kompleks daripada layar kasir harian.
 
+**Kepadatan layar — Tahap 11.** Kasir dan Order Aktif (termasuk detail order & tambah item) dipakai sambil **berdiri melayani antrian** — dipadatkan supaya di tablet 10" landscape (1280×800) grid produk, keranjang, dan tombol aksi kelihatan sekaligus tanpa scroll untuk order ukuran normal (order yang sangat besar, >10 baris berbeda, tetap boleh scroll internal di panel keranjang — itu wajar, bukan yang disasar). Ukuran sentuh tombol **tidak pernah dikecilkan** (tetap ≥48px) — yang dipangkas cuma padding/gap/tinggi baris di sekitarnya. `ListRow` (`src/components/ui/list-row.tsx`) punya prop `dense` khusus untuk ini — dipakai HANYA di Order Aktif (`order-row.tsx`, unpaid-served list di `order-aktif-list.tsx`). Jangan pakai `dense` di layar lain (Piutang, Pesanan Terjadwal, Dashboard, laporan, Tutup Shift) — layar-layar itu dipakai duduk dan sengaja tetap lega.
+
 ## Menu & harga
 
 - Menu = produk base + add-on (bukan produk terpisah per kombinasi).

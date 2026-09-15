@@ -21,7 +21,7 @@ export function ChannelTableBar({
   onTableLabel: (t: TableLabel) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2">
+    <div className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface px-3 py-1.5">
       {CHANNELS.map((c) => (
         <button
           key={c.value}

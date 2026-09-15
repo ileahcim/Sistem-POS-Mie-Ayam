@@ -31,7 +31,7 @@ export function OrderAktifList({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
+      <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
         <h1 className="text-lg font-bold text-ink">Order Aktif</h1>
         <div className="flex flex-wrap gap-2">
           <LinkButton href="/pesanan-terjadwal" variant="secondary">Pesanan Terjadwal</LinkButton>
@@ -43,7 +43,7 @@ export function OrderAktifList({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-3">
         <Card>
           {orders.length === 0 ? (
             <p className="text-ink-faint py-12 text-center">Tidak ada order aktif.</p>
@@ -62,13 +62,13 @@ export function OrderAktifList({
         </Card>
 
         {unpaidServed.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-ink-muted mb-2 text-sm font-bold uppercase tracking-wide">
+          <div className="mt-3">
+            <h2 className="text-ink-muted mb-1.5 text-sm font-bold uppercase tracking-wide">
               Sudah Disajikan · Menunggu Bayar
             </h2>
             <Card>
               {unpaidServed.map((order) => (
-                <ListRow key={order.id} onClick={() => router.push(`/order-aktif/${order.id}`)}>
+                <ListRow key={order.id} onClick={() => router.push(`/order-aktif/${order.id}`)} dense>
                   <span className="w-12 shrink-0 text-lg font-bold text-ink">
                     {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
                   </span>

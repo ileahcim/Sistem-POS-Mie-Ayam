@@ -10,25 +10,33 @@ const MotionLink = motion.create(Link);
 // The shell for one row in a list of items/orders — consistent padding and
 // divider so every list in the app has the same rhythm, instead of each
 // screen picking its own py-2/py-3/py-4 ad hoc. Rows needing more breathing
-// room (an order line with an addon sub-line) pass `roomy`. Pass either
-// `onClick` (an in-page action) or `asLink` (real navigation, so the
-// browser's link semantics/prefetch still work) — not both.
+// room (an order line with an addon sub-line) pass `roomy`. Rows on a
+// screen used standing at the counter (Kasir, Order Aktif — see CLAUDE.md
+// "Kepadatan layar kasir") pass `dense` instead, to fit more rows without
+// scrolling — everywhere else (Piutang, Pesanan Terjadwal, and every
+// sit-down report screen) keeps the default so nothing there is affected.
+// Pass either `onClick` (an in-page action) or `asLink` (real navigation,
+// so the browser's link semantics/prefetch still work) — not both.
 export function ListRow({
   children,
   onClick,
   asLink,
   roomy = false,
+  dense = false,
   className,
 }: {
   children: ReactNode;
   onClick?: () => void;
   asLink?: string;
   roomy?: boolean;
+  dense?: boolean;
   className?: string;
 }) {
-  const padding = roomy ? "py-4" : "py-3";
+  const padding = roomy ? "py-4" : dense ? "py-2" : "py-3";
+  const gap = dense ? "gap-2" : "gap-3";
   const shared = cn(
-    "flex w-full items-center gap-3 border-b border-border px-4 text-left last:border-b-0",
+    "flex w-full items-center border-b border-border px-4 text-left last:border-b-0",
+    gap,
     padding,
     className,
   );
@@ -55,5 +63,5 @@ export function ListRow({
     );
   }
 
-  return <div className={cn("flex items-center gap-3 border-b border-border px-4 last:border-b-0", padding, className)}>{children}</div>;
+  return <div className={cn("flex items-center border-b border-border px-4 last:border-b-0", gap, padding, className)}>{children}</div>;
 }
