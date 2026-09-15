@@ -98,7 +98,14 @@ export function CartPanel({
         )}
 
         <Button variant="primary" size="large" fullWidth disabled={!canSave} onClick={onSave} className="mt-2">
-          {saving ? "Menyimpan..." : saveLabel}
+          {saving ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              Menyimpan...
+            </span>
+          ) : (
+            saveLabel
+          )}
         </Button>
       </div>
     </div>
