@@ -24,6 +24,14 @@ Yang **tidak** perlu lewat helper ini (aman secara desain, bukan kebetulan):
 
 Diaudit ulang Tahap 12: satu-satunya bug nyata yang ketemu adalah nama file export Excel (`toISOString().slice()`, sudah diperbaiki) — semua pengelompokan kalender lain (grafik omzet, window 30 hari menu populer/dashboard) sudah lolos audit atau sudah dipindah ke helper terpusat ini.
 
+## Rendering dinamis — JANGAN dihapus dari root layout
+
+`src/app/layout.tsx` punya `export const dynamic = "force-dynamic"`. **Ini bukan boilerplate, jangan pernah dihapus atau di-override `"auto"`/`"force-static"` di layout/page mana pun** — ditemukan waktu persiapan deploy Tahap 12 lewat `next build` + `next start` beneran (bukan cuma `next dev`), bukan dari membaca dokumentasi saja.
+
+**Masalahnya:** halaman yang HANYA memanggil Prisma (tanpa `cookies()`/`headers()` sendiri — misalnya `kasir/page.tsx` yang cuma manggil `getOpenShift()`/`getActiveMenu()`, autentikasinya sendiri ditangani `src/proxy.ts`, bukan di page-nya) tidak memberi sinyal apa pun ke static-analysis Next.js bahwa halaman itu perlu dirender ulang tiap request — Prisma bukan `fetch()`, jadi tidak kelihatan oleh heuristik caching Next.js. Akibatnya beberapa halaman (Kasir, Piutang, Pesanan Terjadwal, Buka Shift, Input Pengeluaran) otomatis ditandai statis oleh `next build` ("○ Static") dan di-render SEKALI lalu HTML-nya dibekukan selamanya — dibuktikan langsung: harga produk diubah paksa lewat DB saat `next start` jalan, reload keras di browser tetap menampilkan harga lama, sampai `dynamic = "force-dynamic"` ditambahkan di root layout (yang otomatis berlaku ke semua route di bawahnya) dan build ulang — baru setelah itu semua 21 halaman aplikasi tertandai "ƒ Dynamic" dan harga baru langsung muncul di request berikutnya.
+
+Tidak ada halaman yang benar-benar statis di aplikasi ini (semua butuh data live atau sesi live), jadi memaksa dinamis di root layout adalah default yang benar untuk SELURUH pohon route, bukan sesuatu yang perlu di-opt-in per halaman baru. Kalau suatu saat ada halaman yang benar-benar ingin di-cache (jarang, dan harus didiskusikan dulu), override `dynamic` di halaman ITU secara eksplisit — jangan mengubah default root layout.
+
 ## Konteks pengguna (penting untuk semua keputusan UI)
 
 Yang menjaga warung adalah **karyawan berusia lanjut yang kurang terbiasa teknologi**. Implikasinya untuk setiap layar kasir:
