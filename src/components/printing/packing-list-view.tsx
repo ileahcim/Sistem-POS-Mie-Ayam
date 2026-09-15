@@ -1,8 +1,16 @@
 import type { PackingListData } from "@/lib/printing/types";
+import { paperRule } from "@/lib/printing/paper";
 import { formatId } from "@/lib/timezone";
 
 function formatDateTime(date: Date): string {
   return formatId(date, { dateStyle: "medium", timeStyle: "short" });
+}
+
+// Same literal-character rule as ReceiptView (see that file's comment and
+// src/lib/printing/paper.ts) — kept consistent so the two printouts read as
+// the same "brand" of receipt even though this one has no prices.
+function Rule() {
+  return <div className="my-1.5 overflow-hidden text-[9px] leading-none whitespace-pre">{paperRule("=")}</div>;
 }
 
 // Packing checklist for Antar, printed before payment — no prices, no
@@ -21,7 +29,7 @@ export function PackingListView({ data }: { data: PackingListData }) {
         <div>Antar{data.tableLabel ? ` · ${data.tableLabel}` : ""}</div>
       </div>
 
-      <div className="my-2 border-t border-dashed border-black" />
+      <Rule />
 
       <div className="flex flex-col gap-2">
         {data.items.map((item, i) => (
@@ -45,7 +53,7 @@ export function PackingListView({ data }: { data: PackingListData }) {
         ))}
       </div>
 
-      <div className="my-2 border-t border-dashed border-black" />
+      <Rule />
       <div className="text-center text-[12px]">Bukan bukti bayar</div>
     </div>
   );
