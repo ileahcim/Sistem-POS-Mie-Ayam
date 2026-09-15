@@ -11,7 +11,7 @@ import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
 import { voidUnpaidOrder, markOrderReceivable, addExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
 
-type Step = "unpaid" | "expenses" | "count" | "result";
+type Step = "warning" | "unpaid" | "expenses" | "count" | "result";
 
 const CHANNEL_LABEL: Record<UnpaidOrderForClose["channel"], string> = {
   DINE_IN: "Dine In",
@@ -139,7 +139,7 @@ export function TutupShiftFlow({
   userRole: "OWNER" | "CASHIER";
 }) {
   const [unpaidOrders, setUnpaidOrders] = useState(initialUnpaidOrders);
-  const [step, setStep] = useState<Step>(initialUnpaidOrders.length > 0 ? "unpaid" : "expenses");
+  const [step, setStep] = useState<Step>(initialUnpaidOrders.length > 0 ? "warning" : "expenses");
 
   const [expenses, setExpenses] = useState(initialExpenses);
   const [expenseDesc, setExpenseDesc] = useState("");
@@ -182,6 +182,23 @@ export function TutupShiftFlow({
   return (
     <div className="bg-canvas flex h-dvh flex-col overflow-y-auto p-4">
       <h1 className="mb-4 text-xl font-bold text-ink">Tutup Shift</h1>
+
+      {step === "warning" && (
+        <div className="flex flex-col gap-3">
+          <Card padded className="bg-warning-soft flex flex-col gap-1.5">
+            <p className="text-warning text-base font-bold">
+              Ada {unpaidOrders.length} order belum dibayar
+            </p>
+            <p className="text-ink-muted text-sm">
+              Selesaikan dulu satu per satu — batalkan atau tandai piutang — sebelum lanjut ke
+              pengeluaran dan hitung kas.
+            </p>
+          </Card>
+          <Button variant="primary" size="large" fullWidth onClick={() => setStep("unpaid")}>
+            Lanjutkan
+          </Button>
+        </div>
+      )}
 
       {step === "unpaid" && (
         <div className="flex flex-col gap-3">

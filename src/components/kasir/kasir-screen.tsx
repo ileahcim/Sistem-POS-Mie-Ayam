@@ -9,6 +9,8 @@ import { useCartDraft } from "@/lib/cart/use-cart-draft";
 import { sameCartLine, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { HeaderMenuButton } from "@/components/ui/header-menu-button";
+import { ListRow } from "@/components/ui/list-row";
 import { ChannelTableBar } from "./channel-table-bar";
 import { CategoryTabs } from "./category-tabs";
 import { ProductGrid } from "./product-grid";
@@ -160,13 +162,17 @@ export function KasirScreen({
           >
             Order Aktif
           </Link>
-          <Link
-            href="/pesanan-terjadwal"
-            className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink"
-          >
-            Pesanan Terjadwal
-          </Link>
-          <SignOutButton />
+          <HeaderMenuButton>
+            <ListRow asLink="/pesanan-terjadwal">
+              <span className="text-base font-semibold text-ink">Pesanan Terjadwal</span>
+            </ListRow>
+            <ListRow asLink="/shift/tutup">
+              <span className="text-base font-semibold text-ink">Tutup Shift</span>
+            </ListRow>
+            <div className="pt-3">
+              <SignOutButton />
+            </div>
+          </HeaderMenuButton>
         </div>
       </div>
 

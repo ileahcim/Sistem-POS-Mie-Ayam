@@ -6,6 +6,7 @@ import { useNow } from "@/lib/use-now";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
+import { HeaderMenuButton } from "@/components/ui/header-menu-button";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { OrderRow } from "./order-row";
 
@@ -35,14 +36,27 @@ export function OrderAktifList({
     <div className="bg-canvas flex h-dvh flex-col">
       <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
         <h1 className="text-lg font-bold text-ink">Order Aktif</h1>
-        <div className="flex flex-wrap gap-2">
-          {isOwner && <LinkButton href="/dashboard" variant="secondary">Dashboard</LinkButton>}
-          <LinkButton href="/pesanan-terjadwal" variant="secondary">Pesanan Terjadwal</LinkButton>
-          <LinkButton href="/piutang" variant="secondary">Piutang</LinkButton>
-          <LinkButton href="/shift/pengeluaran" variant="secondary">Pengeluaran</LinkButton>
-          <LinkButton href="/shift/tutup" variant="secondary">Tutup Shift</LinkButton>
-          <LinkButton href="/kasir" variant="secondary">Ke Kasir</LinkButton>
-          <SignOutButton />
+        <div className="flex items-center gap-2">
+          <LinkButton href="/kasir" variant="primary">Ke Kasir</LinkButton>
+          <HeaderMenuButton>
+            {isOwner && (
+              <ListRow asLink="/dashboard">
+                <span className="text-base font-semibold text-ink">Dashboard</span>
+              </ListRow>
+            )}
+            <ListRow asLink="/pesanan-terjadwal">
+              <span className="text-base font-semibold text-ink">Pesanan Terjadwal</span>
+            </ListRow>
+            <ListRow asLink="/piutang">
+              <span className="text-base font-semibold text-ink">Piutang</span>
+            </ListRow>
+            <ListRow asLink="/shift/pengeluaran">
+              <span className="text-base font-semibold text-ink">Pengeluaran</span>
+            </ListRow>
+            <div className="pt-3">
+              <SignOutButton />
+            </div>
+          </HeaderMenuButton>
         </div>
       </div>
 
