@@ -1,0 +1,96 @@
+import { prisma } from "@/lib/prisma";
+import { DELIVERY_FEE_PER_FOOD_ITEM } from "@/lib/orders/pricing";
+
+// Local-time getters (not toISOString, which is always UTC) — the server
+// runs in Asia/Jakarta, and every other date display in this app already
+// reads correctly in local time via that same assumption (Intl.DateTimeFormat
+// with no explicit timeZone, Date's own local getters). toISOString-based
+// slicing would silently shift every timestamp back by the UTC offset (a
+// shift opened at 08:00 WIB would show as "01:00" in the export).
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function localTimeStr(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+export type ExportTransactionRow = {
+  orderNumber: number;
+  tanggal: string;
+  jam: string;
+  channel: string;
+  meja: string;
+  namaPelanggan: string;
+  metodeBayar: string;
+  subtotal: number;
+  ongkir: number;
+  total: number;
+};
+
+// Unbounded on purpose — this is a full export, not the dashboard's capped
+// "recent view" (see get-shift-history.ts / get-omzet-history.ts for those).
+export async function getAllPaidTransactions(): Promise<ExportTransactionRow[]> {
+  const orders = await prisma.order.findMany({
+    where: { status: "PAID" },
+    include: { items: true },
+    orderBy: { paidAt: "asc" },
+  });
+
+  return orders.map((order) => {
+    const subtotal = order.items.reduce((sum, i) => sum + i.lineTotal, 0);
+    const ongkir =
+      order.channel === "ANTAR"
+        ? order.items.reduce((sum, i) => sum + (i.isDeliveryChargeable ? i.qty : 0), 0) * DELIVERY_FEE_PER_FOOD_ITEM
+        : 0;
+    const paidAt = order.paidAt ?? order.createdAt;
+    return {
+      orderNumber: order.orderNumber,
+      tanggal: localDateStr(paidAt),
+      jam: localTimeStr(paidAt),
+      channel: order.channel,
+      meja: order.tableLabel ?? "",
+      namaPelanggan: order.customerName ?? "",
+      metodeBayar: order.paymentMethod ?? "",
+      subtotal,
+      ongkir,
+      total: subtotal + ongkir,
+    };
+  });
+}
+
+export type ExportShiftRow = {
+  tanggalBuka: string;
+  jamBuka: string;
+  jamTutup: string;
+  kasir: string;
+  openingCash: number;
+  cashSales: number;
+  nonCashSales: number;
+  expenseTotal: number;
+  expectedCash: number;
+  countedCash: number;
+  difference: number;
+};
+
+// All closed shifts — the frozen numbers, same rule as the dashboard.
+export async function getAllClosedShifts(): Promise<ExportShiftRow[]> {
+  const shifts = await prisma.shift.findMany({
+    where: { status: "CLOSED" },
+    orderBy: { openedAt: "asc" },
+    include: { openedBy: true },
+  });
+
+  return shifts.map((s) => ({
+    tanggalBuka: localDateStr(s.openedAt),
+    jamBuka: localTimeStr(s.openedAt),
+    jamTutup: localTimeStr(s.closedAt ?? s.openedAt),
+    kasir: s.openedBy.name,
+    openingCash: s.openingCash,
+    cashSales: s.cashSales ?? 0,
+    nonCashSales: s.nonCashSales ?? 0,
+    expenseTotal: s.expenseTotal ?? 0,
+    expectedCash: s.expectedCash ?? 0,
+    countedCash: s.countedCash ?? 0,
+    difference: s.difference ?? 0,
+  }));
+}

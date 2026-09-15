@@ -20,11 +20,13 @@ export function OrderAktifList({
   unpaidServed,
   prepBaseMinutes,
   prepMinutesPerPortion,
+  isOwner,
 }: {
   orders: ActiveOrder[];
   unpaidServed: UnpaidServedOrder[];
   prepBaseMinutes: number;
   prepMinutesPerPortion: number;
+  isOwner: boolean;
 }) {
   const router = useRouter();
   const now = useNow();
@@ -34,6 +36,7 @@ export function OrderAktifList({
       <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
         <h1 className="text-lg font-bold text-ink">Order Aktif</h1>
         <div className="flex flex-wrap gap-2">
+          {isOwner && <LinkButton href="/dashboard" variant="secondary">Dashboard</LinkButton>}
           <LinkButton href="/pesanan-terjadwal" variant="secondary">Pesanan Terjadwal</LinkButton>
           <LinkButton href="/piutang" variant="secondary">Piutang</LinkButton>
           <LinkButton href="/shift/pengeluaran" variant="secondary">Pengeluaran</LinkButton>

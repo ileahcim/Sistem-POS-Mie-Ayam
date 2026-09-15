@@ -99,6 +99,27 @@ Nama pemesan (`customerName`) **wajib** diisi khusus untuk pre-order (beda dari 
   - **Batalkan** — untuk order salah input (jadi `VOID`, perlu alasan + role OWNER sesuai aturan void di atas; dalam praktiknya OWNER yang tutup shift jadi ini natural).
   - **Tandai Piutang** — order benar-benar belum dibayar pelanggan. Wajib isi nama (`customerName`). Status jadi `RECEIVABLE`, **tidak** dihitung sebagai penjualan cash/non-cash, dan muncul di halaman daftar piutang terpisah supaya bisa dilunasi belakangan.
 
+## Dashboard — Tahap 11 Bagian B
+
+`/dashboard`, **OWNER only** — dicek server-side di `page.tsx` sendiri (`redirect("/kasir")` kalau bukan OWNER), bukan cuma disembunyikan dari menu. Route export Excel (`/dashboard/export`) adalah entry point terpisah dari halaman, jadi punya `requireRole("OWNER")` sendiri di baris pertama — redirect di halaman tidak melindungi URL itu. Link "Dashboard" di nav Order Aktif juga cuma muncul untuk user `role === "OWNER"` (UX, bukan pengaman). Layar ini dipakai **duduk**, sengaja TIDAK dipadatkan seperti Kasir/Order Aktif (lihat "Kepadatan layar" di atas).
+
+Urutan section (atas ke bawah = prioritas keseringan dibuka, sesuai diskusi pemilik):
+1. **Riwayat Shift & Selisih Kas** — paling atas. Tabel per shift + grafik tren `difference` (bukan alarm ambang "konsisten minus" buatan sendiri — pemilik lebih tahu polanya sendiri daripada angka ambang yang saya karang).
+2. **Omzet** — grafik dengan toggle Harian/Mingguan/Bulanan, di-bucket **client-side** dari histori shift mentah (`get-omzet-history.ts` + `bucket-omzet.ts`) supaya ganti rentang instan tanpa round-trip.
+3. **Menu & Topping Terlaris** — dua ranking independen (produk base vs opsi add-on), beda dari shortcut kombo Tahap 10 (yang me-ranking kombinasi produk+addon sebagai satu unit).
+4. **Margin** — dari snapshot `costPrice` di `OrderItem`/`OrderItemAddon`, bukan dari harga Product/AddonOption yang hidup sekarang. `costPrice` defaultnya kosong per produk sampai diisi manual owner — badge "HPP belum diisi" per produk + banner peringatan kalau ada satu saja produk di laporan yang HPP-nya kosong, supaya angka margin yang sebenarnya "belum ada datanya" tidak terbaca sebagai "untungnya emang tipis".
+5. **Per Channel** — Dine In/Bungkus/Antar.
+6. **Piutang Belum Lunas** — data & aksi sama persis dengan halaman `/piutang` yang sudah ada (baris di sini link ke `/pembayaran/[id]` juga) — satu sumber kebenaran, bukan logika duplikat.
+
+Aturan angka:
+- Section 1 & 2 (apa pun yang berbasis "penjualan shift") **selalu dibaca dari nilai beku di baris `Shift`** (`cashSales`, `nonCashSales`, dst — lihat "Shift & kas" di atas), **tidak pernah** dihitung ulang dari `Order`. Section 3-6 justru HARUS baca dari `OrderItem`/`Order` langsung (item terlaris, margin per produk, breakdown channel — Shift tidak menyimpan rincian itu), tapi tetap cuma `status: "PAID"` yang dihitung; `VOID`/`RECEIVABLE` tidak pernah masuk hitungan mana pun.
+- Section 3-5 pakai jendela rolling 30 hari yang sama (`DASHBOARD_WINDOW_DAYS`, `src/lib/dashboard/config.ts`) — tidak ada date-range picker terpisah per section, biar layarnya tetap sederhana. Section 2 rentangnya independen (toggle Harian/Mingguan/Bulanan-nya sendiri).
+- Total "omzet" di section Margin (murni `lineTotal` item, tanpa ongkir) dan total "omzet" di section Per Channel (termasuk ongkir Antar) **sengaja beda angka** — bukan bug, dua hal yang diukur memang berbeda (omzet produk vs total nilai transaksi).
+
+**Export Excel** (`buildReportWorkbook`, pakai `exceljs`) — satu file tiga sheet, **tidak dibatasi rentang tanggal** (dump semua data, beda dari section 3-5 yang 30 hari): `Transaksi` (satu baris per order `PAID`), `Rekap Harian` (rollup harian dari baris Shift beku yang sama seperti section 1/2, bukan dari Order), `Riwayat Shift` (satu baris per shift tertutup). Semua kolom uang adalah **numeric cell** (`style: { numFmt: "#,##0" }`), bukan string, supaya bisa langsung dijumlah di Excel. Tanggal/jam di export pakai getter lokal Date (`getFullYear`/`getHours`/dst), BUKAN `toISOString().slice(...)` — server jalan di Asia/Jakarta, dan `toISOString` selalu UTC, jadi slicing langsung dari situ akan geser jam tampil (jam buka 08:00 WIB pernah salah tercatat sebagai "01:00" sebelum ini diperbaiki).
+
+Grafik (`TrendLineChart`, `BarChart` di `src/components/dashboard/`) SVG buatan sendiri, tanpa library chart — `viewBox` lebar mengikuti jumlah titik data tapi tinggi tetap lewat CSS (`preserveAspectRatio="none"`), supaya tidak pernah gepeng di layar sempit (HP, lihat "Tes dua ukuran layar" — dashboard/laporan/piutang wajib kebaca di 390×844, beda dari Kasir/Order Aktif yang wajib padat di 1280×800 tablet).
+
 ## Auth
 
 - Login pakai **username + password**, tidak ada konsep email yang terlihat user. Di balik layar dipetakan ke email sintetis (`username@warung.local`) untuk Supabase Auth. Verifikasi email harus OFF di project Supabase (domain sintetis tidak bisa terima email).
