@@ -31,7 +31,7 @@ export function ShiftHistorySection({ shifts }: { shifts: ShiftHistoryRow[] }) {
         <p className="text-ink-muted mb-2 text-sm font-medium">
           Tren selisih ({shifts.length} shift terakhir)
         </p>
-        <TrendLineChart points={trendPoints} />
+        <TrendLineChart points={trendPoints} minPointsMessage="Butuh minimal 2 shift untuk melihat tren." />
       </Card>
 
       <Card className="overflow-x-auto">
