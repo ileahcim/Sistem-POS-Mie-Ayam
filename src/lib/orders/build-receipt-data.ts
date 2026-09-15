@@ -6,6 +6,12 @@ import type { ReceiptData } from "@/lib/printing/types";
 // right after a successful payOrder().
 export function buildReceiptData(order: OrderDetail, settings: StoreSettings): ReceiptData {
   if (!order.paymentMethod) throw new Error("Order belum dibayar, tidak bisa cetak struk.");
+  // payOrder() always attaches shiftId + queueNumber together at payment
+  // time (including for a pre-order, whose queueNumber is null until then —
+  // see CLAUDE.md "Pre-order"), so by the time paymentMethod is set this is
+  // never null. The check just turns a broken invariant into a clear error
+  // instead of printing "Antrian #null".
+  if (order.queueNumber == null) throw new Error("Order belum punya nomor antrian, tidak bisa cetak struk.");
 
   return {
     storeName: settings.storeName,

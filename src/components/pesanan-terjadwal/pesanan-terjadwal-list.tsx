@@ -1,0 +1,63 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import type { PreOrderSummary } from "@/lib/orders/get-preorders";
+import { Card } from "@/components/ui/card";
+import { ListRow } from "@/components/ui/list-row";
+import { Badge } from "@/components/ui/badge";
+import { LinkButton } from "@/components/ui/link-button";
+import { SignOutButton } from "@/components/auth/sign-out-button";
+
+const CHANNEL_LABEL: Record<PreOrderSummary["channel"], string> = {
+  DINE_IN: "Dine In",
+  BUNGKUS: "Bungkus",
+  ANTAR: "Antar",
+};
+
+function formatScheduledFor(iso: string): string {
+  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+}
+
+// Pre-orders not yet due — see CLAUDE.md "Pre-order". Reachable without an
+// open shift on purpose (bulk WhatsApp orders come in at night, warung
+// closed) — this page and "+ Buat Pre-order" never check shift state.
+export function PesananTerjadwalList({ orders }: { orders: PreOrderSummary[] }) {
+  const router = useRouter();
+
+  return (
+    <div className="bg-canvas flex h-dvh flex-col">
+      <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+        <h1 className="text-lg font-bold text-ink">Pesanan Terjadwal</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <LinkButton href="/order-aktif" variant="secondary">Order Aktif</LinkButton>
+          <LinkButton href="/pesanan-terjadwal/baru" variant="primary">+ Buat Pre-order</LinkButton>
+          <SignOutButton />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        <Card>
+          {orders.length === 0 ? (
+            <p className="text-ink-faint py-12 text-center">Belum ada pesanan terjadwal.</p>
+          ) : (
+            orders.map((order) => (
+              <ListRow key={order.id} onClick={() => router.push(`/order-aktif/${order.id}`)} roomy>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-ink text-sm font-bold">{formatScheduledFor(order.scheduledFor)}</span>
+                    {order.status === "PAID" && <Badge variant="success">Lunas</Badge>}
+                  </div>
+                  <div className="text-ink-muted text-sm">
+                    {order.customerName ?? "(tanpa nama)"} ·{" "}
+                    {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
+                  </div>
+                  <div className="text-ink-muted truncate text-sm">{order.itemSummary}</div>
+                </div>
+              </ListRow>
+            ))
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}

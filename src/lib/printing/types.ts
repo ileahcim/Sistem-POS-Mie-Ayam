@@ -49,7 +49,7 @@ export type PackingListItem = {
 export type PackingListData = {
   storeName: string;
   orderNumber: number;
-  queueNumber: number;
+  queueNumber: number | null; // null: a pre-order not yet paid/attached to a shift
   printedAt: Date;
   tableLabel?: string | null;
   items: PackingListItem[];

@@ -19,6 +19,7 @@ export function CartPanel({
   onEdit,
   onRemove,
   onSave,
+  saveLabel = "Simpan Pesanan",
 }: {
   items: CartItem[];
   channel: ChannelType | null;
@@ -31,6 +32,7 @@ export function CartPanel({
   onEdit: (item: CartItem) => void;
   onRemove: (localId: string) => void;
   onSave: () => void;
+  saveLabel?: string;
 }) {
   const totals = computeOrderTotals(items, channel);
   const canSave =
@@ -96,7 +98,7 @@ export function CartPanel({
         )}
 
         <Button variant="primary" size="large" fullWidth disabled={!canSave} onClick={onSave} className="mt-3">
-          {saving ? "Menyimpan..." : "Simpan Pesanan"}
+          {saving ? "Menyimpan..." : saveLabel}
         </Button>
       </div>
     </div>

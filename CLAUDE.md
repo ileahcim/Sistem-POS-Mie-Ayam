@@ -74,9 +74,22 @@ Kasus rombongan yang duduk di satu meja tapi mau bayar terpisah:
 - `prepBaseMinutes` (default 4) dan `prepMinutesPerPortion` (default 1) disimpan di tabel `Setting`, harus bisa diubah dari halaman admin (belum dibangun — Tahap 11).
 - Badge "Borongan" (order dengan total qty > 10) tetap tampil sebagai penanda visual, tapi warnanya sekarang ikut rumus di atas juga (tidak lagi otomatis netral/dikecualikan) — order borongan besar otomatis dapat toleransi waktu lebih lama karena porsinya lebih banyak.
 
+## Pre-order
+
+Order bisa dikasih tanggal+jam kirim (`Order.scheduledFor`). Sebelum hari H, order ini hidup di tab terpisah "Pesanan Terjadwal" (`/pesanan-terjadwal`), bukan Order Aktif — begitu `scheduledFor` terlewati, otomatis pindah ke Order Aktif seperti order biasa, tanpa langkah "aktivasi" apa pun (dua query di server cuma cermin satu sama lain dari cutoff waktu yang sama).
+
+Dua aturan keras hasil diskusi dengan pemilik warung:
+
+1. **Pre-order boleh dibuat TANPA shift terbuka.** Pesanan borongan biasanya masuk lewat WhatsApp malam hari saat warung sudah tutup — jadi pengecekan "harus ada shift terbuka" yang berlaku untuk order biasa (`saveOrder`) **tidak berlaku** untuk pembuatan pre-order (`savePreOrder`). Konsekuensi teknis: satu-satunya layar yang pasti bisa dibuka tanpa shift adalah `/shift/buka` (rantai redirect `/` → `/kasir` → `/shift/buka` memaksa lewat situ kalau belum ada shift), jadi link ke "Pesanan Terjadwal" wajib ada di layar itu juga, bukan cuma di Kasir/Order Aktif — kalau tidak, pre-order jadi tidak bisa dijangkau sama sekali malam hari.
+2. **Pre-order TIDAK ter-attach ke shift yang kebetulan aktif saat dibuat.** `shiftId` dan `queueNumber` (keduanya nullable di skema, khusus untuk kasus ini) tetap `null` sampai pesanan itu **dibayar** — `payOrder` yang mengisi keduanya sekaligus, atomik, ke shift yang terbuka **saat pembayaran terjadi** (pola atomic-increment yang sama seperti `saveOrder`). Dengan begitu penjualannya selalu masuk ke shift hari pengiriman/pembayaran, bukan shift hari pemesanan (yang mungkin malah tidak ada shift sama sekali). Kalau pre-order jatuh tempo tapi belum dibayar dan tidak ada shift terbuka, `payOrder` menolak dengan pesan "Buka shift dulu sebelum membayar pre-order ini." — tidak mengubah data apa pun.
+
+Konsekuensi dari aturan 2: pre-order yang belum dibayar **tidak boleh memblokir penutupan shift hari ini** — yang memblokir cuma order hari berjalan yang `shiftId`-nya sama dengan shift yang mau ditutup. Ini otomatis benar tanpa filter tambahan: `getUnpaidOrdersForShift(shiftId)` (dipakai `closeShift`) sudah query `where: { shiftId, status: "OPEN" }` sejak awal — pre-order yang `shiftId`-nya masih `null` otomatis tidak pernah masuk hitungan sampai dia benar-benar dibayar.
+
+Nama pemesan (`customerName`) **wajib** diisi khusus untuk pre-order (beda dari order biasa yang opsional) — sebelum dibayar, pre-order belum punya nomor antrian sama sekali, jadi nama adalah satu-satunya cara staf mengenali pesanan itu di layar.
+
 ## Shift & kas
 
-- Transaksi diblokir kalau belum ada shift terbuka.
+- Transaksi diblokir kalau belum ada shift terbuka — kecuali pembuatan pre-order, lihat "Pre-order" di atas.
 - `expectedCash` **tidak boleh** tampil ke kasir sebelum kasir input hitungan fisik uang (`countedCash`) — ini sengaja, supaya angka selisih (`difference`) tetap punya arti.
 - Semua angka shift (`cashSales`, `nonCashSales`, `expenseTotal`, `expectedCash`, `countedCash`, `difference`) **dibekukan** saat tutup shift, tidak pernah dihitung ulang dari data live setelahnya (void minggu depan tidak boleh mengubah laporan shift yang sudah tutup).
 - **Pengeluaran dicatat SEBELUM hitung uang fisik**, sebagai langkah eksplisit dalam alur tutup shift — bukan diandalkan dari input real-time selama shift jalan. Alasan: di lapangan pengeluaran biasanya dicatat di kertas dulu, baru diinput belakangan; kalau tidak dimasukkan sebelum hitung fisik, `expectedCash` salah dan selisih kas jadi alarm palsu tiap hari. Menu input pengeluaran harian (real-time) tetap ada sebagai opsi, tapi alur tutup shift punya langkah eksplisit "input pengeluaran dulu" sebelum "hitung uang fisik".
@@ -92,7 +105,6 @@ Kasus rombongan yang duduk di satu meja tapi mau bayar terpisah:
 ## Lain-lain
 
 - Produk & add-on option pakai soft delete (`isActive`), tidak pernah hard delete — laporan lama tetap mereferensikan.
-- Pre-order: order bisa dikasih tanggal+jam kirim, tidak muncul di Order Aktif sampai hari H, ada tab terpisah "Pesanan Terjadwal". Belum dibangun — Tahap 9.
 - Menu populer (shortcut kombinasi): agregasi rolling 30 hari, ambang minimal 10x terjual dalam periode, cache di-refresh sekali sehari saat tutup shift (bukan real-time). Seed manual 6 kombinasi dipakai sebelum data asli terkumpul. Belum dibangun — Tahap 10.
 - Animasi dibatasi ketat: cuma bottom sheet add-on (slide dari bawah) dan feedback singkat saat item masuk keranjang. Ganti kategori, tap produk, dan navigasi antar halaman harus **instan tanpa transisi** — target device tablet Android entry-level, responsivitas di atas kehalusan.
 

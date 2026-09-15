@@ -23,7 +23,9 @@ export function PiutangList({ orders }: { orders: ReceivableOrder[] }) {
           ) : (
             orders.map((order) => (
               <ListRow key={order.id} roomy asLink={`/pembayaran/${order.id}`}>
-                <span className="w-12 shrink-0 text-lg font-bold text-ink">#{order.queueNumber}</span>
+                <span className="w-12 shrink-0 text-lg font-bold text-ink">
+                  {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
+                </span>
                 <span className="text-ink-muted flex-1 text-sm">
                   {order.customerName} · {formatDate(order.createdAt)}
                 </span>

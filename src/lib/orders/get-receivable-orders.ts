@@ -3,7 +3,7 @@ import { DELIVERY_FEE_PER_FOOD_ITEM } from "./pricing";
 
 export type ReceivableOrder = {
   id: string;
-  queueNumber: number;
+  queueNumber: number | null;
   customerName: string | null;
   createdAt: string;
   total: number;

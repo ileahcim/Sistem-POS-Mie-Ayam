@@ -34,6 +34,7 @@ export function OrderAktifList({
       <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
         <h1 className="text-lg font-bold text-ink">Order Aktif</h1>
         <div className="flex flex-wrap gap-2">
+          <LinkButton href="/pesanan-terjadwal" variant="secondary">Pesanan Terjadwal</LinkButton>
           <LinkButton href="/piutang" variant="secondary">Piutang</LinkButton>
           <LinkButton href="/shift/pengeluaran" variant="secondary">Pengeluaran</LinkButton>
           <LinkButton href="/shift/tutup" variant="secondary">Tutup Shift</LinkButton>
@@ -68,7 +69,9 @@ export function OrderAktifList({
             <Card>
               {unpaidServed.map((order) => (
                 <ListRow key={order.id} onClick={() => router.push(`/order-aktif/${order.id}`)}>
-                  <span className="w-12 shrink-0 text-lg font-bold text-ink">#{order.queueNumber}</span>
+                  <span className="w-12 shrink-0 text-lg font-bold text-ink">
+                    {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
+                  </span>
                   <span className="text-ink flex-1 text-sm font-semibold">
                     {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
                   </span>

@@ -54,7 +54,9 @@ export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: Me
     <div className="bg-canvas flex h-dvh flex-col">
       <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
         <div>
-          <h1 className="text-lg font-bold text-ink">Pembayaran #{order.queueNumber}</h1>
+          <h1 className="text-lg font-bold text-ink">
+            Pembayaran {order.queueNumber != null ? `#${order.queueNumber}` : "(Pre-order)"}
+          </h1>
           <p className="text-ink-muted text-sm">No. Order {order.orderNumber}</p>
         </div>
         <Link

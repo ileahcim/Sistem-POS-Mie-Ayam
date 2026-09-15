@@ -39,16 +39,46 @@ export async function payOrder(
 
   const changeGiven = cashTendered != null ? cashTendered - order.total : null;
 
-  await prisma.order.update({
-    where: { id: order.id },
-    data: {
-      status: "PAID",
-      paymentMethod: method,
-      paidAt: new Date(),
-      cashTendered,
-      changeGiven,
-    },
-  });
+  if (order.shiftId == null) {
+    // Pre-order being paid for the first time — see CLAUDE.md "Pre-order".
+    // shiftId/queueNumber are attached now, atomically, to whichever shift
+    // is open at this exact moment (the delivery day's shift, not the day
+    // it was phoned in), same increment pattern saveOrder() uses.
+    const openShift = await prisma.shift.findFirst({ where: { status: "OPEN" } });
+    if (!openShift) {
+      return { ok: false, error: "Belum ada shift terbuka. Buka shift dulu sebelum membayar pre-order ini." };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const shift = await tx.shift.update({
+        where: { id: openShift.id },
+        data: { lastQueueNumber: { increment: 1 } },
+      });
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          shiftId: shift.id,
+          queueNumber: shift.lastQueueNumber,
+          status: "PAID",
+          paymentMethod: method,
+          paidAt: new Date(),
+          cashTendered,
+          changeGiven,
+        },
+      });
+    });
+  } else {
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: "PAID",
+        paymentMethod: method,
+        paidAt: new Date(),
+        cashTendered,
+        changeGiven,
+      },
+    });
+  }
 
   const [paidOrder, settings] = await Promise.all([getOrderDetail(order.id), getSettings()]);
   const receipt = buildReceiptData(paidOrder!, settings);

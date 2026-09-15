@@ -225,9 +225,15 @@ enum PaymentMethod {
 }
 
 model Order {
-  id      String      @id @default(cuid())
-  shiftId String
-  shift   Shift       @relation(fields: [shiftId], references: [id])
+  id      String  @id @default(cuid())
+
+  // Nullable specifically for pre-orders: a pre-order is created with no
+  // shift at all (taken over WhatsApp while the warung is closed, no open
+  // shift to attach to) and stays that way until it's actually paid — see
+  // CLAUDE.md "Pre-order". Every regular walk-in order still gets shiftId
+  // set immediately at creation, same as before.
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id])
 
   // Persistent, never resets — the receipt's own reference number.
   // Distinct from queueNumber below (Postgres autoincrement already gives
@@ -237,8 +243,9 @@ model Order {
   // Server-generated, resets per shift. Identity for the Order Aktif screen.
   // Not shown to the customer when the order is first created (no ticket at
   // that point) — only printed later on the payment receipt, alongside
-  // orderNumber.
-  queueNumber Int
+  // orderNumber. Null until a shift is attached — for a pre-order that's not
+  // until payment, same moment as shiftId (see CLAUDE.md "Pre-order").
+  queueNumber Int?
 
   channel    ChannelType
   tableLabel String? // one of K1, K2, L1, L2, L3 — validated in app code, not DB-level

@@ -7,7 +7,7 @@ export type ActiveOrderItem = {
 
 export type ActiveOrder = {
   id: string;
-  queueNumber: number;
+  queueNumber: number | null; // null: a due pre-order not yet paid — see CLAUDE.md "Pre-order"
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   createdAt: string; // ISO — serializable across the server/client boundary
@@ -47,7 +47,7 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
 
 export type UnpaidServedOrder = {
   id: string;
-  queueNumber: number;
+  queueNumber: number | null;
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   servedAt: string;

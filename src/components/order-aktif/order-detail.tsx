@@ -21,6 +21,10 @@ const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
   ANTAR: "Antar",
 };
 
+function formatScheduledFor(iso: string): string {
+  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+}
+
 export function OrderDetail({
   order,
   menu,
@@ -58,9 +62,14 @@ export function OrderDetail({
       <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
         <div>
           <h1 className="text-lg font-bold text-ink">
-            #{order.queueNumber} · {CHANNEL_LABEL[order.channel]}
+            {order.queueNumber != null ? `#${order.queueNumber}` : "Pre-order"} · {CHANNEL_LABEL[order.channel]}
             {order.tableLabel ? ` · ${order.tableLabel}` : ""}
           </h1>
+          {order.scheduledFor && (
+            <p className="text-primary-strong text-sm font-medium">
+              Kirim {formatScheduledFor(order.scheduledFor)}
+            </p>
+          )}
           <p className="text-ink-muted text-sm">
             No. Order {order.orderNumber}
             {order.customerName ? ` · ${order.customerName}` : ""}

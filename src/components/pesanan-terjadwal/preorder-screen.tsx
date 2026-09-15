@@ -8,25 +8,35 @@ import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
 import type { CartItem } from "@/lib/cart/types";
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import { ChannelTableBar } from "./channel-table-bar";
-import { CategoryTabs } from "./category-tabs";
-import { ProductGrid } from "./product-grid";
-import { AddonSheet, type AddonSheetResult } from "./addon-sheet";
-import { CartPanel } from "./cart-panel";
-import { saveOrder } from "@/app/kasir/actions";
+import { ChannelTableBar } from "@/components/kasir/channel-table-bar";
+import { CategoryTabs } from "@/components/kasir/category-tabs";
+import { ProductGrid } from "@/components/kasir/product-grid";
+import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-sheet";
+import { CartPanel } from "@/components/kasir/cart-panel";
+import { savePreOrder } from "@/app/pesanan-terjadwal/actions";
+
+const PREORDER_STORAGE_KEY = "pos-mi-ayam:preorder-draft";
 
 type SheetTarget = { mode: "add"; product: MenuProduct } | { mode: "edit"; product: MenuProduct; item: CartItem };
 
-export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
+// Same cart-building shape as KasirScreen (product grid, addon sheet, cart
+// panel) but for a pre-order: no shift required to create (see CLAUDE.md
+// "Pre-order" — these are taken over WhatsApp while the warung is closed),
+// plus a required delivery date/time and a required customer name, since
+// there's no queue number to identify it by until it's paid. Uses a
+// separate localStorage draft key so an in-progress walk-in cart on the
+// same device is never clobbered by an in-progress pre-order, or vice versa.
+export function PreOrderScreen({ categories }: { categories: MenuCategory[] }) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
-    useCartDraft();
+    useCartDraft(PREORDER_STORAGE_KEY);
   const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? "");
   const [sheetTarget, setSheetTarget] = useState<SheetTarget | null>(null);
   const [lastAddedLocalId, setLastAddedLocalId] = useState<string | null>(null);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? categories[0];
 
@@ -37,14 +47,12 @@ export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
   }, [draft.items]);
 
   function handleTapProduct(product: MenuProduct) {
-    setSavedNotice(null);
+    setSaveError(null);
     if (product.addonGroups.length > 0) {
       setSheetTarget({ mode: "add", product });
       return;
     }
 
-    // Simple item, no customization possible — repeated taps bump qty on
-    // the same line instead of piling up identical rows.
     const existing = draft.items.find(
       (i) => i.productId === product.id && i.addons.length === 0 && !i.notes,
     );
@@ -96,13 +104,28 @@ export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
 
   async function handleSave() {
     if (!draft.channel) return;
+    if (!draft.customerName.trim()) {
+      setSaveError("Isi nama pemesan dulu — belum ada nomor antrian untuk pre-order.");
+      return;
+    }
+    if (!scheduledDate || !scheduledTime) {
+      setSaveError("Isi tanggal & jam kirim dulu.");
+      return;
+    }
+    const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`);
+    if (Number.isNaN(scheduledFor.getTime()) || scheduledFor.getTime() <= Date.now()) {
+      setSaveError("Tanggal & jam kirim harus di masa depan.");
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
     try {
-      const result = await saveOrder({
+      const result = await savePreOrder({
         channel: draft.channel,
         tableLabel: draft.tableLabel,
-        customerName: draft.customerName.trim() || null,
+        customerName: draft.customerName.trim(),
+        scheduledFor: scheduledFor.toISOString(),
         items: draft.items.map((i) => ({
           productId: i.productId,
           addonOptionIds: i.addons.map((a) => a.addonOptionId),
@@ -115,7 +138,7 @@ export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
         return;
       }
       clear();
-      setSavedNotice(`Order #${result.queueNumber} tersimpan.`);
+      router.push("/pesanan-terjadwal");
       router.refresh();
     } finally {
       setSaving(false);
@@ -124,31 +147,43 @@ export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
 
   return (
     <div className="flex h-dvh flex-col">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <ChannelTableBar
-            channel={draft.channel}
-            tableLabel={draft.tableLabel}
-            onChannel={setChannel}
-            onTableLabel={setTableLabel}
+      <div className="border-border bg-surface border-b px-3 py-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-bold text-ink">Pre-order Baru</h1>
+          <div className="flex items-center gap-2">
+            <Link href="/pesanan-terjadwal" className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink">
+              Batal
+            </Link>
+            <SignOutButton />
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <label className="text-ink-muted text-sm font-medium" htmlFor="scheduledDate">
+            Kirim
+          </label>
+          <input
+            id="scheduledDate"
+            type="date"
+            value={scheduledDate}
+            onChange={(e) => setScheduledDate(e.target.value)}
+            className="rounded-input border-border h-12 border px-3 text-base"
+          />
+          <input
+            id="scheduledTime"
+            type="time"
+            value={scheduledTime}
+            onChange={(e) => setScheduledTime(e.target.value)}
+            className="rounded-input border-border h-12 border px-3 text-base"
           />
         </div>
-        <div className="border-border bg-surface flex items-center gap-2 border-b px-3">
-          <Link
-            href="/order-aktif"
-            className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink"
-          >
-            Order Aktif
-          </Link>
-          <Link
-            href="/pesanan-terjadwal"
-            className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink"
-          >
-            Pesanan Terjadwal
-          </Link>
-          <SignOutButton />
-        </div>
       </div>
+
+      <ChannelTableBar
+        channel={draft.channel}
+        tableLabel={draft.tableLabel}
+        onChannel={setChannel}
+        onTableLabel={setTableLabel}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         <div className="bg-canvas flex flex-1 flex-col overflow-hidden">
@@ -157,9 +192,6 @@ export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
             activeId={activeCategory?.id ?? ""}
             onSelect={setActiveCategoryId}
           />
-          {savedNotice && (
-            <div className="bg-primary-soft text-primary-strong px-4 py-2 text-sm font-medium">{savedNotice}</div>
-          )}
           <ProductGrid
             products={activeCategory?.products ?? []}
             cartQtyByProduct={cartQtyByProduct}
@@ -180,6 +212,7 @@ export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
             onEdit={handleEditItem}
             onRemove={removeItem}
             onSave={handleSave}
+            saveLabel="Simpan Pre-order"
           />
         </div>
       </div>

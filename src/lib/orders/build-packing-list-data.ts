@@ -8,7 +8,7 @@ export function buildPackingListData(order: OrderDetail, settings: StoreSettings
   return {
     storeName: settings.storeName,
     orderNumber: order.orderNumber,
-    queueNumber: order.queueNumber,
+    queueNumber: order.queueNumber, // null for a due-but-unpaid pre-order — see CLAUDE.md "Pre-order"
     printedAt: new Date(),
     tableLabel: order.tableLabel,
     items: order.items.map((item) => ({

@@ -14,7 +14,8 @@ export type OrderDetailItem = {
 
 export type OrderDetail = {
   id: string;
-  queueNumber: number;
+  shiftId: string | null; // null until a shift is attached — see "Pre-order" in CLAUDE.md
+  queueNumber: number | null; // null until shiftId is attached (same moment)
   orderNumber: number;
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
@@ -22,6 +23,7 @@ export type OrderDetail = {
   status: "OPEN" | "PAID" | "VOID" | "RECEIVABLE";
   servedAt: string | null;
   createdAt: string;
+  scheduledFor: string | null; // pre-order delivery date/time, null for a regular order
   paymentMethod: "CASH" | "QRIS" | "TRANSFER" | null;
   paidAt: string | null;
   cashTendered: number | null;
@@ -58,6 +60,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
 
   return {
     id: order.id,
+    shiftId: order.shiftId,
     queueNumber: order.queueNumber,
     orderNumber: order.orderNumber,
     channel: order.channel,
@@ -66,6 +69,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     status: order.status,
     servedAt: order.servedAt?.toISOString() ?? null,
     createdAt: order.createdAt.toISOString(),
+    scheduledFor: order.scheduledFor?.toISOString() ?? null,
     paymentMethod: order.paymentMethod,
     paidAt: order.paidAt?.toISOString() ?? null,
     cashTendered: order.cashTendered,

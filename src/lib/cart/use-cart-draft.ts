@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CartDraft, CartItem, ChannelType, TableLabel } from "./types";
 import { createLocalId, emptyCartDraft } from "./types";
 
-const STORAGE_KEY = "pos-mi-ayam:cart-draft";
+const DEFAULT_STORAGE_KEY = "pos-mi-ayam:cart-draft";
 
 // A tablet can lose power or restart mid-order — the draft cart must survive
 // that, not just live in a React state variable. localStorage is plenty for
 // a single in-progress cart (a handful of line items); no IndexedDB needed.
-function loadDraft(): CartDraft {
+function loadDraft(storageKey: string): CartDraft {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return emptyCartDraft();
     const parsed = JSON.parse(raw) as CartDraft;
     if (!Array.isArray(parsed.items)) return emptyCartDraft();
@@ -21,16 +21,19 @@ function loadDraft(): CartDraft {
   }
 }
 
-function saveDraft(draft: CartDraft) {
+function saveDraft(storageKey: string, draft: CartDraft) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    localStorage.setItem(storageKey, JSON.stringify(draft));
   } catch {
     // Private browsing / storage disabled — draft just won't survive a
     // restart in that case, but the session keeps working.
   }
 }
 
-export function useCartDraft() {
+// Separate storage key per call site (e.g. the pre-order builder) so an
+// in-progress walk-in cart and an in-progress pre-order cart on the same
+// device never clobber each other — see PreOrderScreen.
+export function useCartDraft(storageKey: string = DEFAULT_STORAGE_KEY) {
   const [draft, setDraft] = useState<CartDraft>(emptyCartDraft());
   const hydrated = useRef(false);
 
@@ -41,13 +44,16 @@ export function useCartDraft() {
     // what keeps hydration from mismatching, so this doesn't fit the
     // "don't setState in an effect" heuristic the rule is built for.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDraft(loadDraft());
+    setDraft(loadDraft(storageKey));
     hydrated.current = true;
+    // storageKey is a static choice per call site, not reactive state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!hydrated.current) return; // don't overwrite storage with the initial empty state
-    saveDraft(draft);
+    saveDraft(storageKey, draft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft]);
 
   const setChannel = useCallback((channel: ChannelType) => {

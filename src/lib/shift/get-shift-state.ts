@@ -24,7 +24,7 @@ export async function getOpenShift(): Promise<OpenShift | null> {
 
 export type UnpaidOrderForClose = {
   id: string;
-  queueNumber: number;
+  queueNumber: number | null;
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   customerName: string | null;

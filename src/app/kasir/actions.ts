@@ -44,13 +44,13 @@ export async function saveOrder(input: SaveOrderInput): Promise<SaveOrderResult>
     return { ok: false, error: e instanceof Error ? e.message : "Gagal memproses item." };
   }
 
-  const order = await prisma.$transaction(async (tx) => {
+  const { order, queueNumber } = await prisma.$transaction(async (tx) => {
     const shift = await tx.shift.update({
       where: { id: openShift.id },
       data: { lastQueueNumber: { increment: 1 } },
     });
 
-    return tx.order.create({
+    const order = await tx.order.create({
       data: {
         shiftId: shift.id,
         queueNumber: shift.lastQueueNumber,
@@ -61,7 +61,8 @@ export async function saveOrder(input: SaveOrderInput): Promise<SaveOrderResult>
         items: { create: itemsData },
       },
     });
+    return { order, queueNumber: shift.lastQueueNumber };
   });
 
-  return { ok: true, orderId: order.id, queueNumber: order.queueNumber };
+  return { ok: true, orderId: order.id, queueNumber };
 }

@@ -18,7 +18,7 @@ export function PackingListView({ data }: { data: PackingListData }) {
         <div className="text-base font-bold">{data.storeName}</div>
         <div className="font-bold">DAFTAR PACKING</div>
         <div>No. Order {data.orderNumber}</div>
-        <div>Antrian #{data.queueNumber}</div>
+        <div>{data.queueNumber != null ? `Antrian #${data.queueNumber}` : "Pre-order · belum dibayar"}</div>
         <div>{formatDateTime(data.printedAt)}</div>
         <div>Antar{data.tableLabel ? ` · ${data.tableLabel}` : ""}</div>
       </div>

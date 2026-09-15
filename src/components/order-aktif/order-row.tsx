@@ -49,9 +49,12 @@ export function OrderRow({
 
   return (
     <ListRow onClick={onTap} className={cn(isBulk && "bg-info-soft")}>
-      <span className="w-12 shrink-0 text-lg font-bold text-ink">#{order.queueNumber}</span>
+      <span className="w-12 shrink-0 text-lg font-bold text-ink">
+        {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
+      </span>
       <span className="text-ink w-20 shrink-0 text-sm font-semibold">{secondColumn}</span>
       <span className="text-ink-muted flex-1 truncate text-sm">{itemSummary}</span>
+      {order.queueNumber == null && <Badge variant="info">Pre-order</Badge>}
       {isBulk && <Badge variant="info">Borongan</Badge>}
       {order.status === "PAID" && <Badge variant="success">Lunas</Badge>}
       <span className={cn("w-16 shrink-0 text-right text-sm", timerClass)}>{minutes} mnt</span>

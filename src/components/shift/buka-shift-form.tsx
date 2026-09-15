@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { openShift } from "@/app/shift/actions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export function BukaShiftForm() {
   const router = useRouter();
@@ -31,7 +33,7 @@ export function BukaShiftForm() {
   }
 
   return (
-    <div className="bg-canvas flex flex-1 items-center justify-center p-6">
+    <div className="bg-canvas flex flex-1 flex-col items-center justify-center gap-4 p-6">
       <Card padded className="w-full max-w-sm">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <h1 className="text-center text-xl font-bold text-ink">Buka Shift</h1>
@@ -47,6 +49,16 @@ export function BukaShiftForm() {
           </Button>
         </form>
       </Card>
+
+      {/* Pre-order tidak butuh shift terbuka (order borongan lewat WhatsApp
+          malam hari saat warung tutup) — jadi harus tetap bisa dijangkau
+          dari sini, satu-satunya layar yang pasti kebuka sebelum shift ada. */}
+      <div className="flex items-center gap-2">
+        <Link href="/pesanan-terjadwal" className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink">
+          Pesanan Terjadwal
+        </Link>
+        <SignOutButton />
+      </div>
     </div>
   );
 }
