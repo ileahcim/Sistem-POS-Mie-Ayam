@@ -4,6 +4,10 @@
 
 Ini catatan keputusan yang **sudah final** hasil diskusi dengan pemilik warung. Jangan diubah tanpa konfirmasi ulang. Kalau ada yang terlihat keliru secara teknis dari keputusan ini, bilang dulu sebelum ngoding.
 
+## Bahasa
+
+**Semua balasan dan rangkuman Claude Code di proyek ini wajib pakai Bahasa Indonesia** (permintaan eksplisit pemilik warung, Tahap 12). Kode, nama variabel/fungsi, dan komentar teknis tetap Inggris seperti biasa — ini soal bahasa komunikasi ke pemilik, bukan bahasa kode.
+
 ## Alur kerja Git
 
 - **Commit & push otomatis setiap selesai satu tahap/batch pekerjaan — tidak perlu minta konfirmasi dulu.** Ini pengecualian eksplisit dari kebiasaan default yang biasanya menunggu izin sebelum commit/push.
@@ -152,6 +156,27 @@ Batasan penting yang sengaja dijaga:
 - **Service worker tidak pernah cache atau menyajikan salinan basi dari halaman data-nya sendiri** (Order Aktif, Kasir, Dashboard) — cuma `/offline` yang di-precache, dan itu pun halaman statis tanpa data sama sekali. Alasan: nomor antrian atau kas yang basi lebih berbahaya daripada layar "tidak ada koneksi" yang jujur, untuk mesin kasir.
 - `/offline` sengaja pakai **inline style, bukan class Tailwind/komponen `Card`/`Button` biasa** — `cache.addAll(["/offline"])` cuma nge-cache HTML halaman itu sendiri, bukan file CSS yang direferensikannya (nama filenya di-hash per build, tidak bisa ditebak dari `sw.js`). Kalau file CSS itu kebetulan belum pernah ke-cache lewat pola cache-first di atas, halaman offline yang pakai class Tailwind akan tampil sebagai teks polos tanpa gaya sama sekali — sudah dibuktikan (dan diperbaiki) secara langsung dengan mensimulasikan offline lewat Playwright.
 - `src/proxy.ts` (auth gate) **wajib** mengecualikan `/manifest.webmanifest`, `/sw.js`, `/icon`, `/apple-icon`, dan turunannya (`/icon-192`, `/icon-512`) dari matcher-nya — browser mengambil aset-aset ini lepas dari status login (bahkan dari halaman `/login` itu sendiri), dan registrasi service worker **gagal total** kalau responsnya redirect (bukan 200 asli) atau Content-Type-nya salah. `/offline` juga harus selalu bisa diakses langsung tanpa pernah di-redirect balik ke `/` walau user sedang login — beda dari `/login` yang memang harus redirect kalau sudah login.
+
+### Deploy Vercel
+
+Project: `leahcim-team/pos-mi-ayam` (akun `ileahcim`, plan Hobby). Production: `https://pos-mi-ayam.vercel.app`. Environment variable production sudah dipasang (`DATABASE_URL`, `DIRECT_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) — nilainya sama dengan `.env` dev sampai checklist go-live poin 1 (pisah database) dikerjakan. **Auto-deploy per push ke `main` sengaja dibiarkan menyala** (keputusan pemilik) — lihat poin 6 checklist go-live untuk kapan mempertimbangkan mematikannya.
+
+Dua jebakan yang sudah kejadian nyata sekali saat setup awal, dicatat supaya tidak terulang kalau project di-deploy ulang dari nol:
+- **Project yang dibuat lewat `vercel project add` (bukan lewat alur import dashboard) tidak otomatis punya Framework Preset ke Next.js** — build tetap "sukses" (log build tetap menjalankan `next build` dan menampilkan tabel Route yang benar), tapi diam-diam jatuh ke builder `@vercel/static-build` generik yang cuma menyalin folder `public/` sebagai file statis dan **tidak membuat satu serverless function pun** — hasilnya semua halaman (termasuk `/login`) 404 di production walau build "sukses" dan deployment status "Ready". Terbukti lewat `vercel build` lokal: `.vercel/output/` cuma berisi `static/`, tidak ada folder `functions/`, dan `builds.json` menyebut `"detectedFramework": {"status": "skipped"}` + `"require": "@vercel/static-build"`. Perbaikannya: `vercel project update <nama> --framework nextjs --yes` lalu deploy ulang — setelah itu tabel Route yang sama menghasilkan 21 function sungguhan.
+- **Project baru di tim ini otomatis kena "Deployment Protection" (SSO Vercel)** untuk semua domain `*.vercel.app` termasuk production (`all_except_custom_domains`) — URL production tidak bisa diakses sama sekali tanpa login ke akun Vercel tim, jadi tablet kasir pasti gagal connect kalau ini tidak dimatikan. Dimatikan lewat `vercel project protection disable <nama> --sso` (butuh konfirmasi eksplisit dari pemilik karena ini melemahkan lapisan akses — keamanan aplikasi tetap dijaga oleh login username/password POS sendiri, bukan lapisan SSO Vercel ini).
+
+**Sambungan GitHub untuk auto-deploy belum berhasil dibuat lewat CLI** (`vercel git connect` gagal dengan pesan generic "Failed to connect... Make sure you have access to the repository", walau repo publik dan bisa diakses) — kemungkinan besar karena Vercel GitHub App belum pernah diinstal/diotorisasi untuk akun `ileahcim` di GitHub, dan itu langkah consent yang cuma bisa diselesaikan lewat UI (browser), tidak lewat token API. Kalau perlu diulang: buka `https://vercel.com/leahcim-team/pos-mi-ayam/settings/git` dan klik "Connect Git Repository", ikuti alur otorisasi GitHub yang muncul.
+
+## SEBELUM DIPAKAI DI WARUNG — checklist wajib go-live
+
+Aplikasi sudah di-deploy (Tahap 12), tapi database yang dipakai sekarang masih database **dev** yang sama dari seluruh proses development — belum aman dipakai transaksi sungguhan di warung. Enam hal ini **wajib** selesai dulu sebelum kasir mulai pakai aplikasi ini untuk jualan beneran:
+
+1. **Pisahkan database.** Buat project Supabase kedua khusus production. Database yang sekarang jadi dev — boleh dihapus-hapus isinya, dan Claude Code boleh terus memakainya untuk pengembangan/testing. Database production **tidak boleh disentuh Claude Code sama sekali**.
+2. **Ganti password akun OWNER dan CASHIER** — saat ini masih `1234` untuk keduanya (nilai seed development).
+3. **Isi `costPrice` semua produk dan add-on** — sekarang masih 0, jadi grafik margin di Dashboard belum berarti apa-apa (lihat banner peringatan "HPP belum diisi" di section Margin).
+4. **Tes cetak ke printer thermal asli (Blueprint ECO80D).** Sampai saat ini struk masih lewat `MockPrinter` (overlay di layar) — belum pernah benar-benar menyentuh kertas.
+5. **Siapkan backup otomatis harian.** Plan Supabase gratis tidak menyediakan backup otomatis.
+6. **Pertimbangkan matikan auto-deploy** di project Vercel saat warung sudah mulai jalan sehari-hari, supaya push kode di jam sibuk tidak langsung mengganti aplikasi yang sedang dipakai kasir. (Lihat catatan auto-deploy di "PWA — Tahap 12" / bagian deploy di bawah — untuk sekarang, selama masih tahap setup dan belum dipakai warung, auto-deploy sengaja dibiarkan menyala atas keputusan pemilik.)
 
 ## Auth
 
