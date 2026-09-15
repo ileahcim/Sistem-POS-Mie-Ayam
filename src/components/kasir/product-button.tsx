@@ -28,7 +28,7 @@ export function ProductButton({
         </span>
       )}
       <span className="text-base font-bold leading-tight text-ink">{name}</span>
-      <PriceText amount={price} weight="secondary" />
+      <PriceText amount={price} weight="accent" />
     </motion.button>
   );
 }

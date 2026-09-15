@@ -5,6 +5,7 @@ import type { MarginReport } from "@/lib/dashboard/get-margin-report";
 import type { ChannelBreakdownRow } from "@/lib/dashboard/get-channel-breakdown";
 import type { ReceivableOrder } from "@/lib/orders/get-receivable-orders";
 import { LinkButton } from "@/components/ui/link-button";
+import { FadeIn } from "@/components/ui/fade-in";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ShiftHistorySection } from "./shift-history-section";
 import { OmzetSection } from "./omzet-section";
@@ -53,12 +54,24 @@ export function DashboardScreen({
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
-          <ShiftHistorySection shifts={shifts} />
-          <OmzetSection history={omzetHistory} />
-          <TopItemsSection products={topProducts} toppings={topToppings} />
-          <MarginSection report={marginReport} />
-          <ChannelBreakdownSection rows={channelBreakdown} />
-          <PiutangSection orders={receivables} />
+          <FadeIn delay={0}>
+            <ShiftHistorySection shifts={shifts} />
+          </FadeIn>
+          <FadeIn delay={0.05}>
+            <OmzetSection history={omzetHistory} />
+          </FadeIn>
+          <FadeIn delay={0.1}>
+            <TopItemsSection products={topProducts} toppings={topToppings} />
+          </FadeIn>
+          <FadeIn delay={0.15}>
+            <MarginSection report={marginReport} />
+          </FadeIn>
+          <FadeIn delay={0.2}>
+            <ChannelBreakdownSection rows={channelBreakdown} />
+          </FadeIn>
+          <FadeIn delay={0.25}>
+            <PiutangSection orders={receivables} />
+          </FadeIn>
         </div>
       </div>
     </div>

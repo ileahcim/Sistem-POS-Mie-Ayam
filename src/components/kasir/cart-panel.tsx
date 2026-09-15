@@ -39,7 +39,7 @@ export function CartPanel({
     !!channel && items.length > 0 && !saving && (channel !== "DINE_IN" || !!tableLabel);
 
   return (
-    <div className="border-border bg-surface flex h-full w-full flex-col border-l">
+    <div className="border-border bg-surface shadow-panel relative z-10 flex h-full w-full flex-col border-l">
       <div className="border-border border-b px-3 py-2">
         <h2 className="text-base font-bold text-ink">Keranjang</h2>
       </div>
@@ -104,7 +104,18 @@ export function CartPanel({
               Menyimpan...
             </span>
           ) : (
-            saveLabel
+            <span className="flex items-center justify-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                <path
+                  d="M4 9.5 7.2 12.7 14 5.5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {saveLabel}
+            </span>
           )}
         </Button>
       </div>

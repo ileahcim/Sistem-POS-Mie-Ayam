@@ -24,7 +24,11 @@ export function resolveComboShortcut(
   for (const a of item.addons) {
     const option = allOptions.find((o) => o.id === a.addonOptionId);
     if (!option) return null;
-    addons.push({ addonOptionId: option.id, name: option.name, price: option.price, qty: a.qty });
+    // `a.qty` can be missing on a ComboCache row written before qty existed
+    // on this shape (ComboCache.items is untyped JSON in Postgres — an old
+    // row persists as-is until the next daily refresh, see
+    // refresh-combo-cache.ts) — default to 1 rather than let it become NaN.
+    addons.push({ addonOptionId: option.id, name: option.name, price: option.price, qty: a.qty ?? 1 });
   }
 
   return {
