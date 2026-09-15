@@ -44,7 +44,7 @@ export function BukaShiftForm() {
             <RupiahInput id="openingCash" value={openingCash} onChange={setOpeningCash} className="h-14" />
           </div>
           {error && <p className="text-danger text-sm">{error}</p>}
-          <Button type="submit" variant="primary" size="large" fullWidth disabled={saving || !openingCash}>
+          <Button type="submit" variant="primary" size="large" fullWidth disabled={saving || openingCash === ""}>
             {saving ? "Membuka..." : "Buka Shift"}
           </Button>
         </form>

@@ -264,7 +264,7 @@ export function TutupShiftFlow({
             className="h-14"
           />
           {closeError && <p className="text-danger text-sm">{closeError}</p>}
-          <Button variant="primary" size="large" fullWidth disabled={closing || !countedCash} onClick={handleClose}>
+          <Button variant="primary" size="large" fullWidth disabled={closing || countedCash === ""} onClick={handleClose}>
             {closing ? "Menutup..." : "Tutup Shift"}
           </Button>
         </div>
