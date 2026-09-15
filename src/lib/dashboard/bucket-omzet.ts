@@ -1,4 +1,5 @@
 import type { OmzetShiftPoint } from "./get-omzet-history";
+import { localDateParts, mondayOfLocalWeek, formatId } from "@/lib/timezone";
 
 export type OmzetGranularity = "harian" | "mingguan" | "bulanan";
 
@@ -21,35 +22,35 @@ function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-// Monday of the ISO week containing `d`, at local midnight.
-function mondayOf(d: Date): Date {
-  const copy = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const day = copy.getDay() || 7; // Sunday -> 7
-  if (day > 1) copy.setDate(copy.getDate() - (day - 1));
-  return copy;
-}
-
 function bucketKey(date: Date, granularity: OmzetGranularity): { key: string; label: string } {
   if (granularity === "harian") {
-    const key = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-    const label = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(date);
+    const p = localDateParts(date);
+    const key = `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+    const label = formatId(date, { day: "2-digit", month: "short" });
     return { key, label };
   }
   if (granularity === "mingguan") {
-    const monday = mondayOf(date);
-    const key = `${monday.getFullYear()}-${pad2(monday.getMonth() + 1)}-${pad2(monday.getDate())}`;
-    const label = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(monday);
+    const monday = mondayOfLocalWeek(date);
+    const key = `${monday.year}-${pad2(monday.month)}-${pad2(monday.day)}`;
+    // Label the Monday's own calendar date — build a scratch instant at
+    // Jakarta local noon that day so formatId (timeZone-aware) can never
+    // round it into the adjacent day.
+    const mondayNoonUtc = new Date(Date.UTC(monday.year, monday.month - 1, monday.day, 5, 0, 0));
+    const label = formatId(mondayNoonUtc, { day: "2-digit", month: "short" });
     return { key, label };
   }
-  const key = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
-  const label = new Intl.DateTimeFormat("id-ID", { month: "short", year: "2-digit" }).format(date);
+  const p = localDateParts(date);
+  const key = `${p.year}-${pad2(p.month)}`;
+  const label = formatId(date, { month: "short", year: "2-digit" });
   return { key, label };
 }
 
 // Pure so it's usable both in the client chart and (if ever needed) in a
-// test — buckets by the shift's openedAt "business day", sums cashSales +
-// nonCashSales (the same frozen numbers get-shift-history.ts uses), and
-// returns only the most recent N buckets in chronological order.
+// test — buckets by the shift's openedAt "business day" in Jakarta local
+// time (see src/lib/timezone.ts — never the runtime's default timezone,
+// which is UTC on Vercel), sums cashSales + nonCashSales (the same frozen
+// numbers get-shift-history.ts uses), and returns only the most recent N
+// buckets in chronological order.
 export function bucketOmzet(points: OmzetShiftPoint[], granularity: OmzetGranularity): OmzetBucket[] {
   const byKey = new Map<string, OmzetBucket>();
 

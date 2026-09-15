@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { buildReportWorkbook } from "@/lib/dashboard/build-report-workbook";
+import { localDateStr } from "@/lib/timezone";
 
 // Independent entry point from the dashboard page itself — needs its own
 // requireRole("OWNER") first line (see CLAUDE.md "Server-side
@@ -10,7 +11,7 @@ export async function GET() {
 
   const workbook = await buildReportWorkbook();
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `laporan-pos-mi-ayam-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `laporan-pos-mi-ayam-${localDateStr(new Date())}.xlsx`;
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

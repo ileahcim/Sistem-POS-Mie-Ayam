@@ -3,9 +3,10 @@ import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { PriceText } from "@/components/ui/price-text";
+import { formatId } from "@/lib/timezone";
 
 function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(new Date(iso));
+  return formatId(new Date(iso), { dateStyle: "medium" });
 }
 
 export function PiutangList({ orders }: { orders: ReceivableOrder[] }) {

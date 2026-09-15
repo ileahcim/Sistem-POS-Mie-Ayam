@@ -1,5 +1,6 @@
 import type { ReceiptData } from "@/lib/printing/types";
 import { formatRupiah, mergeReceiptItems } from "@/lib/printing/format";
+import { formatId } from "@/lib/timezone";
 
 const CHANNEL_LABEL: Record<ReceiptData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -14,10 +15,7 @@ const PAYMENT_LABEL: Record<ReceiptData["paymentMethod"], string> = {
 };
 
 function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatId(date, { dateStyle: "medium", timeStyle: "short" });
 }
 
 // Simulates an 80mm thermal receipt on screen: narrow fixed width, monospace,

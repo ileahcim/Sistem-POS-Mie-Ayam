@@ -7,6 +7,7 @@ import { ListRow } from "@/components/ui/list-row";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/link-button";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { formatId } from "@/lib/timezone";
 
 const CHANNEL_LABEL: Record<PreOrderSummary["channel"], string> = {
   DINE_IN: "Dine In",
@@ -15,7 +16,7 @@ const CHANNEL_LABEL: Record<PreOrderSummary["channel"], string> = {
 };
 
 function formatScheduledFor(iso: string): string {
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
 }
 
 // Pre-orders not yet due — see CLAUDE.md "Pre-order". Reachable without an

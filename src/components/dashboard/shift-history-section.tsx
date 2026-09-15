@@ -2,10 +2,11 @@ import type { ShiftHistoryRow } from "@/lib/dashboard/get-shift-history";
 import { Card } from "@/components/ui/card";
 import { formatRupiah } from "@/lib/printing/format";
 import { cn } from "@/components/ui/cn";
+import { formatId } from "@/lib/timezone";
 import { TrendLineChart } from "./trend-line-chart";
 
 function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(new Date(iso));
+  return formatId(new Date(iso), { dateStyle: "medium" });
 }
 
 function selisihClass(value: number): string {

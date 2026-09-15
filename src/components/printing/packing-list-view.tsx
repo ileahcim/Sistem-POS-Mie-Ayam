@@ -1,10 +1,8 @@
 import type { PackingListData } from "@/lib/printing/types";
+import { formatId } from "@/lib/timezone";
 
 function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatId(date, { dateStyle: "medium", timeStyle: "short" });
 }
 
 // Packing checklist for Antar, printed before payment — no prices, no

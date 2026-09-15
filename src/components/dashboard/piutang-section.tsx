@@ -3,9 +3,10 @@ import type { ReceivableOrder } from "@/lib/orders/get-receivable-orders";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { PriceText } from "@/components/ui/price-text";
+import { formatId } from "@/lib/timezone";
 
 function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(new Date(iso));
+  return formatId(new Date(iso), { dateStyle: "medium" });
 }
 
 // Section 6 — reads the same data as the standalone /piutang page (which

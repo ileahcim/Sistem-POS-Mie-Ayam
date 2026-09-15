@@ -10,6 +10,20 @@ Ini catatan keputusan yang **sudah final** hasil diskusi dengan pemilik warung. 
 - Satu commit = satu tahap/batch yang berhubungan. Jangan gabung beberapa tahap tak berhubungan ke satu commit, jangan juga pecah satu tahap jadi banyak commit kecil tanpa alasan.
 - Aturan git safety umum tetap berlaku dan TIDAK termasuk dalam pengecualian ini: tetap jangan pernah force-push, `git reset --hard`, amend commit yang sudah dipush, skip hooks, atau operasi destruktif lain tanpa izin eksplisit. Yang dikecualikan cuma commit+push biasa di akhir tahap.
 
+## Zona waktu
+
+Warung berlokasi di Indonesia (WIB, UTC+7, tidak ada daylight saving). **Setiap kode server yang mengelompokkan per hari, menghitung rentang tanggal, menentukan batas awal/akhir hari, atau menampilkan tanggal/jam ke pengguna WAJIB lewat `src/lib/timezone.ts`** (`localDateStr`, `localTimeStr`, `localDateParts`, `mondayOfLocalWeek`, `formatId`) — jangan pernah `date.getHours()`/`getFullYear()`/dst secara langsung, jangan pernah `date.toISOString().slice(...)`, dan jangan pernah `new Intl.DateTimeFormat(...)` tanpa `timeZone` eksplisit.
+
+**Kenapa ini bukan cuma soal gaya kode:** `getHours()` dkk dan `Intl.DateTimeFormat` tanpa `timeZone` eksplisit itu benar HANYA karena kebetulan OS jam server-nya sudah Asia/Jakarta. Begitu di-deploy ke Vercel (Tahap 12), serverless function-nya jalan di UTC — kode yang sama, tanpa berubah sebaris pun, diam-diam menggeser semua jam yang ditampilkan mundur 7 jam (shift tutup jam 20:00 WIB akan tertampil "13:00"), dan transaksi jam 00:00-06:59 WIB bisa masuk hitungan omzet hari SEBELUMNYA (karena jam segitu masih hari sebelumnya kalau dibaca sebagai UTC). `src/lib/timezone.ts` selalu benar di lingkungan apa pun karena memaksa `timeZone: "Asia/Jakarta"` eksplisit ke Intl API, tidak pernah bergantung ke default runtime — sudah dibuktikan dengan menjalankan logikanya di bawah `TZ=UTC` dan `TZ=Asia/Jakarta` sekaligus, hasilnya identik persis.
+
+Yang **tidak** perlu lewat helper ini (aman secara desain, bukan kebetulan):
+- Window rolling N-hari (`Date.now() - N*24*60*60*1000`, dipakai combo cache Tahap 10 & dashboard Tahap 11) — ini pengurangan durasi murni terhadap instant absolut, bukan operasi batas kalender, jadi timezone tidak relevan sama sekali di sini.
+- Perbandingan instant-vs-instant (`scheduledFor > now`, dst) — sama, tidak ada aritmetika kalender.
+- Penulisan timestamp mentah (`paidAt: new Date()`, `voidedAt: new Date()`, dst) — kolom `timestamptz` menyimpan instant absolut, selalu benar tanpa ambiguitas; zona waktu cuma relevan saat instant itu nanti DITAMPILKAN atau DIKELOMPOKKAN per hari.
+- Input tanggal/jam dari kasir di layar (`preorder-screen.tsx`'s `new Date(\`${date}T${time}\`)`) — ini jam dinding perangkat tablet itu sendiri, bukan kode server; asumsinya OS tablet memang di-set ke WIB (sama seperti asumsi struk tercetak butuh printer nyala), bukan sesuatu yang bisa "dipusatkan" lewat kode.
+
+Diaudit ulang Tahap 12: satu-satunya bug nyata yang ketemu adalah nama file export Excel (`toISOString().slice()`, sudah diperbaiki) — semua pengelompokan kalender lain (grafik omzet, window 30 hari menu populer/dashboard) sudah lolos audit atau sudah dipindah ke helper terpusat ini.
+
 ## Konteks pengguna (penting untuk semua keputusan UI)
 
 Yang menjaga warung adalah **karyawan berusia lanjut yang kurang terbiasa teknologi**. Implikasinya untuk setiap layar kasir:

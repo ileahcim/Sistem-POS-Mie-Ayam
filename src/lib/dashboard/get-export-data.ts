@@ -1,18 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { DELIVERY_FEE_PER_FOOD_ITEM } from "@/lib/orders/pricing";
-
-// Local-time getters (not toISOString, which is always UTC) — the server
-// runs in Asia/Jakarta, and every other date display in this app already
-// reads correctly in local time via that same assumption (Intl.DateTimeFormat
-// with no explicit timeZone, Date's own local getters). toISOString-based
-// slicing would silently shift every timestamp back by the UTC offset (a
-// shift opened at 08:00 WIB would show as "01:00" in the export).
-function localDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function localTimeStr(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
+import { localDateStr, localTimeStr } from "@/lib/timezone";
 
 export type ExportTransactionRow = {
   orderNumber: number;

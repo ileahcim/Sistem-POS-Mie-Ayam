@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
 import { Badge } from "@/components/ui/badge";
+import { formatId } from "@/lib/timezone";
 import { AddItemsPanel } from "./add-items-panel";
 import { markServed } from "@/app/order-aktif/actions";
 
@@ -22,7 +23,7 @@ const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
 };
 
 function formatScheduledFor(iso: string): string {
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function OrderDetail({
