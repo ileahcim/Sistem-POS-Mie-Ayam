@@ -15,17 +15,12 @@ import { cn } from "@/components/ui/cn";
 import { AddItemsPanel } from "@/components/order-aktif/add-items-panel";
 import { payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
 
+// Cash and QRIS only — no Transfer button. Payment is always "tap method,
+// tap Bayar": cashReceived is always the order total, no denomination
+// input, no change calculation. See CLAUDE.md "Pembayaran".
 const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "CASH", label: "Cash" },
   { value: "QRIS", label: "QRIS" },
-  { value: "TRANSFER", label: "Transfer" },
-];
-
-const CASH_DENOMINATIONS: { label: string; amount: number | null }[] = [
-  { label: "Uang Pas", amount: null },
-  { label: "25rb", amount: 25000 },
-  { label: "50rb", amount: 50000 },
-  { label: "100rb", amount: 100000 },
 ];
 
 export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: MenuCategory[] }) {
@@ -38,11 +33,12 @@ export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: Me
   // point. Only PAID/VOID actually block the payment UI.
   const alreadyPaid = order.status !== "OPEN" && order.status !== "RECEIVABLE";
 
-  async function handlePay(chosenMethod: PaymentMethod, cashTendered: number | null) {
+  async function handlePay() {
+    if (!method) return;
     setPaying(true);
     setError(null);
     try {
-      const result = await payOrder(order.id, chosenMethod, cashTendered);
+      const result = await payOrder(order.id, method, null);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -79,11 +75,18 @@ export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: Me
             <Card>
               <div className="divide-border flex flex-col divide-y">
                 {order.items.map((item) => (
-                  <div key={item.id} className="flex justify-between gap-3 p-4">
-                    <span className="text-base font-semibold text-ink">
-                      {item.qty}x {item.productName}
-                    </span>
-                    <PriceText amount={item.lineTotal} weight="secondary" />
+                  <div key={item.id} className="flex flex-col gap-1 p-4">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-base font-semibold text-ink">
+                        {item.qty}x {item.productName}
+                      </span>
+                      <PriceText amount={item.lineTotal} weight="secondary" />
+                    </div>
+                    {(item.addons.length > 0 || item.notes) && (
+                      <span className="text-ink-muted text-sm">
+                        {[item.addons.map((a) => a.name).join(", "), item.notes].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -127,29 +130,6 @@ export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: Me
               ))}
             </div>
 
-            {method === "CASH" && (
-              <div className="mt-3">
-                <p className="text-ink-muted mb-2 text-sm">Pecahan cepat (opsional)</p>
-                <div className="flex gap-2">
-                  {CASH_DENOMINATIONS.map((d) => {
-                    const disabled = d.amount != null && d.amount < order.total;
-                    return (
-                      <Button
-                        key={d.label}
-                        variant="ghost"
-                        fullWidth
-                        disabled={disabled || paying}
-                        onClick={() => handlePay("CASH", d.amount ?? order.total)}
-                        className="text-sm"
-                      >
-                        {d.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {error && <p className="text-danger mt-3 text-sm">{error}</p>}
           </>
         )}
@@ -157,7 +137,7 @@ export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: Me
 
       {!alreadyPaid && (
         <div className="border-border bg-surface border-t p-4">
-          <Button variant="primary" size="large" fullWidth disabled={!method || paying} onClick={() => handlePay(method!, null)}>
+          <Button variant="primary" size="large" fullWidth disabled={!method || paying} onClick={handlePay}>
             {paying ? "Memproses..." : `Bayar - ${formatRupiah(order.total)}`}
           </Button>
         </div>

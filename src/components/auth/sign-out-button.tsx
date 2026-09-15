@@ -16,7 +16,7 @@ export function SignOutButton() {
 
   return (
     <Button variant="secondary" onClick={handleSignOut}>
-      Keluar
+      Keluar / Ganti Akun
     </Button>
   );
 }

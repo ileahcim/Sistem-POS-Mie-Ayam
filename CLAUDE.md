@@ -4,6 +4,12 @@
 
 Ini catatan keputusan yang **sudah final** hasil diskusi dengan pemilik warung. Jangan diubah tanpa konfirmasi ulang. Kalau ada yang terlihat keliru secara teknis dari keputusan ini, bilang dulu sebelum ngoding.
 
+## Alur kerja Git
+
+- **Commit & push otomatis setiap selesai satu tahap/batch pekerjaan — tidak perlu minta konfirmasi dulu.** Ini pengecualian eksplisit dari kebiasaan default yang biasanya menunggu izin sebelum commit/push.
+- Satu commit = satu tahap/batch yang berhubungan. Jangan gabung beberapa tahap tak berhubungan ke satu commit, jangan juga pecah satu tahap jadi banyak commit kecil tanpa alasan.
+- Aturan git safety umum tetap berlaku dan TIDAK termasuk dalam pengecualian ini: tetap jangan pernah force-push, `git reset --hard`, amend commit yang sudah dipush, skip hooks, atau operasi destruktif lain tanpa izin eksplisit. Yang dikecualikan cuma commit+push biasa di akhir tahap.
+
 ## Konteks pengguna (penting untuk semua keputusan UI)
 
 Yang menjaga warung adalah **karyawan berusia lanjut yang kurang terbiasa teknologi**. Implikasinya untuk setiap layar kasir:
@@ -57,8 +63,8 @@ Kasus rombongan yang duduk di satu meja tapi mau bayar terpisah:
 
 ## Pembayaran
 
-- Default: **satu tap langsung selesai**. Tidak ada input nominal uang sebagai jalur utama, tidak boleh ada keyboard numerik.
-- Tombol pecahan cepat (Uang Pas / 25rb / 50rb / 100rb) sebagai **opsi** — sekali tap langsung hitung kembalian + bayar + cetak. Kalau tidak dipencet, tombol "Bayar" biasa yang dipakai (anggap uang pas, tanpa kembalian).
+- **Satu tap langsung selesai**: kasir pilih metode — **Cash** atau **QRIS** saja, tidak ada Transfer — lalu tap "Bayar". Tidak ada input nominal uang sama sekali, tidak ada keyboard numerik di jalur ini.
+- Tidak ada kalkulasi kembalian untuk order normal — `cashReceived` di server dianggap sama dengan total, dan struk tidak pernah mencetak baris "Kembali".
 - Total selalu dihitung ulang di server saat pembayaran, tidak pernah percaya angka dari client.
 
 ## Order Aktif — timer

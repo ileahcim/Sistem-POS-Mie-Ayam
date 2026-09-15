@@ -6,6 +6,7 @@ import { useNow } from "@/lib/use-now";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { OrderRow } from "./order-row";
 
 const CHANNEL_LABEL: Record<UnpaidServedOrder["channel"], string> = {
@@ -37,6 +38,7 @@ export function OrderAktifList({
           <LinkButton href="/shift/pengeluaran" variant="secondary">Pengeluaran</LinkButton>
           <LinkButton href="/shift/tutup" variant="secondary">Tutup Shift</LinkButton>
           <LinkButton href="/kasir" variant="secondary">Ke Kasir</LinkButton>
+          <SignOutButton />
         </div>
       </div>
 

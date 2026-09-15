@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { openShift } from "@/app/shift/actions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { RupiahInput } from "@/components/ui/rupiah-input";
 
 export function BukaShiftForm() {
   const router = useRouter();
-  const [openingCash, setOpeningCash] = useState("");
+  const [openingCash, setOpeningCash] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,17 +39,7 @@ export function BukaShiftForm() {
             <label htmlFor="openingCash" className="text-sm font-medium text-ink">
               Modal Awal Laci
             </label>
-            <input
-              id="openingCash"
-              type="number"
-              inputMode="numeric"
-              required
-              min={0}
-              value={openingCash}
-              onChange={(e) => setOpeningCash(e.target.value)}
-              className="rounded-input border-border h-14 border px-4 text-lg"
-              placeholder="Rp"
-            />
+            <RupiahInput id="openingCash" value={openingCash} onChange={setOpeningCash} className="h-14" />
           </div>
           {error && <p className="text-danger text-sm">{error}</p>}
           <Button type="submit" variant="primary" size="large" fullWidth disabled={saving || !openingCash}>

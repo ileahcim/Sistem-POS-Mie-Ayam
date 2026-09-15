@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
+import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
 import { voidUnpaidOrder, markOrderReceivable, addExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
 
@@ -142,11 +143,11 @@ export function TutupShiftFlow({
 
   const [expenses, setExpenses] = useState(initialExpenses);
   const [expenseDesc, setExpenseDesc] = useState("");
-  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState<number | "">("");
   const [expenseError, setExpenseError] = useState<string | null>(null);
   const [addingExpense, setAddingExpense] = useState(false);
 
-  const [countedCash, setCountedCash] = useState("");
+  const [countedCash, setCountedCash] = useState<number | "">("");
   const [closing, setClosing] = useState(false);
   const [closeError, setCloseError] = useState<string | null>(null);
   const [result, setResult] = useState<Extract<CloseShiftResult, { ok: true }> | null>(null);
@@ -232,14 +233,7 @@ export function TutupShiftFlow({
               placeholder="Keterangan (mis. Beli gas)"
               className="rounded-input border-border h-11 border px-3 text-sm"
             />
-            <input
-              type="number"
-              inputMode="numeric"
-              value={expenseAmount}
-              onChange={(e) => setExpenseAmount(e.target.value)}
-              placeholder="Nominal"
-              className="rounded-input border-border h-11 border px-3 text-sm"
-            />
+            <RupiahInput value={expenseAmount} onChange={setExpenseAmount} placeholder="Nominal" className="h-11 text-sm" />
             {expenseError && <p className="text-danger text-sm">{expenseError}</p>}
             <Button
               variant="secondary"
@@ -263,13 +257,11 @@ export function TutupShiftFlow({
             Hitung fisik semua uang di laci, lalu masukkan jumlahnya. Jangan dihitung dulu berapa yang
             &quot;seharusnya&quot; ada — masukkan apa yang benar-benar kamu hitung.
           </p>
-          <input
-            type="number"
-            inputMode="numeric"
+          <RupiahInput
             value={countedCash}
-            onChange={(e) => setCountedCash(e.target.value)}
+            onChange={setCountedCash}
             placeholder="Total uang fisik di laci"
-            className="rounded-input border-border h-14 border px-4 text-lg"
+            className="h-14"
           />
           {closeError && <p className="text-danger text-sm">{closeError}</p>}
           <Button variant="primary" size="large" fullWidth disabled={closing || !countedCash} onClick={handleClose}>

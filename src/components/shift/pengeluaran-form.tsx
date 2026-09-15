@@ -5,12 +5,13 @@ import type { ShiftExpense } from "@/lib/shift/get-shift-state";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
+import { RupiahInput } from "@/components/ui/rupiah-input";
 import { addExpense } from "@/app/shift/actions";
 
 export function PengeluaranForm({ initialExpenses }: { initialExpenses: ShiftExpense[] }) {
   const [expenses, setExpenses] = useState(initialExpenses);
   const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,14 +53,7 @@ export function PengeluaranForm({ initialExpenses }: { initialExpenses: ShiftExp
           placeholder="Keterangan (mis. Beli gas)"
           className="rounded-input border-border h-11 border px-3 text-sm"
         />
-        <input
-          type="number"
-          inputMode="numeric"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Nominal"
-          className="rounded-input border-border h-11 border px-3 text-sm"
-        />
+        <RupiahInput value={amount} onChange={setAmount} placeholder="Nominal" className="h-11 text-sm" />
         {error && <p className="text-danger text-sm">{error}</p>}
         <Button variant="primary" size="large" fullWidth disabled={saving || !description.trim() || !amount} onClick={handleAdd}>
           + Tambah Pengeluaran

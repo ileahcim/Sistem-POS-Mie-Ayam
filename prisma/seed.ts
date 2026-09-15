@@ -22,8 +22,14 @@ const categories: CategorySeed[] = [
     products: [
       { name: "Mie Ayam", price: 13000 },
       { name: "Bakso", price: 13000 },
+      // Satuan/piece items — separate products, not addons. A standard
+      // Bakso bowl already includes 4 small balls + 1 urat via "Jenis
+      // Bakso" below; these are for buying extra balls by the piece
+      // (e.g. 2x Bakso Urat with no bowl at all = 20.000).
+      { name: "Bakso Urat", price: 10000 },
+      { name: "Bakso Telur", price: 10000 },
       { name: "Pangsit Rebus", price: 13000 },
-      { name: "Ceker Rebus", price: 12000 },
+      { name: "Ceker", price: 12000 },
     ],
   },
   {
@@ -71,12 +77,13 @@ const categories: CategorySeed[] = [
   },
 ];
 
+type AddonOptionSeed = { name: string; price: number; isActive?: boolean };
 type AddonGroupSeed = {
   name: string;
   minSelect: number;
   maxSelect: number | null;
   appliesTo: string[]; // product names
-  options: { name: string; price: number }[];
+  options: AddonOptionSeed[];
 };
 
 const addonGroups: AddonGroupSeed[] = [
@@ -84,12 +91,13 @@ const addonGroups: AddonGroupSeed[] = [
     name: "Topping Mie",
     minSelect: 0,
     maxSelect: null,
-    appliesTo: ["Mie Ayam", "Pangsit Rebus", "Ceker Rebus"],
+    appliesTo: ["Mie Ayam", "Pangsit Rebus", "Ceker"],
     options: [
       { name: "Bakso", price: 5000 },
       { name: "Bakso Urat", price: 8000 },
       { name: "Pangsit", price: 2000 },
       { name: "Ceker", price: 2000 },
+      { name: "Bakso Telur", price: 10000 },
     ],
   },
   {
@@ -123,7 +131,7 @@ async function main() {
     update: {},
     create: {
       id: "singleton",
-      storeName: "Mie Ayam Keluarga",
+      storeName: "Mie Ayam Pangsit dan Bakso Ciptarasa 4 Wonogiri",
       receiptFooter: "Terima kasih!",
     },
   });
@@ -176,13 +184,14 @@ async function main() {
     });
 
     for (const [index, opt] of group.options.entries()) {
+      const isActive = opt.isActive ?? true;
       const existing = await prisma.addonOption.findFirst({
         where: { name: opt.name, addonGroupId: addonGroup.id },
       });
       const option = existing
         ? await prisma.addonOption.update({
             where: { id: existing.id },
-            data: { price: opt.price, sortOrder: index },
+            data: { price: opt.price, sortOrder: index, isActive },
           })
         : await prisma.addonOption.create({
             data: {
@@ -190,6 +199,7 @@ async function main() {
               price: opt.price,
               addonGroupId: addonGroup.id,
               sortOrder: index,
+              isActive,
             },
           });
       optionByGroupAndName.set(`${group.name}::${opt.name}`, {
@@ -255,6 +265,11 @@ function verifySeedPrices(
       label: "Mie Ayam Bakso Urat",
       actual: priceOf("Mie Ayam", ["Topping Mie::Bakso Urat"]),
       expected: 21000,
+    },
+    {
+      label: "Mie Ayam Bakso Telur (topping)",
+      actual: priceOf("Mie Ayam", ["Topping Mie::Bakso Telur"]),
+      expected: 23000,
     },
     {
       label: "Pangsit Rebus Ceker Bakso",
