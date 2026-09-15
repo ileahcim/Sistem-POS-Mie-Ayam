@@ -1,0 +1,167 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import type { OrderDetail } from "@/lib/orders/get-order-detail";
+import type { MenuCategory } from "@/lib/menu/get-active-menu";
+import { getPrinter } from "@/lib/printing/get-printer";
+import { formatRupiah } from "@/lib/printing/format";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { PriceText } from "@/components/ui/price-text";
+import { cn } from "@/components/ui/cn";
+import { AddItemsPanel } from "@/components/order-aktif/add-items-panel";
+import { payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
+
+const METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: "CASH", label: "Cash" },
+  { value: "QRIS", label: "QRIS" },
+  { value: "TRANSFER", label: "Transfer" },
+];
+
+const CASH_DENOMINATIONS: { label: string; amount: number | null }[] = [
+  { label: "Uang Pas", amount: null },
+  { label: "25rb", amount: 25000 },
+  { label: "50rb", amount: 50000 },
+  { label: "100rb", amount: 100000 },
+];
+
+export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: MenuCategory[] }) {
+  const router = useRouter();
+  const [method, setMethod] = useState<PaymentMethod | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // RECEIVABLE (piutang) is still payable — settling it later is the whole
+  // point. Only PAID/VOID actually block the payment UI.
+  const alreadyPaid = order.status !== "OPEN" && order.status !== "RECEIVABLE";
+
+  async function handlePay(chosenMethod: PaymentMethod, cashTendered: number | null) {
+    setPaying(true);
+    setError(null);
+    try {
+      const result = await payOrder(order.id, chosenMethod, cashTendered);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      await getPrinter("mock").printReceipt(result.receipt);
+      router.push("/order-aktif");
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  return (
+    <div className="bg-canvas flex h-dvh flex-col">
+      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
+        <div>
+          <h1 className="text-lg font-bold text-ink">Pembayaran #{order.queueNumber}</h1>
+          <p className="text-ink-muted text-sm">No. Order {order.orderNumber}</p>
+        </div>
+        <Link
+          href={`/order-aktif/${order.id}`}
+          className="rounded-pill bg-muted h-10 px-4 text-sm font-medium leading-10 text-ink"
+        >
+          Kembali
+        </Link>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {alreadyPaid ? (
+          <div className="flex justify-center py-8">
+            <Badge variant="success">Sudah dibayar ({order.paymentMethod})</Badge>
+          </div>
+        ) : (
+          <>
+            <Card>
+              <div className="divide-border flex flex-col divide-y">
+                {order.items.map((item) => (
+                  <div key={item.id} className="flex justify-between gap-3 p-4">
+                    <span className="text-base font-semibold text-ink">
+                      {item.qty}x {item.productName}
+                    </span>
+                    <PriceText amount={item.lineTotal} weight="secondary" />
+                  </div>
+                ))}
+              </div>
+              <div className="border-border flex flex-col gap-1 border-t px-4 py-3">
+                <div className="flex justify-between text-sm text-ink-muted">
+                  <span>Subtotal</span>
+                  <PriceText amount={order.subtotal} weight="secondary" />
+                </div>
+                {order.deliveryFee > 0 && (
+                  <div className="flex justify-between text-sm text-ink-muted">
+                    <span>Ongkir</span>
+                    <PriceText amount={order.deliveryFee} weight="secondary" />
+                  </div>
+                )}
+                <div className="mt-1 flex justify-between border-t border-border pt-2">
+                  <span className="text-base font-bold text-ink">Total</span>
+                  <PriceText amount={order.total} weight="total" />
+                </div>
+              </div>
+            </Card>
+
+            {order.status === "OPEN" && (
+              <div className="mt-4">
+                <AddItemsPanel orderId={order.id} menu={menu} onAdded={() => router.refresh()} />
+              </div>
+            )}
+
+            <div className="mt-4 flex gap-2">
+              {METHODS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setMethod(m.value)}
+                  className={cn(
+                    "rounded-pill h-12 flex-1 text-base font-semibold",
+                    method === m.value ? "bg-primary text-white" : "bg-muted text-ink",
+                  )}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {method === "CASH" && (
+              <div className="mt-3">
+                <p className="text-ink-muted mb-2 text-sm">Pecahan cepat (opsional)</p>
+                <div className="flex gap-2">
+                  {CASH_DENOMINATIONS.map((d) => {
+                    const disabled = d.amount != null && d.amount < order.total;
+                    return (
+                      <Button
+                        key={d.label}
+                        variant="ghost"
+                        fullWidth
+                        disabled={disabled || paying}
+                        onClick={() => handlePay("CASH", d.amount ?? order.total)}
+                        className="text-sm"
+                      >
+                        {d.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {error && <p className="text-danger mt-3 text-sm">{error}</p>}
+          </>
+        )}
+      </div>
+
+      {!alreadyPaid && (
+        <div className="border-border bg-surface border-t p-4">
+          <Button variant="primary" size="large" fullWidth disabled={!method || paying} onClick={() => handlePay(method!, null)}>
+            {paying ? "Memproses..." : `Bayar - ${formatRupiah(order.total)}`}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}

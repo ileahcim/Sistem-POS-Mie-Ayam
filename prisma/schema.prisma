@@ -1,0 +1,352 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Staff
+// ---------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  CASHIER
+}
+
+// Profile row linked to a Supabase Auth user (auth.users.id). Supabase owns
+// credentials and the whole `auth` schema — Prisma only manages `public`,
+// so there's no FK constraint to auth.users here, just the matching UUID.
+// isActive (not a hard delete) because Order/Shift/Expense rows keep a
+// permanent FK to whoever created them.
+//
+// Staff never see or type an email. `username` is what's shown and typed at
+// login; the app maps it to a synthetic email (see src/lib/auth/username.ts)
+// only to satisfy Supabase Auth's email/password API underneath.
+model User {
+  id          String  @id @default(cuid())
+  authUserId  String  @unique @db.Uuid
+  username    String  @unique
+  name        String
+  role        Role    @default(CASHIER)
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  shiftsOpened    Shift[]     @relation("ShiftOpenedBy")
+  shiftsClosed    Shift[]     @relation("ShiftClosedBy")
+  expensesCreated Expense[]
+  ordersCreated   Order[]     @relation("OrderCreatedBy")
+  ordersVoided    Order[]     @relation("OrderVoidedBy")
+}
+
+// ---------------------------------------------------------------------------
+// Store settings — single-outlet warung, so this is a singleton row (fixed
+// id) rather than a table keyed by outlet. Read at print time instead of
+// hardcoding the store name/footer in code, and editable from the admin
+// settings page (stage 5).
+// ---------------------------------------------------------------------------
+
+model Setting {
+  id            String  @id @default("singleton")
+  storeName     String
+  address       String?
+  phone         String?
+  receiptFooter String  @default("Terima kasih!")
+
+  // Order Aktif timer: estimated prep time = prepBaseMinutes +
+  // prepMinutesPerPortion * portions-needing-prep. Orange past estimate,
+  // red past 2x estimate. Owner-tunable from the admin page (stage 11) —
+  // never hardcoded in the timer component itself.
+  prepBaseMinutes       Int @default(4)
+  prepMinutesPerPortion Int @default(1)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Menu: category -> product -> addon groups -> addon options
+// ---------------------------------------------------------------------------
+
+model Category {
+  id       String @id @default(cuid())
+  name     String @unique
+  sortOrder Int   @default(0)
+
+  // Kulkas, Lain-lain, and Frozen items don't need prep and are excluded
+  // from any kitchen-facing queue. Makanan and Minuman Racik do need prep.
+  isKitchenItem Boolean @default(true)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+}
+
+model Product {
+  id         String  @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  name      String
+  price     Int // Rupiah, integer, never Float
+  costPrice Int? // owner-entered estimate, snapshotted onto order items
+  imageUrl  String?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true) // soft delete only — old orders reference this row forever
+
+  addonGroups ProductAddonGroup[]
+  orderItems  OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A group of add-on options, e.g. "Topping Mie" or "Jenis Bakso".
+// minSelect/maxSelect drive both validation and the "Harus dipilih · Pilih 1"
+// vs "Opsional" label in the UI — no separate "required" flag needed.
+model AddonGroup {
+  id        String @id @default(cuid())
+  name      String @unique
+  minSelect Int    @default(0)
+  maxSelect Int? // null = unlimited (e.g. Topping Mie, Topping Bakso)
+
+  options  AddonOption[]
+  products ProductAddonGroup[]
+
+  createdAt DateTime @default(now())
+}
+
+// Many-to-many: which addon groups attach to which products (e.g. "Topping
+// Mie" attaches to Mie Ayam, Pangsit Rebus, and Ceker Rebus).
+model ProductAddonGroup {
+  id           String @id @default(cuid())
+  productId    String
+  addonGroupId String
+  sortOrder    Int    @default(0)
+
+  product    Product    @relation(fields: [productId], references: [id])
+  addonGroup AddonGroup @relation(fields: [addonGroupId], references: [id])
+
+  @@unique([productId, addonGroupId])
+}
+
+model AddonOption {
+  id           String  @id @default(cuid())
+  addonGroupId String
+  addonGroup   AddonGroup @relation(fields: [addonGroupId], references: [id])
+
+  name      String
+  price     Int     @default(0) // Rupiah delta, e.g. +5000
+  costPrice Int?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true) // soft delete only
+
+  orderItemAddons OrderItemAddon[]
+
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Shift & cash reconciliation
+// ---------------------------------------------------------------------------
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+model Shift {
+  id       String      @id @default(cuid())
+  status   ShiftStatus @default(OPEN)
+
+  openedById String
+  openedBy   User   @relation("ShiftOpenedBy", fields: [openedById], references: [id])
+  openedAt   DateTime @default(now())
+  openingCash Int // modal laci, differs every day
+
+  // Per-shift queue number counter. Incremented atomically
+  // (Shift.update({ data: { lastQueueNumber: { increment: 1 } } })) so two
+  // devices can never hand out the same number for the same shift.
+  lastQueueNumber Int @default(0)
+
+  closedById String?
+  closedBy   User?    @relation("ShiftClosedBy", fields: [closedById], references: [id])
+  closedAt   DateTime?
+
+  // Frozen at close time. Never recomputed from live order data afterwards —
+  // a later void must not change a shift report that's already closed.
+  cashSales     Int?
+  nonCashSales  Int?
+  expenseTotal  Int?
+  expectedCash  Int? // openingCash + cashSales - expenseTotal
+  countedCash   Int? // what the cashier physically counted, entered blind
+  difference    Int? // countedCash - expectedCash, shown only after countedCash is submitted
+
+  orders   Order[]
+  expenses Expense[]
+}
+
+model Expense {
+  id      String @id @default(cuid())
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id])
+
+  description String
+  amount      Int // Rupiah
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+enum ChannelType {
+  DINE_IN
+  BUNGKUS
+  ANTAR
+}
+
+enum OrderStatus {
+  OPEN // unpaid, still editable
+  PAID // frozen, no further edits
+  VOID // cancelled, requires OWNER + reason
+  RECEIVABLE // "piutang" — resolved at shift-close time without collecting cash
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+  TRANSFER
+}
+
+model Order {
+  id      String      @id @default(cuid())
+  shiftId String
+  shift   Shift       @relation(fields: [shiftId], references: [id])
+
+  // Persistent, never resets — the receipt's own reference number.
+  // Distinct from queueNumber below (Postgres autoincrement already gives
+  // us atomicity across concurrent devices for free, no manual counter needed).
+  orderNumber Int @unique @default(autoincrement())
+
+  // Server-generated, resets per shift. Identity for the Order Aktif screen.
+  // Not shown to the customer when the order is first created (no ticket at
+  // that point) — only printed later on the payment receipt, alongside
+  // orderNumber.
+  queueNumber Int
+
+  channel    ChannelType
+  tableLabel String? // one of K1, K2, L1, L2, L3 — validated in app code, not DB-level
+
+  // Optional — a name to call out or write on packaging. Free text on
+  // purpose (not tied to tableLabel): "Budi", "meja 3", whatever the
+  // cashier finds useful. Required (enforced in app code) when a shift
+  // close marks this order RECEIVABLE, so there's something to collect
+  // against later.
+  customerName String?
+
+  status OrderStatus @default(OPEN)
+
+  // Food-ready and payment are independent axes — see servedAt vs paidAt.
+  servedAt DateTime?
+
+  paymentMethod PaymentMethod?
+  paidAt        DateTime?
+  cashTendered  Int? // only set when the cashier used a quick cash-denomination button
+  changeGiven   Int?
+
+  // Pre-order: hidden from Order Aktif until this time arrives, shown under
+  // "Pesanan Terjadwal" until then.
+  scheduledFor DateTime?
+
+  createdById String
+  createdBy   User   @relation("OrderCreatedBy", fields: [createdById], references: [id])
+
+  voidReason String?
+  voidedById String?
+  voidedBy   User?   @relation("OrderVoidedBy", fields: [voidedById], references: [id])
+  voidedAt   DateTime?
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shiftId, queueNumber])
+}
+
+// One row per distinct cart line. Product name/price/cost are snapshotted at
+// add-to-cart time so a later price change or product edit never touches
+// historical orders — nothing here is ever joined back to Product for money.
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  productName String // snapshot
+  unitPrice   Int // snapshot of Product.price
+  costPrice   Int? // snapshot of Product.costPrice
+  qty         Int    @default(1)
+  notes       String? // "Catatan · Opsional" free text
+
+  // Snapshot of whether this product's category counted toward Antar
+  // delivery fee at the time it was ordered (category could change later).
+  isDeliveryChargeable Boolean @default(false)
+
+  // Snapshot of Category.isKitchenItem — Makanan and Minuman Racik need
+  // prep, Kulkas/Lain-lain/Frozen don't. Drives the Order Aktif prep-time
+  // estimate (portions needing prep, not total portions).
+  isKitchenItem Boolean @default(true)
+
+  // Sorted fingerprint of productId + addon option ids, e.g. "p1-a3_a5_a7".
+  // Written once at creation; powers the 30-day popular-combo aggregation
+  // without joining/comparing addon sets at query time.
+  comboKey String?
+
+  // (unitPrice + sum(addon prices)) * qty — snapshotted, not recomputed.
+  lineTotal Int
+
+  addons OrderItemAddon[]
+
+  createdAt DateTime @default(now())
+}
+
+model OrderItemAddon {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+
+  addonOptionId String
+  addonOption   AddonOption @relation(fields: [addonOptionId], references: [id])
+
+  name      String // snapshot
+  price     Int // snapshot
+  costPrice Int? // snapshot
+}
+
+// ---------------------------------------------------------------------------
+// Popular combo shortcuts (rolling 30-day cache, refreshed once daily at
+// shift close — never computed on demand while the cashier screen is open)
+// ---------------------------------------------------------------------------
+
+model ComboCache {
+  id          String @id @default(cuid())
+  comboKey    String @unique
+
+  displayName   String
+  totalPrice    Int
+  salesCount30d Int
+
+  // [{ productId, name, qty, addons: [{ addonOptionId, name }] }]
+  items Json
+
+  updatedAt DateTime @updatedAt
+}
