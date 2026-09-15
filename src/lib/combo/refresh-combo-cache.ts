@@ -1,7 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import { buildComboKey } from "@/lib/orders/pricing";
+import { formatAddonWithQty } from "@/lib/printing/format";
 import { NAMED_COMBOS, POPULAR_COMBO_MIN_SALES_30D, POPULAR_COMBO_WINDOW_DAYS } from "./named-combos";
 import type { ComboShortcutItem } from "./types";
+
+// A qty-2 addon (e.g. Ceker x2) is stored as two OrderItemAddon rows with
+// the same addonOptionId (see expandAddonOptionIds) — group them back into
+// one entry with a qty before they become part of a combo's identity/label,
+// so an aggregated combo shows "Ceker x2" instead of "Ceker, Ceker".
+function groupAddonRows(
+  addons: { addonOptionId: string; name: string }[],
+): { addonOptionId: string; name: string; qty: number }[] {
+  const byId = new Map<string, { addonOptionId: string; name: string; qty: number }>();
+  for (const a of addons) {
+    const existing = byId.get(a.addonOptionId);
+    if (existing) existing.qty += 1;
+    else byId.set(a.addonOptionId, { ...a, qty: 1 });
+  }
+  return [...byId.values()];
+}
 
 type ComboCacheRow = {
   comboKey: string;
@@ -54,7 +71,7 @@ async function resolveNamedCombos(): Promise<ComboCacheRow[]> {
           productId: product.id,
           name: product.name,
           qty: 1,
-          addons: resolved.map((o) => ({ addonOptionId: o.id, name: o.name })),
+          addons: resolved.map((o) => ({ addonOptionId: o.id, name: o.name, qty: 1 })),
         },
       ],
     });
@@ -85,7 +102,7 @@ async function aggregateRealCombos(namedByComboKey: Map<string, string>): Promis
 
   const grouped = new Map<
     string,
-    { productId: string; productName: string; addons: { addonOptionId: string; name: string }[]; qty: number }
+    { productId: string; productName: string; addons: { addonOptionId: string; name: string; qty: number }[]; qty: number }
   >();
 
   for (const item of items) {
@@ -98,7 +115,7 @@ async function aggregateRealCombos(namedByComboKey: Map<string, string>): Promis
       grouped.set(key, {
         productId: item.productId,
         productName: item.productName,
-        addons: item.addons.map((a) => ({ addonOptionId: a.addonOptionId, name: a.name })),
+        addons: groupAddonRows(item.addons.map((a) => ({ addonOptionId: a.addonOptionId, name: a.name }))),
         qty: item.qty,
       });
     }
@@ -130,7 +147,8 @@ async function aggregateRealCombos(namedByComboKey: Map<string, string>): Promis
         product.price + g.addons.reduce((sum, a) => sum + (addonById.get(a.addonOptionId)?.price ?? 0), 0);
       return {
         comboKey,
-        displayName: namedByComboKey.get(comboKey) ?? naturalLanguageLabel(g.productName, g.addons.map((a) => a.name)),
+        displayName:
+          namedByComboKey.get(comboKey) ?? naturalLanguageLabel(g.productName, g.addons.map(formatAddonWithQty)),
         totalPrice,
         salesCount30d: g.qty,
         items: [{ productId: g.productId, name: g.productName, qty: 1, addons: g.addons }],

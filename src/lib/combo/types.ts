@@ -6,7 +6,7 @@ export type ComboShortcutItem = {
   productId: string;
   name: string;
   qty: number;
-  addons: { addonOptionId: string; name: string }[];
+  addons: { addonOptionId: string; name: string; qty: number }[];
 };
 
 export type ComboShortcut = {

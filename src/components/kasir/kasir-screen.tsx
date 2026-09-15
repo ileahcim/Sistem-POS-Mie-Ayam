@@ -6,7 +6,7 @@ import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
-import { sameCartLine, type CartItem } from "@/lib/cart/types";
+import { sameCartLine, expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { HeaderMenuButton } from "@/components/ui/header-menu-button";
@@ -127,7 +127,7 @@ export function KasirScreen({
         customerName: draft.customerName.trim() || null,
         items: draft.items.map((i) => ({
           productId: i.productId,
-          addonOptionIds: i.addons.map((a) => a.addonOptionId),
+          addonOptionIds: expandAddonOptionIds(i.addons),
           notes: i.notes,
           qty: i.qty,
         })),
@@ -219,7 +219,7 @@ export function KasirScreen({
             initial={
               sheetTarget.mode === "edit"
                 ? {
-                    selectedOptionIds: sheetTarget.item.addons.map((a) => a.addonOptionId),
+                    addons: sheetTarget.item.addons,
                     notes: sheetTarget.item.notes,
                     qty: sheetTarget.item.qty,
                   }

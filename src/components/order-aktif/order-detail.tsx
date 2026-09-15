@@ -13,6 +13,7 @@ import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
 import { Badge } from "@/components/ui/badge";
 import { formatId } from "@/lib/timezone";
+import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { AddItemsPanel } from "./add-items-panel";
 import { markServed } from "@/app/order-aktif/actions";
 
@@ -94,7 +95,9 @@ export function OrderDetail({
                 </div>
                 {(item.addons.length > 0 || item.notes) && (
                   <span className="text-ink-muted text-sm">
-                    {[item.addons.map((a) => a.name).join(", "), item.notes].filter(Boolean).join(" · ")}
+                    {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 )}
               </div>

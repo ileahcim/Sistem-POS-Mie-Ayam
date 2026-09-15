@@ -6,7 +6,7 @@ import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
-import { sameCartLine, type CartItem } from "@/lib/cart/types";
+import { sameCartLine, expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ChannelTableBar } from "@/components/kasir/channel-table-bar";
@@ -148,7 +148,7 @@ export function PreOrderScreen({
         scheduledFor: scheduledFor.toISOString(),
         items: draft.items.map((i) => ({
           productId: i.productId,
-          addonOptionIds: i.addons.map((a) => a.addonOptionId),
+          addonOptionIds: expandAddonOptionIds(i.addons),
           notes: i.notes,
           qty: i.qty,
         })),
@@ -246,7 +246,7 @@ export function PreOrderScreen({
             initial={
               sheetTarget.mode === "edit"
                 ? {
-                    selectedOptionIds: sheetTarget.item.addons.map((a) => a.addonOptionId),
+                    addons: sheetTarget.item.addons,
                     notes: sheetTarget.item.notes,
                     qty: sheetTarget.item.qty,
                   }

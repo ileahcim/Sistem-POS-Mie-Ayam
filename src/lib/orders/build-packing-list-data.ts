@@ -1,6 +1,7 @@
 import type { OrderDetail } from "./get-order-detail";
 import type { StoreSettings } from "@/lib/settings/get-settings";
 import type { PackingListData } from "@/lib/printing/types";
+import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 
 // Antar-only, printed before payment — checklist for assembling the order,
 // not proof of payment. See CLAUDE.md "Struk & printer".
@@ -13,7 +14,7 @@ export function buildPackingListData(order: OrderDetail, settings: StoreSettings
     tableLabel: order.tableLabel,
     items: order.items.map((item) => ({
       productName: item.productName,
-      addons: item.addons.map((a) => a.name),
+      addons: groupAddonsForPrint(item.addons).map(formatAddonWithQty),
       notes: item.notes,
       qty: item.qty,
     })),

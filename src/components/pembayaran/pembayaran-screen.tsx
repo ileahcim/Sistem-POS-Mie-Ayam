@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { OrderDetail } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
 import { getPrinter } from "@/lib/printing/get-printer";
-import { formatRupiah } from "@/lib/printing/format";
+import { formatRupiah, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,7 +86,9 @@ export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: Me
                     </div>
                     {(item.addons.length > 0 || item.notes) && (
                       <span className="text-ink-muted text-sm">
-                        {[item.addons.map((a) => a.name).join(", "), item.notes].filter(Boolean).join(" · ")}
+                        {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     )}
                   </div>

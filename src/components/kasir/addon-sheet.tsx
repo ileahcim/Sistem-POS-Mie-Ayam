@@ -9,7 +9,7 @@ import { PriceText } from "@/components/ui/price-text";
 import { formatRupiah } from "@/lib/printing/format";
 
 export type AddonSheetInitial = {
-  selectedOptionIds: string[];
+  addons: CartAddon[];
   notes: string;
   qty: number;
 };
@@ -42,8 +42,11 @@ export function AddonSheet({
   onConfirm: (result: AddonSheetResult) => void;
   onClose: () => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(initial?.selectedOptionIds ?? []),
+  // optionId -> qty (0/absent = not selected). A single-select (radio)
+  // group's chosen option always sits at qty 1; a multi-select group's
+  // options can go above 1 via the stepper below.
+  const [qtyByOption, setQtyByOption] = useState<Map<string, number>>(
+    () => new Map((initial?.addons ?? []).map((a) => [a.addonOptionId, a.qty])),
   );
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [qty, setQty] = useState(initial?.qty ?? 1);
@@ -56,20 +59,20 @@ export function AddonSheet({
     return map;
   }, [product]);
 
-  function toggleOption(group: MenuAddonGroup, optionId: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      const isSingle = group.maxSelect === 1;
-      if (isSingle) {
-        for (const opt of group.options) next.delete(opt.id);
-        next.add(optionId);
-        return next;
-      }
-      if (next.has(optionId)) {
-        next.delete(optionId);
-      } else {
-        next.add(optionId);
-      }
+  function selectSingle(group: MenuAddonGroup, optionId: string) {
+    setQtyByOption((prev) => {
+      const next = new Map(prev);
+      for (const opt of group.options) next.delete(opt.id);
+      next.set(optionId, 1);
+      return next;
+    });
+  }
+
+  function setOptionQty(optionId: string, nextQty: number) {
+    setQtyByOption((prev) => {
+      const next = new Map(prev);
+      if (nextQty <= 0) next.delete(optionId);
+      else next.set(optionId, nextQty);
       return next;
     });
   }
@@ -78,18 +81,18 @@ export function AddonSheet({
     let sum = 0;
     for (const group of product.addonGroups) {
       for (const opt of group.options) {
-        if (selected.has(opt.id)) sum += opt.price;
+        sum += opt.price * (qtyByOption.get(opt.id) ?? 0);
       }
     }
     return sum;
-  }, [product, selected]);
+  }, [product, qtyByOption]);
 
   const unitTotal = product.price + unitAddonsTotal;
   const grandTotal = unitTotal * qty;
 
   const allRequiredSatisfied = product.addonGroups.every((group) => {
     if (!isRequired(group)) return true;
-    const count = group.options.filter((o) => selected.has(o.id)).length;
+    const count = group.options.filter((o) => (qtyByOption.get(o.id) ?? 0) > 0).length;
     return count >= group.minSelect;
   });
 
@@ -97,7 +100,8 @@ export function AddonSheet({
     const addons: CartAddon[] = [];
     for (const group of product.addonGroups) {
       for (const opt of group.options) {
-        if (selected.has(opt.id)) addons.push({ addonOptionId: opt.id, name: opt.name, price: opt.price });
+        const optQty = qtyByOption.get(opt.id) ?? 0;
+        if (optQty > 0) addons.push({ addonOptionId: opt.id, name: opt.name, price: opt.price, qty: optQty });
       }
     }
     onConfirm({ addons, notes: notes.trim(), qty });
@@ -118,44 +122,83 @@ export function AddonSheet({
         <PriceText amount={product.price} weight="primary" className="text-lg" />
       </div>
 
-      {product.addonGroups.map((group) => (
-        <div key={group.id} className="border-b border-border py-3">
-          <div className="mb-2">
-            <div className="text-sm font-bold text-ink">{group.name}</div>
-            <div className={`text-xs ${isRequired(group) ? "text-primary-strong" : "text-ink-muted"}`}>
-              {ruleLabel(group)}
+      {product.addonGroups.map((group) => {
+        const isSingle = group.maxSelect === 1;
+        return (
+          <div key={group.id} className="border-b border-border py-3">
+            <div className="mb-2">
+              <div className="text-sm font-bold text-ink">{group.name}</div>
+              <div className={`text-xs ${isRequired(group) ? "text-primary-strong" : "text-ink-muted"}`}>
+                {ruleLabel(group)}
+              </div>
+            </div>
+            <div className="flex flex-col divide-y divide-border">
+              {group.options.map((opt) => {
+                const optQty = qtyByOption.get(opt.id) ?? 0;
+                const checked = optQty > 0;
+
+                if (isSingle) {
+                  return (
+                    <label
+                      key={opt.id}
+                      className="flex min-h-12 cursor-pointer items-center justify-between gap-3 py-2"
+                    >
+                      <span className="text-base text-ink">{opt.name}</span>
+                      <span className="flex items-center gap-3">
+                        {opt.price > 0 ? (
+                          <PriceText amount={opt.price} weight="secondary" prefix="+" />
+                        ) : (
+                          <span className="text-sm font-medium text-ink-muted">Gratis</span>
+                        )}
+                        <input
+                          type="radio"
+                          name={group.id}
+                          checked={checked}
+                          onChange={() => selectSingle(optionToGroup.get(opt.id) ?? group, opt.id)}
+                          className="text-primary h-5 w-5 accent-current"
+                        />
+                      </span>
+                    </label>
+                  );
+                }
+
+                return (
+                  <div key={opt.id} className="flex min-h-12 items-center justify-between gap-3 py-2">
+                    <span className="text-base text-ink">{opt.name}</span>
+                    <span className="flex items-center gap-3">
+                      {opt.price > 0 ? (
+                        <PriceText amount={opt.price} weight="secondary" prefix="+" />
+                      ) : (
+                        <span className="text-sm font-medium text-ink-muted">Gratis</span>
+                      )}
+                      <span className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setOptionQty(opt.id, optQty - 1)}
+                          disabled={optQty === 0}
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border text-xl text-ink disabled:opacity-30"
+                          aria-label={`Kurangi ${opt.name}`}
+                        >
+                          −
+                        </button>
+                        <span className="w-6 text-center text-base font-semibold text-ink">{optQty}</span>
+                        <button
+                          type="button"
+                          onClick={() => setOptionQty(opt.id, optQty + 1)}
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border text-xl text-ink"
+                          aria-label={`Tambah ${opt.name}`}
+                        >
+                          +
+                        </button>
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <div className="flex flex-col divide-y divide-border">
-            {group.options.map((opt) => {
-              const isSingle = group.maxSelect === 1;
-              const checked = selected.has(opt.id);
-              return (
-                <label
-                  key={opt.id}
-                  className="flex min-h-12 cursor-pointer items-center justify-between gap-3 py-2"
-                >
-                  <span className="text-base text-ink">{opt.name}</span>
-                  <span className="flex items-center gap-3">
-                    {opt.price > 0 ? (
-                      <PriceText amount={opt.price} weight="secondary" prefix="+" />
-                    ) : (
-                      <span className="text-sm font-medium text-ink-muted">Gratis</span>
-                    )}
-                    <input
-                      type={isSingle ? "radio" : "checkbox"}
-                      name={group.id}
-                      checked={checked}
-                      onChange={() => toggleOption(optionToGroup.get(opt.id) ?? group, opt.id)}
-                      className="text-primary h-5 w-5 accent-current"
-                    />
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       <div className="py-3">
         <label htmlFor="notes" className="mb-1 block text-sm font-bold text-ink">

@@ -24,7 +24,7 @@ export function resolveComboShortcut(
   for (const a of item.addons) {
     const option = allOptions.find((o) => o.id === a.addonOptionId);
     if (!option) return null;
-    addons.push({ addonOptionId: option.id, name: option.name, price: option.price });
+    addons.push({ addonOptionId: option.id, name: option.name, price: option.price, qty: a.qty });
   }
 
   return {

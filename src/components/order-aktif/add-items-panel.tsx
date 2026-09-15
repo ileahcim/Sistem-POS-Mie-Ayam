@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import type { CartItem } from "@/lib/cart/types";
-import { createLocalId, cartItemLineTotal } from "@/lib/cart/types";
+import { createLocalId, cartItemLineTotal, expandAddonOptionIds } from "@/lib/cart/types";
+import { formatAddonWithQty } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
@@ -93,7 +94,7 @@ export function AddItemsPanel({
         orderId,
         pendingItems.map((i) => ({
           productId: i.productId,
-          addonOptionIds: i.addons.map((a) => a.addonOptionId),
+          addonOptionIds: expandAddonOptionIds(i.addons),
           notes: i.notes,
           qty: i.qty,
         })),
@@ -135,7 +136,7 @@ export function AddItemsPanel({
                 <span className="text-ink font-medium">
                   {item.qty}x {item.productName}
                   {item.addons.length > 0 && (
-                    <span className="text-ink-faint"> ({item.addons.map((a) => a.name).join(", ")})</span>
+                    <span className="text-ink-faint"> ({item.addons.map(formatAddonWithQty).join(", ")})</span>
                   )}
                 </span>
                 <PriceText amount={cartItemLineTotal(item)} weight="secondary" />

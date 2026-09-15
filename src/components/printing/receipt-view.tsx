@@ -1,5 +1,5 @@
 import type { ReceiptData } from "@/lib/printing/types";
-import { formatRupiah, mergeReceiptItems } from "@/lib/printing/format";
+import { formatRupiah, mergeReceiptItems, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { formatId } from "@/lib/timezone";
 
 const CHANNEL_LABEL: Record<ReceiptData["channel"], string> = {
@@ -50,7 +50,7 @@ export function ReceiptView({ data }: { data: ReceiptData }) {
             </div>
             {item.addons.length > 0 && (
               <div className="pl-3 text-[12px] text-neutral-700">
-                {item.addons.map((a) => a.name).join(", ")}
+                {groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", ")}
               </div>
             )}
             {item.notes && (

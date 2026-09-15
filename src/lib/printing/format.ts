@@ -29,5 +29,33 @@ export function mergeReceiptItems(items: ReceiptItem[]): ReceiptItem[] {
 }
 
 export function formatRupiah(amount: number): string {
-  return amount.toLocaleString("id-ID");
+  const sign = amount < 0 ? "-" : "";
+  return `${sign}Rp${Math.abs(amount).toLocaleString("id-ID")}`;
+}
+
+// Groups a flat addon list (one row per selected unit — an addon option
+// picked with qty 2 appears as two identical {name, price} entries, see
+// CartAddon.qty / expandAddonOptionIds) back into one entry per distinct
+// option with a qty count, so it can be printed as "Ceker x2" instead of
+// two separate "Ceker" lines.
+export function groupAddonsForPrint<T extends { name: string; price: number }>(
+  addons: T[],
+): (T & { qty: number })[] {
+  const grouped: (T & { qty: number })[] = [];
+  const indexByKey = new Map<string, number>();
+  for (const addon of addons) {
+    const key = `${addon.name}::${addon.price}`;
+    const existingIndex = indexByKey.get(key);
+    if (existingIndex != null) {
+      grouped[existingIndex].qty += 1;
+    } else {
+      indexByKey.set(key, grouped.length);
+      grouped.push({ ...addon, qty: 1 });
+    }
+  }
+  return grouped;
+}
+
+export function formatAddonWithQty(addon: { name: string; qty: number }): string {
+  return addon.qty > 1 ? `${addon.name} x${addon.qty}` : addon.name;
 }

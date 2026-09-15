@@ -6,6 +6,11 @@ export type CartAddon = {
   addonOptionId: string;
   name: string;
   price: number;
+  // How many of this addon option — a multi-select group ("boleh pilih
+  // banyak") uses a qty stepper instead of a checkbox (e.g. Ceker x2), a
+  // single-select group (radio) always has qty 1. Server-side there's no
+  // separate qty column — see expandAddonOptionIds below.
+  qty: number;
 };
 
 // One cart line. `localId` is a client-only key (stable across re-renders,
@@ -40,7 +45,19 @@ export function createLocalId(): string {
 }
 
 export function cartItemUnitTotal(item: Pick<CartItem, "unitPrice" | "addons">): number {
-  return item.unitPrice + item.addons.reduce((sum, a) => sum + a.price, 0);
+  return item.unitPrice + item.addons.reduce((sum, a) => sum + a.price * a.qty, 0);
+}
+
+// Flattens {addonOptionId, qty}[] into one repeated id per unit — e.g. Ceker
+// with qty 2 becomes ["ceker-id", "ceker-id"] — because the server side
+// (buildOrderItemsCreateData / OrderItemAddon) has no qty column: it just
+// creates one snapshot row per array entry. Two rows of "Ceker" IS qty 2,
+// with no schema change needed and every existing DB-reading aggregate
+// (top-addon-terlaris, margin) counting it correctly for free. Only the
+// receipt/packing-list *display* needs to re-group rows back into "Ceker x2"
+// — see groupAddonsForPrint in src/lib/printing/format.ts.
+export function expandAddonOptionIds(addons: Pick<CartAddon, "addonOptionId" | "qty">[]): string[] {
+  return addons.flatMap((a) => Array(a.qty).fill(a.addonOptionId) as string[]);
 }
 
 export function cartItemLineTotal(item: Pick<CartItem, "unitPrice" | "addons" | "qty">): number {
@@ -58,7 +75,7 @@ export function sameCartLine(
   if (a.productId !== b.productId) return false;
   if (a.notes || b.notes) return false;
   if (a.addons.length !== b.addons.length) return false;
-  const aIds = [...a.addons.map((x) => x.addonOptionId)].sort();
-  const bIds = [...b.addons.map((x) => x.addonOptionId)].sort();
+  const aIds = [...a.addons.map((x) => `${x.addonOptionId}:${x.qty}`)].sort();
+  const bIds = [...b.addons.map((x) => `${x.addonOptionId}:${x.qty}`)].sort();
   return aIds.every((id, i) => id === bIds[i]);
 }

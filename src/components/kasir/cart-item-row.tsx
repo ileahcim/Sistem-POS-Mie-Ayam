@@ -1,6 +1,7 @@
 import type { CartItem } from "@/lib/cart/types";
 import { cartItemLineTotal } from "@/lib/cart/types";
 import { PriceText } from "@/components/ui/price-text";
+import { formatAddonWithQty } from "@/lib/printing/format";
 
 export function CartItemRow({
   item,
@@ -24,7 +25,7 @@ export function CartItemRow({
 
       {hasDetail && (
         <span className="text-sm text-ink-muted">
-          {[item.addons.map((a) => a.name).join(", "), item.notes].filter(Boolean).join(" · ")}
+          {[item.addons.map(formatAddonWithQty).join(", "), item.notes].filter(Boolean).join(" · ")}
         </span>
       )}
 

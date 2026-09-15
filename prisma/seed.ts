@@ -24,14 +24,16 @@ const categories: CategorySeed[] = [
     products: [
       { name: "Mie Ayam", price: 13000 },
       { name: "Bakso", price: 13000 },
+      { name: "Pangsit Rebus", price: 13000 },
+      { name: "Ceker", price: 12000 },
       // Satuan/piece items — separate products, not addons. A standard
       // Bakso bowl already includes 4 small balls + 1 urat via "Jenis
       // Bakso" below; these are for buying extra balls by the piece
-      // (e.g. 2x Bakso Urat with no bowl at all = 20.000).
-      { name: "Bakso Urat", price: 10000 },
-      { name: "Bakso Telur", price: 10000 },
-      { name: "Pangsit Rebus", price: 13000 },
-      { name: "Ceker", price: 12000 },
+      // (e.g. 2x Bakso Urat (bijian) with no bowl at all = 20.000). Kept
+      // at the bottom of the grid + "(bijian)" suffix so they don't get
+      // confused with ordering a full Bakso bowl.
+      { name: "Bakso Urat (bijian)", price: 10000 },
+      { name: "Bakso Telur (bijian)", price: 10000 },
     ],
   },
   {
@@ -275,7 +277,7 @@ async function seedComboCache(
             productId: product.id,
             name: combo.productName,
             qty: 1,
-            addons: resolvedOptions.map((o) => ({ addonOptionId: o.id, name: o.key.split("::")[1] })),
+            addons: resolvedOptions.map((o) => ({ addonOptionId: o.id, name: o.key.split("::")[1], qty: 1 })),
           },
         ],
       },
