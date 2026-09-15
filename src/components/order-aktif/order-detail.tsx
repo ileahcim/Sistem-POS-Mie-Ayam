@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
+import type { PackingListData } from "@/lib/printing/types";
+import { getPrinter } from "@/lib/printing/get-printer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
@@ -19,13 +21,22 @@ const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
   ANTAR: "Antar",
 };
 
-export function OrderDetail({ order, menu }: { order: OrderDetailData; menu: MenuCategory[] }) {
+export function OrderDetail({
+  order,
+  menu,
+  packingList,
+}: {
+  order: OrderDetailData;
+  menu: MenuCategory[];
+  packingList: PackingListData | null;
+}) {
   const router = useRouter();
   const [markingServed, setMarkingServed] = useState(false);
 
   const canAddItems = order.status === "OPEN";
   const canPay = order.status === "OPEN";
   const needsServing = !order.servedAt;
+  const canPrintPackingList = order.status === "OPEN" && !!packingList;
 
   async function handleMarkServed() {
     setMarkingServed(true);
@@ -35,6 +46,11 @@ export function OrderDetail({ order, menu }: { order: OrderDetailData; menu: Men
     } finally {
       setMarkingServed(false);
     }
+  }
+
+  async function handlePrintDaftar() {
+    if (!packingList) return;
+    await getPrinter("mock").printPackingList(packingList);
   }
 
   return (
@@ -79,6 +95,14 @@ export function OrderDetail({ order, menu }: { order: OrderDetailData; menu: Men
             <PriceText amount={order.subtotal} weight="total" />
           </div>
         </Card>
+
+        {canPrintPackingList && (
+          <div className="mt-4">
+            <Button variant="secondary" size="large" fullWidth onClick={handlePrintDaftar}>
+              Print Daftar
+            </Button>
+          </div>
+        )}
 
         {canAddItems && (
           <div className="mt-4">
