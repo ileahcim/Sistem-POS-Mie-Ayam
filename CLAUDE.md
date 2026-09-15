@@ -58,7 +58,7 @@ Kasus rombongan yang duduk di satu meja tapi mau bayar terpisah:
 
 - Print **hanya sekali**, saat pembayaran (MockPrinter sekarang, printer fisik menyusul).
 - Item dengan nama + add-on identik digabung jadi satu baris dengan qty.
-- Khusus channel Antar: tombol **"Print Daftar"** terpisah, dipakai **sebelum** bayar — kotak centang kosong di kiri tiap nama menu, qty dicetak besar, **tanpa harga/total** (ini daftar packing, bukan bukti bayar). Belum dibangun — rencana Tahap 8.
+- Khusus channel Antar: tombol **"Print Daftar"** terpisah, dipakai **sebelum** bayar — kotak centang kosong di kiri tiap nama menu, qty dicetak besar, **tanpa harga/total** (ini daftar packing, bukan bukti bayar). Dibangun Tahap 8.
 - Nama warung, alamat, telepon, footer struk **selalu** dari tabel `Setting` (singleton), tidak pernah di-hardcode di kode.
 
 ## Pembayaran
