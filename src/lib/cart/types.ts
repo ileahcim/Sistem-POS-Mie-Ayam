@@ -46,3 +46,19 @@ export function cartItemUnitTotal(item: Pick<CartItem, "unitPrice" | "addons">):
 export function cartItemLineTotal(item: Pick<CartItem, "unitPrice" | "addons" | "qty">): number {
   return cartItemUnitTotal(item) * item.qty;
 }
+
+// Same product + exact same add-on selection + no notes -> a repeat tap
+// should bump qty on the existing line instead of creating a duplicate one.
+// Order-independent on addons (a cart line's addon array order isn't
+// meaningful). Used for both plain-product re-taps and combo shortcut taps.
+export function sameCartLine(
+  a: Pick<CartItem, "productId" | "addons" | "notes">,
+  b: Pick<CartItem, "productId" | "addons" | "notes">,
+): boolean {
+  if (a.productId !== b.productId) return false;
+  if (a.notes || b.notes) return false;
+  if (a.addons.length !== b.addons.length) return false;
+  const aIds = [...a.addons.map((x) => x.addonOptionId)].sort();
+  const bIds = [...b.addons.map((x) => x.addonOptionId)].sort();
+  return aIds.every((id, i) => id === bIds[i]);
+}

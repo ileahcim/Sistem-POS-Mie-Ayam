@@ -6,18 +6,26 @@ import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
-import type { CartItem } from "@/lib/cart/types";
+import { sameCartLine, type CartItem } from "@/lib/cart/types";
+import type { ComboShortcut } from "@/lib/combo/types";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ChannelTableBar } from "./channel-table-bar";
 import { CategoryTabs } from "./category-tabs";
 import { ProductGrid } from "./product-grid";
+import { ComboShortcutRow } from "./combo-shortcut-row";
 import { AddonSheet, type AddonSheetResult } from "./addon-sheet";
 import { CartPanel } from "./cart-panel";
 import { saveOrder } from "@/app/kasir/actions";
 
 type SheetTarget = { mode: "add"; product: MenuProduct } | { mode: "edit"; product: MenuProduct; item: CartItem };
 
-export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
+export function KasirScreen({
+  categories,
+  comboShortcuts,
+}: {
+  categories: MenuCategory[];
+  comboShortcuts: ComboShortcut[];
+}) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
     useCartDraft();
@@ -61,6 +69,18 @@ export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
         qty: 1,
         isDeliveryChargeable: product.isDeliveryChargeable,
       });
+      setLastAddedLocalId(localId);
+    }
+  }
+
+  function handleTapCombo(item: Omit<CartItem, "localId">) {
+    setSavedNotice(null);
+    const existing = draft.items.find((i) => sameCartLine(i, item));
+    if (existing) {
+      replaceItem(existing.localId, { ...existing, qty: existing.qty + item.qty });
+      setLastAddedLocalId(existing.localId);
+    } else {
+      const localId = addItem(item);
       setLastAddedLocalId(localId);
     }
   }
@@ -157,6 +177,7 @@ export function KasirScreen({ categories }: { categories: MenuCategory[] }) {
             activeId={activeCategory?.id ?? ""}
             onSelect={setActiveCategoryId}
           />
+          <ComboShortcutRow shortcuts={comboShortcuts} categories={categories} onTap={handleTapCombo} />
           {savedNotice && (
             <div className="bg-primary-soft text-primary-strong px-4 py-2 text-sm font-medium">{savedNotice}</div>
           )}

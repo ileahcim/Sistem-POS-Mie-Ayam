@@ -1,6 +1,8 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { buildComboKey } from "../src/lib/orders/pricing";
+import { NAMED_COMBOS } from "../src/lib/combo/named-combos";
 
 const adapter = new PrismaPg({ connectionString: process.env.DIRECT_URL });
 const prisma = new PrismaClient({ adapter });
@@ -222,6 +224,65 @@ async function main() {
   console.log(`Seeded ${categories.length} categories, ${productByName.size} products, ${addonGroups.length} addon groups.`);
 
   verifySeedPrices(productByName, optionByGroupAndName);
+  await seedComboCache(productByName, optionByGroupAndName);
+}
+
+// Menu populer: the 6 manual named combos, used as the "Menu Populer"
+// shortcut row before 30 days of real sales data crosses the threshold —
+// see CLAUDE.md "Menu populer" and src/lib/combo/refresh-combo-cache.ts.
+// Only seeds on a fresh install (ComboCache empty) — once real sales data
+// has taken over the cache, re-running this script must never contaminate
+// it back with the fallback placeholders.
+//
+// Prices are computed from the SAME productByName/optionByGroupAndName maps
+// verifySeedPrices just validated above — never hardcoded here, so any
+// future menu price change (like the Bakso Urat/Telur satuan split or the
+// Bakso Telur topping price) is automatically reflected without touching
+// this function.
+async function seedComboCache(
+  products: Map<string, { id: string; price: number }>,
+  options: Map<string, { id: string; price: number }>,
+) {
+  const existingCount = await prisma.comboCache.count();
+  if (existingCount > 0) {
+    console.log("ComboCache already has data (real sales likely took over) — skipping seed.");
+    return;
+  }
+
+  for (const combo of NAMED_COMBOS) {
+    const product = products.get(combo.productName);
+    if (!product) throw new Error(`Seed error: product "${combo.productName}" not found for combo "${combo.displayName}"`);
+    const resolvedOptions = combo.addonKeys.map((key) => {
+      const option = options.get(key);
+      if (!option) throw new Error(`Seed error: addon option "${key}" not found for combo "${combo.displayName}"`);
+      return { key, ...option };
+    });
+
+    const comboKey = buildComboKey(
+      product.id,
+      resolvedOptions.map((o) => o.id),
+    );
+    const totalPrice = product.price + resolvedOptions.reduce((sum, o) => sum + o.price, 0);
+
+    await prisma.comboCache.create({
+      data: {
+        comboKey,
+        displayName: combo.displayName,
+        totalPrice,
+        salesCount30d: 0,
+        items: [
+          {
+            productId: product.id,
+            name: combo.productName,
+            qty: 1,
+            addons: resolvedOptions.map((o) => ({ addonOptionId: o.id, name: o.key.split("::")[1] })),
+          },
+        ],
+      },
+    });
+  }
+
+  console.log(`Seeded ${NAMED_COMBOS.length} combo cache rows.`);
 }
 
 // Cross-check the base-product + add-on structure actually reproduces the

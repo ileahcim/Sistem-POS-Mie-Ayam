@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireRole } from "@/lib/auth/get-current-user";
 import { DELIVERY_FEE_PER_FOOD_ITEM } from "@/lib/orders/pricing";
+import { refreshComboCache } from "@/lib/combo/refresh-combo-cache";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -136,6 +137,16 @@ export async function closeShift(countedCash: number): Promise<CloseShiftResult>
       difference,
     },
   });
+
+  // Menu populer: rolling 30-day aggregation, refreshed once a day right
+  // here (never real-time) — see CLAUDE.md "Menu populer". Never let a
+  // failure here block the shift from actually closing; it's a cash
+  // reconciliation event, not a business-intelligence one.
+  try {
+    await refreshComboCache();
+  } catch (e) {
+    console.error("refreshComboCache failed after shift close:", e);
+  }
 
   return { ok: true, cashSales, nonCashSales, expenseTotal, expectedCash, countedCash, difference };
 }

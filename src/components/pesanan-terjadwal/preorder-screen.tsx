@@ -6,11 +6,13 @@ import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
-import type { CartItem } from "@/lib/cart/types";
+import { sameCartLine, type CartItem } from "@/lib/cart/types";
+import type { ComboShortcut } from "@/lib/combo/types";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ChannelTableBar } from "@/components/kasir/channel-table-bar";
 import { CategoryTabs } from "@/components/kasir/category-tabs";
 import { ProductGrid } from "@/components/kasir/product-grid";
+import { ComboShortcutRow } from "@/components/kasir/combo-shortcut-row";
 import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-sheet";
 import { CartPanel } from "@/components/kasir/cart-panel";
 import { savePreOrder } from "@/app/pesanan-terjadwal/actions";
@@ -26,7 +28,13 @@ type SheetTarget = { mode: "add"; product: MenuProduct } | { mode: "edit"; produ
 // there's no queue number to identify it by until it's paid. Uses a
 // separate localStorage draft key so an in-progress walk-in cart on the
 // same device is never clobbered by an in-progress pre-order, or vice versa.
-export function PreOrderScreen({ categories }: { categories: MenuCategory[] }) {
+export function PreOrderScreen({
+  categories,
+  comboShortcuts,
+}: {
+  categories: MenuCategory[];
+  comboShortcuts: ComboShortcut[];
+}) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
     useCartDraft(PREORDER_STORAGE_KEY);
@@ -69,6 +77,18 @@ export function PreOrderScreen({ categories }: { categories: MenuCategory[] }) {
         qty: 1,
         isDeliveryChargeable: product.isDeliveryChargeable,
       });
+      setLastAddedLocalId(localId);
+    }
+  }
+
+  function handleTapCombo(item: Omit<CartItem, "localId">) {
+    setSaveError(null);
+    const existing = draft.items.find((i) => sameCartLine(i, item));
+    if (existing) {
+      replaceItem(existing.localId, { ...existing, qty: existing.qty + item.qty });
+      setLastAddedLocalId(existing.localId);
+    } else {
+      const localId = addItem(item);
       setLastAddedLocalId(localId);
     }
   }
@@ -192,6 +212,7 @@ export function PreOrderScreen({ categories }: { categories: MenuCategory[] }) {
             activeId={activeCategory?.id ?? ""}
             onSelect={setActiveCategoryId}
           />
+          <ComboShortcutRow shortcuts={comboShortcuts} categories={categories} onTap={handleTapCombo} />
           <ProductGrid
             products={activeCategory?.products ?? []}
             cartQtyByProduct={cartQtyByProduct}
