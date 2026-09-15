@@ -7,6 +7,8 @@ import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { HeaderMenuButton } from "@/components/ui/header-menu-button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { NoOrdersIcon } from "@/components/ui/empty-state-icons";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { OrderRow } from "./order-row";
 
@@ -63,7 +65,13 @@ export function OrderAktifList({
       <div className="flex-1 overflow-y-auto p-3">
         <Card>
           {orders.length === 0 ? (
-            <p className="text-ink-faint py-12 text-center">Tidak ada order aktif.</p>
+            <EmptyState
+              icon={<NoOrdersIcon />}
+              title="Belum ada order aktif"
+              description="Order yang dibuat di Kasir akan muncul di sini sampai selesai dibayar."
+              actionHref="/kasir"
+              actionLabel="Ke Kasir"
+            />
           ) : (
             orders.map((order) => (
               <OrderRow

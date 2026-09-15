@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/link-button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { NoScheduleIcon } from "@/components/ui/empty-state-icons";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { formatId } from "@/lib/timezone";
 
@@ -39,7 +41,13 @@ export function PesananTerjadwalList({ orders }: { orders: PreOrderSummary[] }) 
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           {orders.length === 0 ? (
-            <p className="text-ink-faint py-12 text-center">Belum ada pesanan terjadwal.</p>
+            <EmptyState
+              icon={<NoScheduleIcon />}
+              title="Belum ada pesanan terjadwal"
+              description="Pre-order yang belum jatuh tempo (mis. pesanan WhatsApp untuk besok) muncul di sini."
+              actionHref="/kasir"
+              actionLabel="Ke Kasir"
+            />
           ) : (
             orders.map((order) => (
               <ListRow key={order.id} onClick={() => router.push(`/order-aktif/${order.id}`)} roomy>

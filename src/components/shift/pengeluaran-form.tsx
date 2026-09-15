@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
 import { RupiahInput } from "@/components/ui/rupiah-input";
+import { EmptyState } from "@/components/ui/empty-state";
+import { NoExpenseIcon } from "@/components/ui/empty-state-icons";
 import { addExpense } from "@/app/shift/actions";
 
 export function PengeluaranForm({ initialExpenses }: { initialExpenses: ShiftExpense[] }) {
@@ -34,7 +36,15 @@ export function PengeluaranForm({ initialExpenses }: { initialExpenses: ShiftExp
       </p>
 
       <Card>
-        {expenses.length === 0 && <p className="text-ink-faint p-4 text-sm">Belum ada pengeluaran.</p>}
+        {expenses.length === 0 && (
+          <EmptyState
+            icon={<NoExpenseIcon />}
+            title="Belum ada pengeluaran"
+            description="Catat di sini setiap kali beli gas, bensin, atau keperluan warung lain."
+            actionHref="/kasir"
+            actionLabel="Ke Kasir"
+          />
+        )}
         <div className="divide-border flex flex-col divide-y">
           {expenses.map((e) => (
             <div key={e.id} className="flex justify-between p-4 text-sm">

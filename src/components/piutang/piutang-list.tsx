@@ -3,6 +3,8 @@ import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { PriceText } from "@/components/ui/price-text";
+import { EmptyState } from "@/components/ui/empty-state";
+import { NoDebtIcon } from "@/components/ui/empty-state-icons";
 import { formatId } from "@/lib/timezone";
 
 function formatDate(iso: string): string {
@@ -20,7 +22,13 @@ export function PiutangList({ orders }: { orders: ReceivableOrder[] }) {
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           {orders.length === 0 ? (
-            <p className="text-ink-faint py-12 text-center">Tidak ada piutang.</p>
+            <EmptyState
+              icon={<NoDebtIcon />}
+              title="Tidak ada piutang"
+              description="Semua order sudah lunas — belum ada yang ditandai piutang."
+              actionHref="/kasir"
+              actionLabel="Ke Kasir"
+            />
           ) : (
             orders.map((order) => (
               <ListRow key={order.id} roomy asLink={`/pembayaran/${order.id}`}>
