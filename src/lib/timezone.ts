@@ -75,6 +75,20 @@ export function mondayOfLocalWeek(date: Date): { year: number; month: number; da
   return { year: scratch.getUTCFullYear(), month: scratch.getUTCMonth() + 1, day: scratch.getUTCDate() };
 }
 
+// Turns a "YYYY-MM-DD" Jakarta calendar date (e.g. a <input type="date">
+// filter value) into the UTC instant range covering that whole day in WIB —
+// [start, end) — ready for a Prisma `gte`/`lt` range query. WIB has no DST
+// (see module comment), so this is a fixed -7h offset from local midnight;
+// Date.UTC's built-in overflow normalization handles the day rollover, same
+// day-math-scratchpad trick as mondayOfLocalWeek above.
+export function wibDateRange(dateStr: string): { start: Date; end: Date } {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return {
+    start: new Date(Date.UTC(year, month - 1, day, -7, 0, 0, 0)),
+    end: new Date(Date.UTC(year, month - 1, day + 1, -7, 0, 0, 0)),
+  };
+}
+
 // Every user-facing date/time display should call this instead of
 // constructing `new Intl.DateTimeFormat("id-ID", ...)` directly — same
 // explicit-timeZone reasoning as above. Safe to import from both client

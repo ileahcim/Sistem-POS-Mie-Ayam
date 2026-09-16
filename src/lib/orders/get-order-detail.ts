@@ -28,6 +28,8 @@ export type OrderDetail = {
   paidAt: string | null;
   cashTendered: number | null;
   changeGiven: number | null;
+  voidReason: string | null;
+  voidedAt: string | null;
   items: OrderDetailItem[];
   subtotal: number;
   deliveryFee: number;
@@ -74,6 +76,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     paidAt: order.paidAt?.toISOString() ?? null,
     cashTendered: order.cashTendered,
     changeGiven: order.changeGiven,
+    voidReason: order.voidReason,
+    voidedAt: order.voidedAt?.toISOString() ?? null,
     items,
     subtotal,
     deliveryFee,

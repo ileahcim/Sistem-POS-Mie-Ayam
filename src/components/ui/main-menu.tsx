@@ -15,6 +15,9 @@ export function MainMenu({ isOwner }: { isOwner: boolean }) {
       <ListRow asLink="/order-aktif">
         <span className="text-base font-semibold text-ink">Order Aktif</span>
       </ListRow>
+      <ListRow asLink="/riwayat-pesanan">
+        <span className="text-base font-semibold text-ink">Riwayat Pesanan</span>
+      </ListRow>
       {isOwner && (
         <ListRow asLink="/dashboard">
           <span className="text-base font-semibold text-ink">Dashboard</span>

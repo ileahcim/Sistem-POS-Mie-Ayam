@@ -50,3 +50,13 @@ export function NoExpenseIcon() {
     </svg>
   );
 }
+
+export function NoHistoryIcon() {
+  return (
+    <svg {...shared}>
+      <circle cx="20" cy="21" r="14" />
+      <path d="M20 13v8l6 4" />
+      <path d="M9 8 6 11M31 8l3 3" />
+    </svg>
+  );
+}
