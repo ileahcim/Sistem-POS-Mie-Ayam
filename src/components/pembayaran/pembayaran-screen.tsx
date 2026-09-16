@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { OrderDetail } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
 import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { ReceiptData } from "@/lib/printing/types";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { formatRupiah, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
@@ -31,16 +32,24 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
 export function PembayaranScreen({
   order,
   menu,
+  autoPrintReceipt,
   orderAktifIndicator,
 }: {
   order: OrderDetail;
   menu: MenuCategory[];
+  autoPrintReceipt: boolean;
   orderAktifIndicator: OrderAktifIndicator;
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set only when autoPrintReceipt is off and payment just succeeded — the
+  // transaction is already fully saved at this point either way (CLAUDE.md
+  // "Opsi Print"), this state purely gates whether the PRINT action itself
+  // happens before leaving the screen.
+  const [pendingReceipt, setPendingReceipt] = useState<ReceiptData | null>(null);
+  const [printing, setPrinting] = useState(false);
 
   // RECEIVABLE (piutang) is still payable — settling it later is the whole
   // point. Only PAID/VOID actually block the payment UI.
@@ -56,11 +65,27 @@ export function PembayaranScreen({
         setError(result.error);
         return;
       }
-      await getPrinter("mock").printReceipt(result.receipt);
-      router.push("/order-aktif");
+      if (autoPrintReceipt) {
+        await getPrinter("mock").printReceipt(result.receipt);
+        router.push("/order-aktif");
+      } else {
+        setPendingReceipt(result.receipt);
+      }
     } finally {
       setPaying(false);
     }
+  }
+
+  async function handlePrintChoice(shouldPrint: boolean) {
+    if (shouldPrint && pendingReceipt) {
+      setPrinting(true);
+      try {
+        await getPrinter("mock").printReceipt(pendingReceipt);
+      } finally {
+        setPrinting(false);
+      }
+    }
+    router.push("/order-aktif");
   }
 
   return (
@@ -88,7 +113,35 @@ export function PembayaranScreen({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {alreadyPaid ? (
+        {pendingReceipt ? (
+          <div className="flex flex-col items-center gap-4 py-8 text-center">
+            <Badge variant="success">Pembayaran berhasil</Badge>
+            <div>
+              <p className="text-ink text-lg font-bold">Cetak struk?</p>
+              <p className="text-ink-muted mt-1 text-sm">Transaksi sudah tersimpan — ini cuma soal cetak kertasnya.</p>
+            </div>
+            <div className="flex w-full max-w-xs gap-2">
+              <Button
+                variant="secondary"
+                size="large"
+                fullWidth
+                disabled={printing}
+                onClick={() => handlePrintChoice(false)}
+              >
+                Tidak
+              </Button>
+              <Button
+                variant="primary"
+                size="large"
+                fullWidth
+                disabled={printing}
+                onClick={() => handlePrintChoice(true)}
+              >
+                {printing ? "Mencetak..." : "Ya, Cetak"}
+              </Button>
+            </div>
+          </div>
+        ) : alreadyPaid ? (
           <div className="flex justify-center py-8">
             <Badge variant="success">Sudah dibayar ({order.paymentMethod})</Badge>
           </div>
@@ -165,7 +218,7 @@ export function PembayaranScreen({
         )}
       </div>
 
-      {!alreadyPaid && (
+      {!alreadyPaid && !pendingReceipt && (
         <div className="border-border bg-surface border-t p-4">
           <Button variant="primary" size="large" fullWidth disabled={!method || paying} onClick={handlePay}>
             {paying ? "Memproses..." : `Bayar - ${formatRupiah(order.total)}`}

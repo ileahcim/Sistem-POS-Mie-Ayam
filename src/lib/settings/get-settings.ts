@@ -7,6 +7,7 @@ export type StoreSettings = {
   receiptFooter: string;
   prepBaseMinutes: number;
   prepMinutesPerPortion: number;
+  autoPrintReceipt: boolean;
 };
 
 const FALLBACK: StoreSettings = {
@@ -16,6 +17,7 @@ const FALLBACK: StoreSettings = {
   receiptFooter: "Terima kasih!",
   prepBaseMinutes: 4,
   prepMinutesPerPortion: 1,
+  autoPrintReceipt: true,
 };
 
 // The singleton row is created by prisma/seed.ts, but fall back gracefully
@@ -30,5 +32,6 @@ export async function getSettings(): Promise<StoreSettings> {
     receiptFooter: setting.receiptFooter,
     prepBaseMinutes: setting.prepBaseMinutes,
     prepMinutesPerPortion: setting.prepMinutesPerPortion,
+    autoPrintReceipt: setting.autoPrintReceipt,
   };
 }

@@ -63,6 +63,14 @@ model Setting {
   prepBaseMinutes       Int @default(4)
   prepMinutesPerPortion Int @default(1)
 
+  // On (default): receipt prints automatically right after payment, same
+  // as before this setting existed. Off: the cashier is asked "Cetak
+  // struk?" after Bayar — the transaction itself is always fully saved
+  // either way; this only ever gates the PRINT action, never the payment.
+  // Owner-tunable from /admin/settings — paper-saving toggle for customers
+  // who don't need a receipt.
+  autoPrintReceipt Boolean @default(true)
+
   updatedAt DateTime @updatedAt
 }
 
