@@ -17,6 +17,7 @@ export function buildReceiptData(order: OrderDetail, settings: StoreSettings): R
     storeName: settings.storeName,
     orderNumber: order.orderNumber,
     queueNumber: order.queueNumber,
+    queueSuffix: order.queueSuffix,
     printedAt: order.paidAt ? new Date(order.paidAt) : new Date(),
     channel: order.channel,
     tableLabel: order.tableLabel,

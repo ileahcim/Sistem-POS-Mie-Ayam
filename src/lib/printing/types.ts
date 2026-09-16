@@ -24,6 +24,7 @@ export type ReceiptData = {
   storeName: string;
   orderNumber: number;
   queueNumber: number;
+  queueSuffix: string; // "" normally, "A"/"B"/... for a Pisahkan & Bayar child
   printedAt: Date;
   channel: ReceiptChannel;
   tableLabel?: string | null;
@@ -50,6 +51,7 @@ export type PackingListData = {
   storeName: string;
   orderNumber: number;
   queueNumber: number | null; // null: a pre-order not yet paid/attached to a shift
+  queueSuffix: string;
   printedAt: Date;
   tableLabel?: string | null;
   items: PackingListItem[];

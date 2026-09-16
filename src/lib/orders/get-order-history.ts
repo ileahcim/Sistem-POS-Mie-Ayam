@@ -6,6 +6,7 @@ export type OrderHistoryRow = {
   id: string;
   orderNumber: number;
   queueNumber: number | null;
+  queueSuffix: string;
   createdAt: string;
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
@@ -67,6 +68,7 @@ export async function getOrderHistory(filter: OrderHistoryFilter): Promise<Order
       id: order.id,
       orderNumber: order.orderNumber,
       queueNumber: order.queueNumber,
+      queueSuffix: order.queueSuffix,
       createdAt: order.createdAt.toISOString(),
       channel: order.channel,
       tableLabel: order.tableLabel,

@@ -13,6 +13,7 @@ import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { formatId } from "@/lib/timezone";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
@@ -60,7 +61,8 @@ export function RiwayatDetail({
       <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
         <div>
           <h1 className="text-lg font-bold text-ink">
-            {order.queueNumber != null ? `#${order.queueNumber}` : "Pre-order"} · {CHANNEL_LABEL[order.channel]}
+            {order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : "Pre-order"} ·{" "}
+            {CHANNEL_LABEL[order.channel]}
             {order.tableLabel ? ` · ${order.tableLabel}` : ""}
           </h1>
           <p className="text-ink-muted text-sm">

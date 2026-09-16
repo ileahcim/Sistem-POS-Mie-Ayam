@@ -8,6 +8,7 @@ export type ActiveOrderItem = {
 export type ActiveOrder = {
   id: string;
   queueNumber: number | null; // null: a due pre-order not yet paid — see CLAUDE.md "Pre-order"
+  queueSuffix: string; // "" normally, "A"/"B"/... for a Pisahkan & Bayar child — see queue-label.ts
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   createdAt: string; // ISO — serializable across the server/client boundary
@@ -35,6 +36,7 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
   return orders.map((order) => ({
     id: order.id,
     queueNumber: order.queueNumber,
+    queueSuffix: order.queueSuffix,
     channel: order.channel,
     tableLabel: order.tableLabel,
     createdAt: order.createdAt.toISOString(),
@@ -48,6 +50,7 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
 export type UnpaidServedOrder = {
   id: string;
   queueNumber: number | null;
+  queueSuffix: string;
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   servedAt: string;
@@ -66,6 +69,7 @@ export async function getUnpaidServedOrders(): Promise<UnpaidServedOrder[]> {
   return orders.map((order) => ({
     id: order.id,
     queueNumber: order.queueNumber,
+    queueSuffix: order.queueSuffix,
     channel: order.channel,
     tableLabel: order.tableLabel,
     servedAt: order.servedAt!.toISOString(),

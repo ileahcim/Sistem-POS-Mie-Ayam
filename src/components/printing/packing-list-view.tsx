@@ -1,6 +1,7 @@
 import type { PackingListData } from "@/lib/printing/types";
 import { paperRule } from "@/lib/printing/paper";
 import { formatId } from "@/lib/timezone";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 
 function formatDateTime(date: Date): string {
   return formatId(date, { dateStyle: "medium", timeStyle: "short" });
@@ -24,7 +25,11 @@ export function PackingListView({ data }: { data: PackingListData }) {
         <div className="text-base font-bold">{data.storeName}</div>
         <div className="font-bold">DAFTAR PACKING</div>
         <div>No. Order {data.orderNumber}</div>
-        <div>{data.queueNumber != null ? `Antrian #${data.queueNumber}` : "Pre-order · belum dibayar"}</div>
+        <div>
+          {data.queueNumber != null
+            ? `Antrian ${formatQueueLabel(data.queueNumber, data.queueSuffix)}`
+            : "Pre-order · belum dibayar"}
+        </div>
         <div>{formatDateTime(data.printedAt)}</div>
         <div>Antar{data.tableLabel ? ` · ${data.tableLabel}` : ""}</div>
       </div>

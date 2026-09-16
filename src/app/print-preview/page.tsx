@@ -11,6 +11,7 @@ function sampleReceipt(): ReceiptData {
     storeName: STORE_NAME,
     orderNumber: 118,
     queueNumber: 7,
+    queueSuffix: "",
     printedAt: new Date(),
     channel: "DINE_IN",
     tableLabel: "K1",
@@ -48,6 +49,7 @@ function samplePackingList(): PackingListData {
     storeName: STORE_NAME,
     orderNumber: 119,
     queueNumber: 8,
+    queueSuffix: "",
     printedAt: new Date(),
     items: [
       {

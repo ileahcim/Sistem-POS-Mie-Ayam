@@ -4,6 +4,7 @@ import { DELIVERY_FEE_PER_FOOD_ITEM } from "./pricing";
 export type ReceivableOrder = {
   id: string;
   queueNumber: number | null;
+  queueSuffix: string;
   customerName: string | null;
   createdAt: string;
   total: number;
@@ -25,6 +26,7 @@ export async function getReceivableOrders(): Promise<ReceivableOrder[]> {
     return {
       id: order.id,
       queueNumber: order.queueNumber,
+      queueSuffix: order.queueSuffix,
       customerName: order.customerName,
       createdAt: order.createdAt.toISOString(),
       total: subtotal + deliveryFee,

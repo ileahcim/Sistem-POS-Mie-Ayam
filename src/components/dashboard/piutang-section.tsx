@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { PriceText } from "@/components/ui/price-text";
 import { formatId } from "@/lib/timezone";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 
 function formatDate(iso: string): string {
   return formatId(new Date(iso), { dateStyle: "medium" });
@@ -28,8 +29,8 @@ export function PiutangSection({ orders }: { orders: ReceivableOrder[] }) {
         ) : (
           orders.map((order) => (
             <ListRow key={order.id} asLink={`/pembayaran/${order.id}`}>
-              <span className="w-12 shrink-0 text-lg font-bold text-ink">
-                {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
+              <span className="w-14 shrink-0 text-lg font-bold text-ink">
+                {formatQueueLabel(order.queueNumber, order.queueSuffix)}
               </span>
               <span className="text-ink-muted flex-1 text-sm">
                 {order.customerName} · {formatDate(order.createdAt)}

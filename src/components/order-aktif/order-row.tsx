@@ -1,6 +1,7 @@
 import type { ActiveOrder } from "@/lib/orders/get-active-orders";
 import { BULK_ORDER_QTY_THRESHOLD } from "@/lib/orders/pricing";
 import { computeEstimateMinutes, elapsedMinutes, isLateOrder } from "@/lib/orders/prep-timer";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { ListRow } from "@/components/ui/list-row";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/components/ui/cn";
@@ -45,8 +46,8 @@ export function OrderRow({
 
   return (
     <ListRow onClick={onTap} dense className={cn(isBulk && "bg-info-soft")}>
-      <span className="w-12 shrink-0 text-lg font-bold text-ink">
-        {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
+      <span className="w-14 shrink-0 text-lg font-bold text-ink">
+        {formatQueueLabel(order.queueNumber, order.queueSuffix)}
       </span>
       <span className="text-ink w-20 shrink-0 text-sm font-semibold">{secondColumn}</span>
       <span className="text-ink-muted flex-1 truncate text-sm">{itemSummary}</span>

@@ -16,6 +16,8 @@ import { cn } from "@/components/ui/cn";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { AddItemsPanel } from "@/components/order-aktif/add-items-panel";
+import { SplitAndPayButton } from "@/components/order-aktif/split-and-pay-sheet";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
 
 // Cash and QRIS only — no Transfer button. Payment is always "tap method,
@@ -67,7 +69,7 @@ export function PembayaranScreen({
       <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
         <div>
           <h1 className="text-lg font-bold text-ink">
-            Pembayaran {order.queueNumber != null ? `#${order.queueNumber}` : "(Pre-order)"}
+            Pembayaran {order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : "(Pre-order)"}
           </h1>
           <p className="text-ink-muted text-sm">No. Order {order.orderNumber}</p>
         </div>
@@ -133,6 +135,12 @@ export function PembayaranScreen({
             {order.status === "OPEN" && (
               <div className="mt-4">
                 <AddItemsPanel orderId={order.id} menu={menu} onAdded={() => router.refresh()} />
+              </div>
+            )}
+
+            {order.status === "OPEN" && (
+              <div className="mt-3 flex justify-center">
+                <SplitAndPayButton order={order} />
               </div>
             )}
 

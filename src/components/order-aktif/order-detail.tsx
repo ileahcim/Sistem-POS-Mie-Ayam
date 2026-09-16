@@ -15,8 +15,10 @@ import { PriceText } from "@/components/ui/price-text";
 import { Badge } from "@/components/ui/badge";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { formatId } from "@/lib/timezone";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { AddItemsPanel } from "./add-items-panel";
+import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { markServed } from "@/app/order-aktif/actions";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
@@ -69,7 +71,8 @@ export function OrderDetail({
       <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
         <div>
           <h1 className="text-lg font-bold text-ink">
-            {order.queueNumber != null ? `#${order.queueNumber}` : "Pre-order"} · {CHANNEL_LABEL[order.channel]}
+            {order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : "Pre-order"} ·{" "}
+            {CHANNEL_LABEL[order.channel]}
             {order.tableLabel ? ` · ${order.tableLabel}` : ""}
           </h1>
           {order.scheduledFor && (
@@ -119,6 +122,12 @@ export function OrderDetail({
             <Button variant="secondary" size="large" fullWidth onClick={handlePrintDaftar}>
               Print Daftar
             </Button>
+          </div>
+        )}
+
+        {order.status === "OPEN" && (
+          <div className="mt-3 flex justify-center">
+            <SplitAndPayButton order={order} />
           </div>
         )}
 

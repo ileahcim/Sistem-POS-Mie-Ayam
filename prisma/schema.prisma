@@ -259,6 +259,15 @@ model Order {
   // until payment, same moment as shiftId (see CLAUDE.md "Pre-order").
   queueNumber Int?
 
+  // "" for a normal order. "A"/"B"/... for a child created by "Pisahkan &
+  // Bayar" (see splitAndPay in order-aktif/actions.ts) — it shares its
+  // parent's queueNumber (shown as "#18-A") but is otherwise a completely
+  // normal, independently payable Order row with its own orderNumber. Never
+  // null (unlike queueNumber) specifically so it can sit in the unique
+  // constraint below without Postgres's NULL-is-never-equal-to-NULL rule
+  // silently letting two plain orders share a queueNumber.
+  queueSuffix String @default("")
+
   channel    ChannelType
   tableLabel String? // one of K1, K2, L1, L2, L3 — validated in app code, not DB-level
 
@@ -296,7 +305,7 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([shiftId, queueNumber])
+  @@unique([shiftId, queueNumber, queueSuffix])
 }
 
 // One row per distinct cart line. Product name/price/cost are snapshotted at

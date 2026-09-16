@@ -9,6 +9,7 @@ import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { voidUnpaidOrder, markOrderReceivable, addExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
 
 type Step = "warning" | "unpaid" | "expenses" | "count" | "result";
@@ -55,7 +56,8 @@ function UnpaidOrderRow({
     <Card padded>
       <div className="flex justify-between gap-3">
         <span className="font-semibold text-ink">
-          #{order.queueNumber} · {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
+          {formatQueueLabel(order.queueNumber, order.queueSuffix)} ·{" "}
+          {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
         </span>
         <PriceText amount={order.total} weight="primary" />
       </div>

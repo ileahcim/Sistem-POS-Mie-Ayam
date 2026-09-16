@@ -2,6 +2,7 @@ import type { ReceiptData } from "@/lib/printing/types";
 import { formatRupiah, mergeReceiptItems, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { paperRule, centeredRule } from "@/lib/printing/paper";
 import { formatId } from "@/lib/timezone";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 
 const CHANNEL_LABEL: Record<ReceiptData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -43,7 +44,7 @@ export function ReceiptView({ data }: { data: ReceiptData }) {
       <div className="text-center">
         <div className="text-base font-bold">{data.storeName}</div>
         <div>No. Order {data.orderNumber}</div>
-        <div>Antrian #{data.queueNumber}</div>
+        <div>Antrian {formatQueueLabel(data.queueNumber, data.queueSuffix)}</div>
         <div>{formatDateTime(data.printedAt)}</div>
         <div>{channelLine}</div>
       </div>

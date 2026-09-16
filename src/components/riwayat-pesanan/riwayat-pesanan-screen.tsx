@@ -15,6 +15,7 @@ import { NoHistoryIcon } from "@/components/ui/empty-state-icons";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { formatId } from "@/lib/timezone";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 
 const CHANNEL_LABEL: Record<OrderHistoryRow["channel"], string> = {
   DINE_IN: "Dine In",
@@ -135,7 +136,7 @@ export function RiwayatPesananScreen({
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
                     <span className="text-ink shrink-0 text-base font-bold">
-                      {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
+                      {formatQueueLabel(order.queueNumber, order.queueSuffix)}
                     </span>
                     <span className="text-ink-muted truncate text-sm">
                       {CHANNEL_LABEL[order.channel]}

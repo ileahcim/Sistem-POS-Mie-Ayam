@@ -16,6 +16,7 @@ export type OrderDetail = {
   id: string;
   shiftId: string | null; // null until a shift is attached — see "Pre-order" in CLAUDE.md
   queueNumber: number | null; // null until shiftId is attached (same moment)
+  queueSuffix: string; // "" normally, "A"/"B"/... for a Pisahkan & Bayar child — see queue-label.ts
   orderNumber: number;
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
@@ -64,6 +65,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     id: order.id,
     shiftId: order.shiftId,
     queueNumber: order.queueNumber,
+    queueSuffix: order.queueSuffix,
     orderNumber: order.orderNumber,
     channel: order.channel,
     tableLabel: order.tableLabel,

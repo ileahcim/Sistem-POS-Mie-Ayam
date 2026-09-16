@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { ActiveOrder, UnpaidServedOrder } from "@/lib/orders/get-active-orders";
 import { useNow } from "@/lib/use-now";
 import { computeEstimateMinutes, elapsedMinutes, isLateOrder } from "@/lib/orders/prep-timer";
+import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
@@ -90,8 +91,8 @@ export function OrderAktifList({
             <Card>
               {unpaidServed.map((order) => (
                 <ListRow key={order.id} onClick={() => router.push(`/order-aktif/${order.id}`)} dense>
-                  <span className="w-12 shrink-0 text-lg font-bold text-ink">
-                    {order.queueNumber != null ? `#${order.queueNumber}` : "—"}
+                  <span className="w-14 shrink-0 text-lg font-bold text-ink">
+                    {formatQueueLabel(order.queueNumber, order.queueSuffix)}
                   </span>
                   <span className="text-ink flex-1 text-sm font-semibold">
                     {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}

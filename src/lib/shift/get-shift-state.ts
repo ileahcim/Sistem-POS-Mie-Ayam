@@ -25,6 +25,7 @@ export async function getOpenShift(): Promise<OpenShift | null> {
 export type UnpaidOrderForClose = {
   id: string;
   queueNumber: number | null;
+  queueSuffix: string;
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   customerName: string | null;
@@ -51,6 +52,7 @@ export async function getUnpaidOrdersForShift(shiftId: string): Promise<UnpaidOr
     return {
       id: order.id,
       queueNumber: order.queueNumber,
+      queueSuffix: order.queueSuffix,
       channel: order.channel,
       tableLabel: order.tableLabel,
       customerName: order.customerName,
