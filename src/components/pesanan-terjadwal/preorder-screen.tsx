@@ -15,6 +15,7 @@ import { ProductGrid } from "@/components/kasir/product-grid";
 import { ComboShortcutRow } from "@/components/kasir/combo-shortcut-row";
 import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-sheet";
 import { CartPanel } from "@/components/kasir/cart-panel";
+import { CartBar } from "@/components/kasir/cart-bar";
 import { savePreOrder } from "@/app/pesanan-terjadwal/actions";
 
 const PREORDER_STORAGE_KEY = "pos-mi-ayam:preorder-draft";
@@ -45,6 +46,7 @@ export function PreOrderScreen({
   const [scheduledTime, setScheduledTime] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [cartSheetOpen, setCartSheetOpen] = useState(false);
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? categories[0];
 
@@ -158,6 +160,7 @@ export function PreOrderScreen({
         return;
       }
       clear();
+      setCartSheetOpen(false);
       router.push("/pesanan-terjadwal");
       router.refresh();
     } finally {
@@ -205,7 +208,7 @@ export function PreOrderScreen({
         onTableLabel={setTableLabel}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         <div className="bg-canvas flex flex-1 flex-col overflow-hidden">
           <CategoryTabs
             categories={categories}
@@ -217,10 +220,11 @@ export function PreOrderScreen({
             products={activeCategory?.products ?? []}
             cartQtyByProduct={cartQtyByProduct}
             onTapProduct={handleTapProduct}
+            className="pb-24 lg:pb-2"
           />
         </div>
 
-        <div className="w-[340px] shrink-0">
+        <div className="hidden w-[340px] shrink-0 lg:block">
           <CartPanel
             items={draft.items}
             channel={draft.channel}
@@ -237,6 +241,29 @@ export function PreOrderScreen({
           />
         </div>
       </div>
+
+      <CartBar items={draft.items} channel={draft.channel} onTap={() => setCartSheetOpen(true)} />
+
+      <AnimatePresence>
+        {cartSheetOpen && (
+          <CartPanel
+            variant="sheet"
+            items={draft.items}
+            channel={draft.channel}
+            tableLabel={draft.tableLabel}
+            customerName={draft.customerName}
+            onCustomerNameChange={setCustomerName}
+            saving={saving}
+            saveError={saveError}
+            lastAddedLocalId={lastAddedLocalId}
+            onEdit={handleEditItem}
+            onRemove={removeItem}
+            onSave={handleSave}
+            saveLabel="Simpan Pre-order"
+            onClose={() => setCartSheetOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {sheetTarget && (

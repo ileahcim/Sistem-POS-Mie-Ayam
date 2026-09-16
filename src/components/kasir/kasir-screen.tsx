@@ -2,21 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
 import { sameCartLine, expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
-import { SignOutButton } from "@/components/auth/sign-out-button";
-import { HeaderMenuButton } from "@/components/ui/header-menu-button";
-import { ListRow } from "@/components/ui/list-row";
+import { MainMenu } from "@/components/ui/main-menu";
 import { ChannelTableBar } from "./channel-table-bar";
 import { CategoryTabs } from "./category-tabs";
 import { ProductGrid } from "./product-grid";
 import { ComboShortcutRow } from "./combo-shortcut-row";
 import { AddonSheet, type AddonSheetResult } from "./addon-sheet";
 import { CartPanel } from "./cart-panel";
+import { CartBar } from "./cart-bar";
 import { saveOrder } from "@/app/kasir/actions";
 
 type SheetTarget = { mode: "add"; product: MenuProduct } | { mode: "edit"; product: MenuProduct; item: CartItem };
@@ -24,9 +22,11 @@ type SheetTarget = { mode: "add"; product: MenuProduct } | { mode: "edit"; produ
 export function KasirScreen({
   categories,
   comboShortcuts,
+  isOwner,
 }: {
   categories: MenuCategory[];
   comboShortcuts: ComboShortcut[];
+  isOwner: boolean;
 }) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
@@ -37,6 +37,7 @@ export function KasirScreen({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [cartSheetOpen, setCartSheetOpen] = useState(false);
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? categories[0];
 
@@ -138,6 +139,7 @@ export function KasirScreen({
       }
       clear();
       setSavedNotice(`Order #${result.queueNumber} tersimpan.`);
+      setCartSheetOpen(false);
       router.refresh();
     } finally {
       setSaving(false);
@@ -147,7 +149,7 @@ export function KasirScreen({
   return (
     <div className="flex h-dvh flex-col">
       <div className="flex items-center justify-between">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <ChannelTableBar
             channel={draft.channel}
             tableLabel={draft.tableLabel}
@@ -155,28 +157,12 @@ export function KasirScreen({
             onTableLabel={setTableLabel}
           />
         </div>
-        <div className="border-border bg-surface flex items-center gap-2 border-b px-3">
-          <Link
-            href="/order-aktif"
-            className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink"
-          >
-            Order Aktif
-          </Link>
-          <HeaderMenuButton>
-            <ListRow asLink="/pesanan-terjadwal">
-              <span className="text-base font-semibold text-ink">Pesanan Terjadwal</span>
-            </ListRow>
-            <ListRow asLink="/shift/tutup">
-              <span className="text-base font-semibold text-ink">Tutup Shift</span>
-            </ListRow>
-            <div className="pt-3">
-              <SignOutButton />
-            </div>
-          </HeaderMenuButton>
+        <div className="border-border bg-surface flex shrink-0 items-center gap-2 border-b px-3">
+          <MainMenu isOwner={isOwner} />
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         <div className="bg-canvas flex flex-1 flex-col overflow-hidden">
           <CategoryTabs
             categories={categories}
@@ -191,10 +177,11 @@ export function KasirScreen({
             products={activeCategory?.products ?? []}
             cartQtyByProduct={cartQtyByProduct}
             onTapProduct={handleTapProduct}
+            className="pb-24 lg:pb-2"
           />
         </div>
 
-        <div className="w-[340px] shrink-0">
+        <div className="hidden w-[340px] shrink-0 lg:block">
           <CartPanel
             items={draft.items}
             channel={draft.channel}
@@ -210,6 +197,28 @@ export function KasirScreen({
           />
         </div>
       </div>
+
+      <CartBar items={draft.items} channel={draft.channel} onTap={() => setCartSheetOpen(true)} />
+
+      <AnimatePresence>
+        {cartSheetOpen && (
+          <CartPanel
+            variant="sheet"
+            items={draft.items}
+            channel={draft.channel}
+            tableLabel={draft.tableLabel}
+            customerName={draft.customerName}
+            onCustomerNameChange={setCustomerName}
+            saving={saving}
+            saveError={saveError}
+            lastAddedLocalId={lastAddedLocalId}
+            onEdit={handleEditItem}
+            onRemove={removeItem}
+            onSave={handleSave}
+            onClose={() => setCartSheetOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {sheetTarget && (

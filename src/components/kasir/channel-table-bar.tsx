@@ -21,14 +21,14 @@ export function ChannelTableBar({
   onTableLabel: (t: TableLabel) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface px-3 py-1.5">
+    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-surface px-3 py-1.5">
       {CHANNELS.map((c) => (
         <button
           key={c.value}
           type="button"
           onClick={() => onChannel(c.value)}
           className={cn(
-            "rounded-pill h-12 min-w-24 px-4 text-base font-semibold",
+            "rounded-pill h-12 min-w-24 shrink-0 px-4 text-base font-semibold",
             channel === c.value ? "bg-primary text-white" : "bg-muted text-ink",
           )}
         >
@@ -38,14 +38,14 @@ export function ChannelTableBar({
 
       {channel === "DINE_IN" && (
         <>
-          <div className="mx-1 h-8 w-px bg-border" aria-hidden />
+          <div className="mx-1 h-8 w-px shrink-0 bg-border" aria-hidden />
           {TABLE_LABELS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => onTableLabel(t)}
               className={cn(
-                "rounded-pill h-12 w-16 text-base font-semibold",
+                "rounded-pill h-12 w-16 shrink-0 text-base font-semibold",
                 tableLabel === t ? "bg-primary text-white" : "bg-muted text-ink",
               )}
             >

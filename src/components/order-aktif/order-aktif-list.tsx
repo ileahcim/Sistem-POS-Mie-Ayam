@@ -6,10 +6,9 @@ import { useNow } from "@/lib/use-now";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
-import { HeaderMenuButton } from "@/components/ui/header-menu-button";
+import { MainMenu } from "@/components/ui/main-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoOrdersIcon } from "@/components/ui/empty-state-icons";
-import { SignOutButton } from "@/components/auth/sign-out-button";
 import { OrderRow } from "./order-row";
 
 const CHANNEL_LABEL: Record<UnpaidServedOrder["channel"], string> = {
@@ -40,25 +39,7 @@ export function OrderAktifList({
         <h1 className="text-lg font-bold text-ink">Order Aktif</h1>
         <div className="flex items-center gap-2">
           <LinkButton href="/kasir" variant="primary">Ke Kasir</LinkButton>
-          <HeaderMenuButton>
-            {isOwner && (
-              <ListRow asLink="/dashboard">
-                <span className="text-base font-semibold text-ink">Dashboard</span>
-              </ListRow>
-            )}
-            <ListRow asLink="/pesanan-terjadwal">
-              <span className="text-base font-semibold text-ink">Pesanan Terjadwal</span>
-            </ListRow>
-            <ListRow asLink="/piutang">
-              <span className="text-base font-semibold text-ink">Piutang</span>
-            </ListRow>
-            <ListRow asLink="/shift/pengeluaran">
-              <span className="text-base font-semibold text-ink">Pengeluaran</span>
-            </ListRow>
-            <div className="pt-3">
-              <SignOutButton />
-            </div>
-          </HeaderMenuButton>
+          <MainMenu isOwner={isOwner} />
         </div>
       </div>
 
