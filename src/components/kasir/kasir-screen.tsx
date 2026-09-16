@@ -8,6 +8,8 @@ import { useCartDraft } from "@/lib/cart/use-cart-draft";
 import { sameCartLine, expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import { MainMenu } from "@/components/ui/main-menu";
+import { OrderAktifButton } from "@/components/ui/order-aktif-button";
+import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { ChannelTableBar } from "./channel-table-bar";
 import { CategoryTabs } from "./category-tabs";
 import { ProductGrid } from "./product-grid";
@@ -23,10 +25,12 @@ export function KasirScreen({
   categories,
   comboShortcuts,
   isOwner,
+  orderAktifIndicator,
 }: {
   categories: MenuCategory[];
   comboShortcuts: ComboShortcut[];
   isOwner: boolean;
+  orderAktifIndicator: { activeCount: number; lateCount: number };
 }) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
@@ -148,6 +152,7 @@ export function KasirScreen({
 
   return (
     <div className="flex h-dvh flex-col">
+      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
           <ChannelTableBar
@@ -158,6 +163,10 @@ export function KasirScreen({
           />
         </div>
         <div className="border-border bg-surface flex shrink-0 items-center gap-2 border-b px-3">
+          <OrderAktifButton
+            activeCount={orderAktifIndicator.activeCount}
+            lateCount={orderAktifIndicator.lateCount}
+          />
           <MainMenu isOwner={isOwner} />
         </div>
       </div>

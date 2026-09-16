@@ -3,12 +3,18 @@ import { getOrderDetail } from "@/lib/orders/get-order-detail";
 import { getSettings } from "@/lib/settings/get-settings";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { buildReceiptData } from "@/lib/orders/build-receipt-data";
+import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import { localDateStr } from "@/lib/timezone";
 import { RiwayatDetail } from "@/components/riwayat-pesanan/riwayat-detail";
 
 export default async function RiwayatDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const [order, settings, user] = await Promise.all([getOrderDetail(orderId), getSettings(), getCurrentUser()]);
+  const [order, settings, user, orderAktifIndicator] = await Promise.all([
+    getOrderDetail(orderId),
+    getSettings(),
+    getCurrentUser(),
+    getOrderAktifIndicator(),
+  ]);
   if (!order) notFound();
 
   // Riwayat only ever shows a concluded order — same status set as
@@ -26,5 +32,5 @@ export default async function RiwayatDetailPage({ params }: { params: Promise<{ 
 
   const receipt = order.status === "PAID" ? buildReceiptData(order, settings) : null;
 
-  return <RiwayatDetail order={order} receipt={receipt} />;
+  return <RiwayatDetail order={order} receipt={receipt} orderAktifIndicator={orderAktifIndicator} />;
 }

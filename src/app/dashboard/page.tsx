@@ -7,6 +7,7 @@ import { getMarginReport } from "@/lib/dashboard/get-margin-report";
 import { getLowMarginItems } from "@/lib/dashboard/get-low-margin-items";
 import { getChannelBreakdown } from "@/lib/dashboard/get-channel-breakdown";
 import { getReceivableOrders } from "@/lib/orders/get-receivable-orders";
+import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import { DashboardScreen } from "@/components/dashboard/dashboard-screen";
 
 // OWNER only, checked server-side here (not just a hidden menu item) — see
@@ -19,17 +20,27 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const [shifts, omzetHistory, topProducts, topToppings, marginReport, lowMarginItems, channelBreakdown, receivables] =
-    await Promise.all([
-      getShiftHistory(),
-      getOmzetHistory(),
-      getTopProducts(),
-      getTopToppings(),
-      getMarginReport(),
-      getLowMarginItems(),
-      getChannelBreakdown(),
-      getReceivableOrders(),
-    ]);
+  const [
+    shifts,
+    omzetHistory,
+    topProducts,
+    topToppings,
+    marginReport,
+    lowMarginItems,
+    channelBreakdown,
+    receivables,
+    orderAktifIndicator,
+  ] = await Promise.all([
+    getShiftHistory(),
+    getOmzetHistory(),
+    getTopProducts(),
+    getTopToppings(),
+    getMarginReport(),
+    getLowMarginItems(),
+    getChannelBreakdown(),
+    getReceivableOrders(),
+    getOrderAktifIndicator(),
+  ]);
 
   return (
     <DashboardScreen
@@ -41,6 +52,7 @@ export default async function DashboardPage() {
       lowMarginItems={lowMarginItems}
       channelBreakdown={channelBreakdown}
       receivables={receivables}
+      orderAktifIndicator={orderAktifIndicator}
     />
   );
 }

@@ -3,18 +3,16 @@ import { ListRow } from "./list-row";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 
 // The single shared navigation menu for the app — every destination lives
-// here now instead of being scattered across per-screen header buttons
-// (Kasir used to have its own "Order Aktif" pill, Order Aktif its own list
-// of 5+ links). Rendered identically on Kasir and Order Aktif so there is
-// only one nav to keep in sync as destinations are added. "Tutup Shift" is
-// visually set apart (warning tint) since it's the one deliberate,
-// once-a-day action mixed in among the read/navigate-only items.
+// here now instead of being scattered across per-screen header buttons.
+// Rendered identically on every screen so there is only one nav to keep in
+// sync as destinations are added. "Order Aktif" graduated out of this list
+// into its own always-visible header button (OrderAktifButton) since it
+// needs to carry the late-order indicator — see CLAUDE.md-worthy brief.
+// "Tutup Shift" is visually set apart (warning tint) since it's the one
+// deliberate, once-a-day action mixed in among the read/navigate-only items.
 export function MainMenu({ isOwner }: { isOwner: boolean }) {
   return (
     <HeaderMenuButton>
-      <ListRow asLink="/order-aktif">
-        <span className="text-base font-semibold text-ink">Order Aktif</span>
-      </ListRow>
       <ListRow asLink="/riwayat-pesanan">
         <span className="text-base font-semibold text-ink">Riwayat Pesanan</span>
       </ListRow>

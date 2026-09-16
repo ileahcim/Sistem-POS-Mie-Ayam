@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation";
 import type { ActiveOrder, UnpaidServedOrder } from "@/lib/orders/get-active-orders";
 import { useNow } from "@/lib/use-now";
+import { computeEstimateMinutes, elapsedMinutes, isLateOrder } from "@/lib/orders/prep-timer";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { MainMenu } from "@/components/ui/main-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoOrdersIcon } from "@/components/ui/empty-state-icons";
+import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { OrderRow } from "./order-row";
 
 const CHANNEL_LABEL: Record<UnpaidServedOrder["channel"], string> = {
@@ -33,8 +35,21 @@ export function OrderAktifList({
   const router = useRouter();
   const now = useNow();
 
+  // Computed from the same list/now the row timers already use, so this
+  // banner ticks live in step with them instead of only refreshing on the
+  // next navigation like the header indicator does on every other screen
+  // (see get-order-aktif-indicator.ts) — and skips that redundant fetch,
+  // since we're already sitting on the exact data it would recompute.
+  const lateCount = orders.filter((o) =>
+    isLateOrder(
+      elapsedMinutes(o.createdAt, now),
+      computeEstimateMinutes(prepBaseMinutes, prepMinutesPerPortion, o.portionsToCook),
+    ),
+  ).length;
+
   return (
     <div className="bg-canvas flex h-dvh flex-col">
+      <LateOrderBanner lateCount={lateCount} />
       <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
         <h1 className="text-lg font-bold text-ink">Order Aktif</h1>
         <div className="flex items-center gap-2">

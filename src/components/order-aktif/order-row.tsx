@@ -1,5 +1,6 @@
 import type { ActiveOrder } from "@/lib/orders/get-active-orders";
 import { BULK_ORDER_QTY_THRESHOLD } from "@/lib/orders/pricing";
+import { computeEstimateMinutes, elapsedMinutes, isLateOrder } from "@/lib/orders/prep-timer";
 import { ListRow } from "@/components/ui/list-row";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/components/ui/cn";
@@ -9,10 +10,6 @@ const CHANNEL_LABEL: Record<ActiveOrder["channel"], string> = {
   BUNGKUS: "Bungkus",
   ANTAR: "Antar",
 };
-
-function elapsedMinutes(createdAt: string, now: Date): number {
-  return Math.max(0, Math.floor((now.getTime() - new Date(createdAt).getTime()) / 60000));
-}
 
 export function OrderRow({
   order,
@@ -33,13 +30,12 @@ export function OrderRow({
   // Estimate scales with how much there actually is to cook, so a big
   // "borongan" order gets a proportionally longer grace period instead of
   // being exempt from the warning outright.
-  const estimateMinutes = prepBaseMinutes + prepMinutesPerPortion * order.portionsToCook;
-  const timerClass =
-    minutes >= estimateMinutes * 2
-      ? "text-danger font-bold"
-      : minutes >= estimateMinutes
-        ? "text-warning font-bold"
-        : "text-ink-muted";
+  const estimateMinutes = computeEstimateMinutes(prepBaseMinutes, prepMinutesPerPortion, order.portionsToCook);
+  const timerClass = isLateOrder(minutes, estimateMinutes)
+    ? "text-danger font-bold"
+    : minutes >= estimateMinutes
+      ? "text-warning font-bold"
+      : "text-ink-muted";
 
   const secondColumn = order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel];
 

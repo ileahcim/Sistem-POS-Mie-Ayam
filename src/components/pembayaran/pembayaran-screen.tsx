@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { OrderDetail } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
+import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { formatRupiah, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
@@ -12,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PriceText } from "@/components/ui/price-text";
 import { cn } from "@/components/ui/cn";
+import { OrderAktifButton } from "@/components/ui/order-aktif-button";
+import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { AddItemsPanel } from "@/components/order-aktif/add-items-panel";
 import { payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
 
@@ -23,7 +26,15 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "QRIS", label: "QRIS" },
 ];
 
-export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: MenuCategory[] }) {
+export function PembayaranScreen({
+  order,
+  menu,
+  orderAktifIndicator,
+}: {
+  order: OrderDetail;
+  menu: MenuCategory[];
+  orderAktifIndicator: OrderAktifIndicator;
+}) {
   const router = useRouter();
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [paying, setPaying] = useState(false);
@@ -52,6 +63,7 @@ export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: Me
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
+      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
       <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
         <div>
           <h1 className="text-lg font-bold text-ink">
@@ -59,12 +71,18 @@ export function PembayaranScreen({ order, menu }: { order: OrderDetail; menu: Me
           </h1>
           <p className="text-ink-muted text-sm">No. Order {order.orderNumber}</p>
         </div>
-        <Link
-          href={`/order-aktif/${order.id}`}
-          className="rounded-pill bg-muted h-10 px-4 text-sm font-medium leading-10 text-ink"
-        >
-          Kembali
-        </Link>
+        <div className="flex items-center gap-2">
+          <OrderAktifButton
+            activeCount={orderAktifIndicator.activeCount}
+            lateCount={orderAktifIndicator.lateCount}
+          />
+          <Link
+            href={`/order-aktif/${order.id}`}
+            className="rounded-pill bg-muted h-10 px-4 text-sm font-medium leading-10 text-ink"
+          >
+            Kembali
+          </Link>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

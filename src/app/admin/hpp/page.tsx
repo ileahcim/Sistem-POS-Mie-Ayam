@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getHppItems } from "@/lib/hpp/get-hpp-items";
+import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import { HppScreen } from "@/components/admin/hpp-screen";
 
 // OWNER only, checked server-side here — see CLAUDE.md "Server-side
@@ -11,6 +12,6 @@ export default async function HppAdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const { products, addons } = await getHppItems();
-  return <HppScreen products={products} addons={addons} />;
+  const [{ products, addons }, orderAktifIndicator] = await Promise.all([getHppItems(), getOrderAktifIndicator()]);
+  return <HppScreen products={products} addons={addons} orderAktifIndicator={orderAktifIndicator} />;
 }

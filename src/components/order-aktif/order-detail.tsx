@@ -6,12 +6,14 @@ import Link from "next/link";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
 import type { PackingListData } from "@/lib/printing/types";
+import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
 import { Badge } from "@/components/ui/badge";
+import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { formatId } from "@/lib/timezone";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { AddItemsPanel } from "./add-items-panel";
@@ -31,10 +33,12 @@ export function OrderDetail({
   order,
   menu,
   packingList,
+  orderAktifIndicator,
 }: {
   order: OrderDetailData;
   menu: MenuCategory[];
   packingList: PackingListData | null;
+  orderAktifIndicator: OrderAktifIndicator;
 }) {
   const router = useRouter();
   const [markingServed, setMarkingServed] = useState(false);
@@ -61,6 +65,7 @@ export function OrderDetail({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
+      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
       <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
         <div>
           <h1 className="text-lg font-bold text-ink">

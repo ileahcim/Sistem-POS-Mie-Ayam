@@ -4,11 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
 import type { ReceiptData } from "@/lib/printing/types";
+import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import { OrderAktifButton } from "@/components/ui/order-aktif-button";
+import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { formatId } from "@/lib/timezone";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 
@@ -30,7 +33,15 @@ function formatDateTime(iso: string): string {
 // so there's no Void/Serve/Pay/Add-item action here, only the record and a
 // reprint. `receipt` is null for a VOID/RECEIVABLE order — nothing was ever
 // printed for those (CLAUDE.md "Print hanya sekali, saat pembayaran").
-export function RiwayatDetail({ order, receipt }: { order: OrderDetailData; receipt: ReceiptData | null }) {
+export function RiwayatDetail({
+  order,
+  receipt,
+  orderAktifIndicator,
+}: {
+  order: OrderDetailData;
+  receipt: ReceiptData | null;
+  orderAktifIndicator: OrderAktifIndicator;
+}) {
   const [printing, setPrinting] = useState(false);
 
   async function handleReprint() {
@@ -45,6 +56,7 @@ export function RiwayatDetail({ order, receipt }: { order: OrderDetailData; rece
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
+      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
       <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
         <div>
           <h1 className="text-lg font-bold text-ink">
@@ -55,12 +67,18 @@ export function RiwayatDetail({ order, receipt }: { order: OrderDetailData; rece
             No. Order {order.orderNumber} · {formatDateTime(order.createdAt)}
           </p>
         </div>
-        <Link
-          href="/riwayat-pesanan"
-          className="rounded-pill bg-muted h-10 px-4 text-sm font-medium leading-10 text-ink"
-        >
-          Kembali
-        </Link>
+        <div className="flex items-center gap-2">
+          <OrderAktifButton
+            activeCount={orderAktifIndicator.activeCount}
+            lateCount={orderAktifIndicator.lateCount}
+          />
+          <Link
+            href="/riwayat-pesanan"
+            className="rounded-pill bg-muted h-10 px-4 text-sm font-medium leading-10 text-ink"
+          >
+            Kembali
+          </Link>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

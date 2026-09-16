@@ -3,18 +3,25 @@ import { getActiveMenu } from "@/lib/menu/get-active-menu";
 import { getOpenShift } from "@/lib/shift/get-shift-state";
 import { getComboShortcuts } from "@/lib/combo/get-combo-shortcuts";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import { KasirScreen } from "@/components/kasir/kasir-screen";
 
 export default async function KasirPage() {
   const openShift = await getOpenShift();
   if (!openShift) redirect("/shift/buka");
 
-  const [categories, comboShortcuts, user] = await Promise.all([
+  const [categories, comboShortcuts, user, orderAktifIndicator] = await Promise.all([
     getActiveMenu(),
     getComboShortcuts(),
     getCurrentUser(),
+    getOrderAktifIndicator(),
   ]);
   return (
-    <KasirScreen categories={categories} comboShortcuts={comboShortcuts} isOwner={user?.role === "OWNER"} />
+    <KasirScreen
+      categories={categories}
+      comboShortcuts={comboShortcuts}
+      isOwner={user?.role === "OWNER"}
+      orderAktifIndicator={orderAktifIndicator}
+    />
   );
 }
