@@ -4,6 +4,7 @@ import { getShiftHistory } from "@/lib/dashboard/get-shift-history";
 import { getOmzetHistory } from "@/lib/dashboard/get-omzet-history";
 import { getTopProducts, getTopToppings } from "@/lib/dashboard/get-top-items";
 import { getMarginReport } from "@/lib/dashboard/get-margin-report";
+import { getLowMarginItems } from "@/lib/dashboard/get-low-margin-items";
 import { getChannelBreakdown } from "@/lib/dashboard/get-channel-breakdown";
 import { getReceivableOrders } from "@/lib/orders/get-receivable-orders";
 import { DashboardScreen } from "@/components/dashboard/dashboard-screen";
@@ -18,13 +19,14 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const [shifts, omzetHistory, topProducts, topToppings, marginReport, channelBreakdown, receivables] =
+  const [shifts, omzetHistory, topProducts, topToppings, marginReport, lowMarginItems, channelBreakdown, receivables] =
     await Promise.all([
       getShiftHistory(),
       getOmzetHistory(),
       getTopProducts(),
       getTopToppings(),
       getMarginReport(),
+      getLowMarginItems(),
       getChannelBreakdown(),
       getReceivableOrders(),
     ]);
@@ -36,6 +38,7 @@ export default async function DashboardPage() {
       topProducts={topProducts}
       topToppings={topToppings}
       marginReport={marginReport}
+      lowMarginItems={lowMarginItems}
       channelBreakdown={channelBreakdown}
       receivables={receivables}
     />

@@ -23,6 +23,11 @@ export function MainMenu({ isOwner }: { isOwner: boolean }) {
           <span className="text-base font-semibold text-ink">Dashboard</span>
         </ListRow>
       )}
+      {isOwner && (
+        <ListRow asLink="/admin/hpp">
+          <span className="text-base font-semibold text-ink">Isi HPP</span>
+        </ListRow>
+      )}
       <ListRow asLink="/pesanan-terjadwal">
         <span className="text-base font-semibold text-ink">Pesanan Terjadwal</span>
       </ListRow>

@@ -2,6 +2,7 @@ import type { ShiftHistoryRow } from "@/lib/dashboard/get-shift-history";
 import type { OmzetShiftPoint } from "@/lib/dashboard/get-omzet-history";
 import type { TopItemRow } from "@/lib/dashboard/get-top-items";
 import type { MarginReport } from "@/lib/dashboard/get-margin-report";
+import type { LowMarginItem } from "@/lib/dashboard/get-low-margin-items";
 import type { ChannelBreakdownRow } from "@/lib/dashboard/get-channel-breakdown";
 import type { ReceivableOrder } from "@/lib/orders/get-receivable-orders";
 import { LinkButton } from "@/components/ui/link-button";
@@ -25,6 +26,7 @@ export function DashboardScreen({
   topProducts,
   topToppings,
   marginReport,
+  lowMarginItems,
   channelBreakdown,
   receivables,
 }: {
@@ -33,6 +35,7 @@ export function DashboardScreen({
   topProducts: TopItemRow[];
   topToppings: TopItemRow[];
   marginReport: MarginReport;
+  lowMarginItems: LowMarginItem[];
   channelBreakdown: ChannelBreakdownRow[];
   receivables: ReceivableOrder[];
 }) {
@@ -64,7 +67,7 @@ export function DashboardScreen({
             <TopItemsSection products={topProducts} toppings={topToppings} />
           </FadeIn>
           <FadeIn delay={0.15}>
-            <MarginSection report={marginReport} />
+            <MarginSection report={marginReport} lowMarginItems={lowMarginItems} />
           </FadeIn>
           <FadeIn delay={0.2}>
             <ChannelBreakdownSection rows={channelBreakdown} />

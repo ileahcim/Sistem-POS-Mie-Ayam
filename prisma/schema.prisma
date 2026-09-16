@@ -92,6 +92,15 @@ model Product {
   name      String
   price     Int // Rupiah, integer, never Float
   costPrice Int? // owner-entered estimate, snapshotted onto order items
+  // Whether costPrice above is a confirmed number (from stated profit or a
+  // real receipt) vs a back-of-envelope estimate — shown as a badge on the
+  // HPP admin page (/admin/hpp) so the owner knows which numbers still need
+  // confirming. Meaningless while costPrice is null.
+  costPriceEstimated Boolean @default(false)
+  // Owner-confirmed "yes, this margin is deliberately thin/negative" (e.g. a
+  // loss-leader) — suppresses the low-margin warning on the HPP admin page
+  // and the Dashboard Margin section for this item specifically.
+  marginIntentional Boolean @default(false)
   imageUrl  String?
   sortOrder Int     @default(0)
   isActive  Boolean @default(true) // soft delete only — old orders reference this row forever
@@ -140,6 +149,9 @@ model AddonOption {
   name      String
   price     Int     @default(0) // Rupiah delta, e.g. +5000
   costPrice Int?
+  // Same two flags as Product above — see comments there.
+  costPriceEstimated Boolean @default(false)
+  marginIntentional Boolean @default(false)
   sortOrder Int     @default(0)
   isActive  Boolean @default(true) // soft delete only
 
