@@ -39,6 +39,14 @@ export async function payOrder(
 
   const changeGiven = cashTendered != null ? cashTendered - order.total : null;
 
+  // Bungkus/Antar: the customer usually pays first and then waits, so once
+  // it's paid the cashier's part is done — it's marked served right here
+  // instead of needing a separate "Sudah Disajikan" tap to leave Order
+  // Aktif. Dine In keeps the two independent steps (food usually comes out
+  // before payment there). An earlier manual servedAt is never overwritten.
+  const paidAt = new Date();
+  const servedAt = order.servedAt ? undefined : order.channel !== "DINE_IN" ? paidAt : undefined;
+
   if (order.shiftId == null) {
     // Pre-order being paid for the first time — see CLAUDE.md "Pre-order".
     // shiftId/queueNumber are attached now, atomically, to whichever shift
@@ -61,7 +69,8 @@ export async function payOrder(
           queueNumber: shift.lastQueueNumber,
           status: "PAID",
           paymentMethod: method,
-          paidAt: new Date(),
+          paidAt,
+          servedAt,
           cashTendered,
           changeGiven,
         },
@@ -73,7 +82,8 @@ export async function payOrder(
       data: {
         status: "PAID",
         paymentMethod: method,
-        paidAt: new Date(),
+        paidAt,
+        servedAt,
         cashTendered,
         changeGiven,
       },

@@ -47,7 +47,11 @@ export function OrderDetail({
 
   const canAddItems = order.status === "OPEN";
   const canPay = order.status === "OPEN";
-  const needsServing = !order.servedAt;
+  // Bungkus/Antar are marked served automatically at payment (payOrder), so
+  // an unpaid one never needs the manual step — only Dine In does. A PAID
+  // order still unserved (older data) keeps the button as a way out.
+  const needsServing =
+    !order.servedAt && (order.status === "OPEN" ? order.channel === "DINE_IN" : order.status === "PAID");
   const canPrintPackingList = order.status === "OPEN" && !!packingList;
 
   async function handleMarkServed() {
