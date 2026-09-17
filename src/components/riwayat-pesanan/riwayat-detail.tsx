@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
 import type { ReceiptData } from "@/lib/printing/types";
@@ -15,6 +16,7 @@ import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
+import { VoidOrderButton } from "@/components/order-aktif/void-order-sheet";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -36,18 +38,21 @@ function formatDateTime(iso: string): string {
 
 // Read-only — unlike OrderDetail (order-aktif), this order has already
 // concluded (see riwayat-pesanan/[orderId]/page.tsx's settled-status guard),
-// so there's no Void/Serve/Pay/Add-item action here, only the record and a
-// reprint. `receipt` is null for a VOID/RECEIVABLE/CANCELLED order — nothing was ever
+// so there's no Serve/Pay/Add-item action here — only the record, a
+// reprint, and (OWNER, PAID only) Void. `receipt` is null for a VOID/RECEIVABLE/CANCELLED order — nothing was ever
 // printed for those (CLAUDE.md "Print hanya sekali, saat pembayaran").
 export function RiwayatDetail({
   order,
   receipt,
   orderAktifIndicator,
+  isOwner,
 }: {
   order: OrderDetailData;
   receipt: ReceiptData | null;
   orderAktifIndicator: OrderAktifIndicator;
+  isOwner: boolean;
 }) {
+  const router = useRouter();
   const [printing, setPrinting] = useState(false);
 
   async function handleReprint() {
@@ -99,8 +104,11 @@ export function RiwayatDetail({
 
         {order.status === "VOID" && order.voidReason && (
           <Card padded className="bg-danger-soft mb-3">
-            <p className="text-danger text-sm font-semibold">Alasan void</p>
-            <p className="text-ink mt-0.5 text-sm">{order.voidReason}</p>
+            <p className="text-danger text-sm font-semibold">
+              Di-void{order.voidedByName ? ` oleh ${order.voidedByName}` : ""}
+              {order.voidedAt ? ` · ${formatDateTime(order.voidedAt)}` : ""}
+            </p>
+            <p className="text-ink mt-0.5 text-sm">Alasan: {order.voidReason}</p>
           </Card>
         )}
 
@@ -153,11 +161,31 @@ export function RiwayatDetail({
         </Card>
       </div>
 
-      {receipt && (
-        <div className="border-border bg-surface border-t p-4">
-          <Button variant="primary" size="large" fullWidth disabled={printing} onClick={handleReprint}>
-            {printing ? "Mencetak..." : "Cetak Ulang Struk"}
-          </Button>
+      {(receipt || (isOwner && order.status === "PAID")) && (
+        <div className="border-border bg-surface flex gap-2 border-t p-4">
+          {isOwner && order.status === "PAID" && (
+            <div className="flex-1">
+              <VoidOrderButton
+                orderId={order.id}
+                orderLabel={
+                  order.queueNumber != null
+                    ? formatQueueLabel(order.queueNumber, order.queueSuffix)
+                    : `No. ${order.orderNumber}`
+                }
+                total={order.total}
+                paymentMethod={order.paymentMethod}
+                shiftClosed={order.shiftStatus === "CLOSED"}
+                onVoided={() => router.refresh()}
+              />
+            </div>
+          )}
+          {receipt && (
+            <div className="flex-1">
+              <Button variant="primary" size="large" fullWidth disabled={printing} onClick={handleReprint}>
+                {printing ? "Mencetak..." : "Cetak Ulang Struk"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

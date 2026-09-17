@@ -4,6 +4,7 @@ import { getActiveMenu } from "@/lib/menu/get-active-menu";
 import { getSettings } from "@/lib/settings/get-settings";
 import { buildPackingListData } from "@/lib/orders/build-packing-list-data";
 import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { OrderDetail } from "@/components/order-aktif/order-detail";
 
 export default async function OrderDetailPage({
@@ -17,14 +18,21 @@ export default async function OrderDetailPage({
   // A cancelled order has nothing left to act on — show its record instead.
   if (order.status === "CANCELLED") redirect(`/riwayat-pesanan/${order.id}`);
 
-  const [menu, settings, orderAktifIndicator] = await Promise.all([
+  const [menu, settings, orderAktifIndicator, user] = await Promise.all([
     getActiveMenu(),
     getSettings(),
     getOrderAktifIndicator(),
+    getCurrentUser(),
   ]);
   const packingList = order.channel === "ANTAR" ? buildPackingListData(order, settings) : null;
 
   return (
-    <OrderDetail order={order} menu={menu} packingList={packingList} orderAktifIndicator={orderAktifIndicator} />
+    <OrderDetail
+      order={order}
+      menu={menu}
+      packingList={packingList}
+      orderAktifIndicator={orderAktifIndicator}
+      isOwner={user?.role === "OWNER"}
+    />
   );
 }

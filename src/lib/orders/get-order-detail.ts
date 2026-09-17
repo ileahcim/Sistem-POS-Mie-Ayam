@@ -32,6 +32,10 @@ export type OrderDetail = {
   changeGiven: number | null;
   voidReason: string | null;
   voidedAt: string | null;
+  voidedByName: string | null;
+  // Status of the shift this order belongs to — a void after that shift
+  // closed doesn't change its frozen report (shown as a notice).
+  shiftStatus: "OPEN" | "CLOSED" | null;
   cancelReason: string | null;
   cancelledAt: string | null;
   cancelledByName: string | null;
@@ -48,6 +52,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       items: { include: { addons: true }, orderBy: { createdAt: "asc" } },
       createdBy: { select: { name: true } },
       cancelledBy: { select: { name: true } },
+      voidedBy: { select: { name: true } },
+      shift: { select: { status: true } },
     },
   });
   if (!order) return null;
@@ -89,6 +95,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     changeGiven: order.changeGiven,
     voidReason: order.voidReason,
     voidedAt: order.voidedAt?.toISOString() ?? null,
+    voidedByName: order.voidedBy?.name ?? null,
+    shiftStatus: order.shift?.status ?? null,
     cancelReason: order.cancelReason,
     cancelledAt: order.cancelledAt?.toISOString() ?? null,
     cancelledByName: order.cancelledBy?.name ?? null,

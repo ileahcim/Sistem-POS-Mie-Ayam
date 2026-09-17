@@ -20,6 +20,7 @@ import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { AddItemsPanel } from "./add-items-panel";
 import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { CancelOrderButton } from "./cancel-order-sheet";
+import { VoidOrderButton } from "./void-order-sheet";
 import { markServed } from "@/app/order-aktif/actions";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
@@ -37,11 +38,13 @@ export function OrderDetail({
   menu,
   packingList,
   orderAktifIndicator,
+  isOwner,
 }: {
   order: OrderDetailData;
   menu: MenuCategory[];
   packingList: PackingListData | null;
   orderAktifIndicator: OrderAktifIndicator;
+  isOwner: boolean;
 }) {
   const router = useRouter();
   const [markingServed, setMarkingServed] = useState(false);
@@ -139,6 +142,19 @@ export function OrderDetail({
         {canAddItems && (
           <div className="mt-3">
             <AddItemsPanel orderId={order.id} menu={menu} onAdded={() => router.refresh()} />
+          </div>
+        )}
+
+        {order.status === "PAID" && isOwner && (
+          <div className="mt-6">
+            <VoidOrderButton
+              orderId={order.id}
+              orderLabel={order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : `No. ${order.orderNumber}`}
+              total={order.total}
+              paymentMethod={order.paymentMethod}
+              shiftClosed={order.shiftStatus === "CLOSED"}
+              onVoided={() => router.push(`/riwayat-pesanan/${order.id}`)}
+            />
           </div>
         )}
 

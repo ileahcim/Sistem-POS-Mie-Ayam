@@ -32,5 +32,7 @@ export default async function RiwayatDetailPage({ params }: { params: Promise<{ 
 
   const receipt = order.status === "PAID" ? buildReceiptData(order, settings) : null;
 
-  return <RiwayatDetail order={order} receipt={receipt} orderAktifIndicator={orderAktifIndicator} />;
+  return (
+    <RiwayatDetail order={order} receipt={receipt} orderAktifIndicator={orderAktifIndicator} isOwner={isOwner} />
+  );
 }
