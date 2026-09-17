@@ -28,6 +28,15 @@ export function mergeReceiptItems(items: ReceiptItem[]): ReceiptItem[] {
   return [...merged.values()];
 }
 
+// Total portion count across the (already-merged) item list — printed as
+// "5 item" above Subtotal so staff can sanity-check a bulk order is
+// complete at a glance. Sum of qty, not distinct product lines: "2x Mie
+// Ayam, 1x Es Teh" should read as 3 item, matching what's physically being
+// handed over.
+export function totalItemCount(items: { qty: number }[]): number {
+  return items.reduce((sum, item) => sum + item.qty, 0);
+}
+
 export function formatRupiah(amount: number): string {
   const sign = amount < 0 ? "-" : "";
   return `${sign}Rp${Math.abs(amount).toLocaleString("id-ID")}`;

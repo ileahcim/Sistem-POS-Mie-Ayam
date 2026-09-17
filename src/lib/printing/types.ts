@@ -22,9 +22,12 @@ export type ReceiptItem = {
 
 export type ReceiptData = {
   storeName: string;
+  address?: string | null; // may contain "\n" for a second address line
+  phone?: string | null;
   orderNumber: number;
   queueNumber: number;
-  queueSuffix: string; // "" normally, "A"/"B"/... for a Pisahkan & Bayar child
+  queueSuffix: string; // "" normally, "A"/"B"/... for a Pisahkan & Bayar child — never printed on the receipt itself, only used elsewhere (Order Aktif, Riwayat)
+  kasirName: string;
   printedAt: Date;
   channel: ReceiptChannel;
   tableLabel?: string | null;
@@ -49,6 +52,8 @@ export type PackingListItem = {
 
 export type PackingListData = {
   storeName: string;
+  address?: string | null;
+  phone?: string | null;
   orderNumber: number;
   queueNumber: number | null; // null: a pre-order not yet paid/attached to a shift
   queueSuffix: string;

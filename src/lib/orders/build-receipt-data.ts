@@ -15,9 +15,12 @@ export function buildReceiptData(order: OrderDetail, settings: StoreSettings): R
 
   return {
     storeName: settings.storeName,
+    address: settings.address,
+    phone: settings.phone,
     orderNumber: order.orderNumber,
     queueNumber: order.queueNumber,
     queueSuffix: order.queueSuffix,
+    kasirName: order.createdByName,
     printedAt: order.paidAt ? new Date(order.paidAt) : new Date(),
     channel: order.channel,
     tableLabel: order.tableLabel,

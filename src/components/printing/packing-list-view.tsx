@@ -2,9 +2,14 @@ import type { PackingListData } from "@/lib/printing/types";
 import { paperRule } from "@/lib/printing/paper";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
+import { ReceiptHeader, MetaRow } from "./receipt-meta";
 
-function formatDateTime(date: Date): string {
-  return formatId(date, { dateStyle: "medium", timeStyle: "short" });
+function formatTanggal(date: Date): string {
+  return formatId(date, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function formatJam(date: Date): string {
+  return formatId(date, { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 // Same literal-character rule as ReceiptView (see that file's comment and
@@ -21,17 +26,20 @@ function Rule() {
 export function PackingListView({ data }: { data: PackingListData }) {
   return (
     <div className="mx-auto w-[320px] bg-white p-4 font-mono text-[13px] leading-relaxed text-black">
-      <div className="text-center">
-        <div className="text-base font-bold">{data.storeName}</div>
-        <div className="font-bold">DAFTAR PACKING</div>
-        <div>No. Order {data.orderNumber}</div>
-        <div>
-          {data.queueNumber != null
-            ? `Antrian ${formatQueueLabel(data.queueNumber, data.queueSuffix)}`
-            : "Pre-order · belum dibayar"}
-        </div>
-        <div>{formatDateTime(data.printedAt)}</div>
-        <div>Antar{data.tableLabel ? ` · ${data.tableLabel}` : ""}</div>
+      <ReceiptHeader storeName={data.storeName} address={data.address} phone={data.phone} />
+      <div className="mt-1 text-center font-bold">DAFTAR PACKING</div>
+
+      <Rule />
+
+      <div className="flex flex-col">
+        <MetaRow label="No. Order" value={String(data.orderNumber)} />
+        <MetaRow
+          label="Antrian"
+          value={data.queueNumber != null ? formatQueueLabel(data.queueNumber, data.queueSuffix) : "Belum dibayar"}
+        />
+        <MetaRow label="Tanggal" value={formatTanggal(data.printedAt)} />
+        <MetaRow label="Jam" value={formatJam(data.printedAt)} />
+        <MetaRow label="Tipe" value={`Antar${data.tableLabel ? ` - ${data.tableLabel}` : ""}`} />
       </div>
 
       <Rule />

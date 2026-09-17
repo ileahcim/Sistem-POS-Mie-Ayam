@@ -4,14 +4,19 @@ import { getPrinter } from "@/lib/printing/get-printer";
 import type { ReceiptData, PackingListData } from "@/lib/printing/types";
 import { Button } from "@/components/ui/button";
 
-const STORE_NAME = "Mie Ayam Keluarga"; // TODO: ganti sesuai nama warung asli
+const STORE_NAME = "Mie Ayam Pangsit dan Bakso Ciptarasa 4 Wonogiri";
+const STORE_ADDRESS = "Perum Triraksa Village 1 Blok A3 No. 02\nTigaraksa, Tangerang";
+const STORE_PHONE = "0813 2951 4746";
 
 function sampleReceipt(): ReceiptData {
   return {
     storeName: STORE_NAME,
+    address: STORE_ADDRESS,
+    phone: STORE_PHONE,
     orderNumber: 118,
     queueNumber: 7,
     queueSuffix: "",
+    kasirName: "Owner",
     printedAt: new Date(),
     channel: "DINE_IN",
     tableLabel: "K1",
@@ -47,10 +52,13 @@ function sampleReceipt(): ReceiptData {
 function samplePackingList(): PackingListData {
   return {
     storeName: STORE_NAME,
+    address: STORE_ADDRESS,
+    phone: STORE_PHONE,
     orderNumber: 119,
     queueNumber: 8,
     queueSuffix: "",
     printedAt: new Date(),
+    tableLabel: "Jl. Mawar No. 3",
     items: [
       {
         productName: "Mie Ayam",

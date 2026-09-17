@@ -21,6 +21,7 @@ export type OrderDetail = {
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   customerName: string | null;
+  createdByName: string; // who input the order — printed as "Kasir" on the receipt
   status: "OPEN" | "PAID" | "VOID" | "RECEIVABLE";
   servedAt: string | null;
   createdAt: string;
@@ -40,7 +41,10 @@ export type OrderDetail = {
 export async function getOrderDetail(orderId: string): Promise<OrderDetail | null> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: { include: { addons: true }, orderBy: { createdAt: "asc" } } },
+    include: {
+      items: { include: { addons: true }, orderBy: { createdAt: "asc" } },
+      createdBy: { select: { name: true } },
+    },
   });
   if (!order) return null;
 
@@ -70,6 +74,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     channel: order.channel,
     tableLabel: order.tableLabel,
     customerName: order.customerName,
+    createdByName: order.createdBy.name,
     status: order.status,
     servedAt: order.servedAt?.toISOString() ?? null,
     createdAt: order.createdAt.toISOString(),

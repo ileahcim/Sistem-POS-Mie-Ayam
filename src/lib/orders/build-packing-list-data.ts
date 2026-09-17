@@ -8,6 +8,8 @@ import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 export function buildPackingListData(order: OrderDetail, settings: StoreSettings): PackingListData {
   return {
     storeName: settings.storeName,
+    address: settings.address,
+    phone: settings.phone,
     orderNumber: order.orderNumber,
     queueNumber: order.queueNumber, // null for a due-but-unpaid pre-order — see CLAUDE.md "Pre-order"
     queueSuffix: order.queueSuffix,
