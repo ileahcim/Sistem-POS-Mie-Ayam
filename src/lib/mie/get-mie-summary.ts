@@ -2,27 +2,32 @@ import { prisma } from "@/lib/prisma";
 import { mieEntrySignedAmount } from "./types";
 
 export type MieSummary = {
-  totalReceivable: number; // sum of positive balances only — a credit customer isn't "receivable"
-  debtorCount: number;
+  // Sum of positive balances across ALL customers, aktif and nonaktif —
+  // deactivating someone must never make their debt vanish from the
+  // report. A credit customer (negative balance) isn't "receivable".
+  totalReceivable: number;
+  inactiveReceivable: number; // the part of totalReceivable owed by nonaktif customers
+  debtorCount: number; // all customers currently owing, aktif + nonaktif
+  inactiveDebtorCount: number;
   oldestDebtDays: number | null; // null when nobody currently owes anything
   oldestDebtSince: string | null; // ISO date, for display alongside the day count
 };
 
 // "Berapa lama utang tertua menggantung" can't be computed per-rupiah
 // (payments are deliberately NOT matched to specific orders — see
-// CLAUDE.md-worthy brief), so this is an honest proxy: among customers who
-// currently owe money, the earliest transaction date on their ledger. It
-// answers "how long has this relationship been carrying a balance", not
-// "how old is this exact rupiah of debt" — the two aren't the same thing,
-// and nothing here claims otherwise.
+// CLAUDE.md "Catatan Mi Mentah"), so this is an honest proxy: among
+// customers who currently owe money, the earliest transaction date on
+// their ledger. It answers "how long has this relationship been carrying a
+// balance", not "how old is this exact rupiah of debt".
 export async function getMieSummary(): Promise<MieSummary> {
   const customers = await prisma.mieCustomer.findMany({
-    where: { isActive: true },
     include: { entries: { select: { kind: true, amount: true, date: true } } },
   });
 
   let totalReceivable = 0;
+  let inactiveReceivable = 0;
   let debtorCount = 0;
+  let inactiveDebtorCount = 0;
   let oldestDebtSince: Date | null = null;
 
   for (const c of customers) {
@@ -32,6 +37,10 @@ export async function getMieSummary(): Promise<MieSummary> {
 
     totalReceivable += balance;
     debtorCount += 1;
+    if (!c.isActive) {
+      inactiveReceivable += balance;
+      inactiveDebtorCount += 1;
+    }
     const earliest = c.entries.reduce((min, e) => (e.date < min ? e.date : min), c.entries[0].date);
     if (oldestDebtSince === null || earliest < oldestDebtSince) oldestDebtSince = earliest;
   }
@@ -43,7 +52,9 @@ export async function getMieSummary(): Promise<MieSummary> {
 
   return {
     totalReceivable,
+    inactiveReceivable,
     debtorCount,
+    inactiveDebtorCount,
     oldestDebtDays,
     oldestDebtSince: oldestDebtSince?.toISOString() ?? null,
   };

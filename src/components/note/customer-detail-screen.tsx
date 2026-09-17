@@ -183,7 +183,7 @@ export function CustomerDetailScreen({
                   Nonaktifkan {customer.name}? Pelanggan hilang dari daftar utama dan tidak bisa dipilih untuk
                   transaksi baru. Riwayatnya tetap bisa dibuka.
                   {customer.balance !== 0 &&
-                    ` Catatan: masih ada saldo Rp${customer.balance.toLocaleString("id-ID")} — tidak ikut dihitung di Total Piutang selama nonaktif.`}
+                    ` Saldo Rp${customer.balance.toLocaleString("id-ID")} tetap tercatat dan tetap dihitung di Total Piutang (ditandai sebagai piutang pelanggan nonaktif).`}
                 </p>
                 <div className="flex gap-2">
                   <Button variant="secondary" fullWidth onClick={() => setConfirm(null)}>
