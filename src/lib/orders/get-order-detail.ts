@@ -22,7 +22,7 @@ export type OrderDetail = {
   tableLabel: string | null;
   customerName: string | null;
   createdByName: string; // who input the order — printed as "Kasir" on the receipt
-  status: "OPEN" | "PAID" | "VOID" | "RECEIVABLE";
+  status: "OPEN" | "PAID" | "VOID" | "RECEIVABLE" | "CANCELLED";
   servedAt: string | null;
   createdAt: string;
   scheduledFor: string | null; // pre-order delivery date/time, null for a regular order
@@ -32,6 +32,9 @@ export type OrderDetail = {
   changeGiven: number | null;
   voidReason: string | null;
   voidedAt: string | null;
+  cancelReason: string | null;
+  cancelledAt: string | null;
+  cancelledByName: string | null;
   items: OrderDetailItem[];
   subtotal: number;
   deliveryFee: number;
@@ -44,6 +47,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     include: {
       items: { include: { addons: true }, orderBy: { createdAt: "asc" } },
       createdBy: { select: { name: true } },
+      cancelledBy: { select: { name: true } },
     },
   });
   if (!order) return null;
@@ -85,6 +89,9 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     changeGiven: order.changeGiven,
     voidReason: order.voidReason,
     voidedAt: order.voidedAt?.toISOString() ?? null,
+    cancelReason: order.cancelReason,
+    cancelledAt: order.cancelledAt?.toISOString() ?? null,
+    cancelledByName: order.cancelledBy?.name ?? null,
     items,
     subtotal,
     deliveryFee,

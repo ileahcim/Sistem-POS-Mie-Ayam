@@ -27,12 +27,14 @@ const STATUS_LABEL: Record<OrderHistoryRow["status"], string> = {
   PAID: "Lunas",
   VOID: "Void",
   RECEIVABLE: "Piutang",
+  CANCELLED: "Batal",
 };
 
 const STATUS_VARIANT: Record<OrderHistoryRow["status"], BadgeVariant> = {
   PAID: "success",
   VOID: "danger",
   RECEIVABLE: "warning",
+  CANCELLED: "neutral",
 };
 
 function formatDateTime(iso: string): string {
@@ -126,7 +128,7 @@ export function RiwayatPesananScreen({
             <EmptyState
               icon={<NoHistoryIcon />}
               title="Belum ada riwayat di rentang ini"
-              description="Order yang sudah lunas, void, atau piutang akan muncul di sini."
+              description="Order yang sudah lunas, batal, void, atau piutang akan muncul di sini."
               actionHref="/kasir"
               actionLabel="Ke Kasir"
             />

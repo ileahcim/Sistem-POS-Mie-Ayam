@@ -22,8 +22,13 @@ const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
   ANTAR: "Antar",
 };
 
-const STATUS_LABEL: Record<string, string> = { PAID: "Lunas", VOID: "Void", RECEIVABLE: "Piutang" };
-const STATUS_VARIANT: Record<string, BadgeVariant> = { PAID: "success", VOID: "danger", RECEIVABLE: "warning" };
+const STATUS_LABEL: Record<string, string> = { PAID: "Lunas", VOID: "Void", RECEIVABLE: "Piutang", CANCELLED: "Batal" };
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  PAID: "success",
+  VOID: "danger",
+  RECEIVABLE: "warning",
+  CANCELLED: "neutral",
+};
 
 function formatDateTime(iso: string): string {
   return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
@@ -32,7 +37,7 @@ function formatDateTime(iso: string): string {
 // Read-only — unlike OrderDetail (order-aktif), this order has already
 // concluded (see riwayat-pesanan/[orderId]/page.tsx's settled-status guard),
 // so there's no Void/Serve/Pay/Add-item action here, only the record and a
-// reprint. `receipt` is null for a VOID/RECEIVABLE order — nothing was ever
+// reprint. `receipt` is null for a VOID/RECEIVABLE/CANCELLED order — nothing was ever
 // printed for those (CLAUDE.md "Print hanya sekali, saat pembayaran").
 export function RiwayatDetail({
   order,
@@ -96,6 +101,16 @@ export function RiwayatDetail({
           <Card padded className="bg-danger-soft mb-3">
             <p className="text-danger text-sm font-semibold">Alasan void</p>
             <p className="text-ink mt-0.5 text-sm">{order.voidReason}</p>
+          </Card>
+        )}
+
+        {order.status === "CANCELLED" && (
+          <Card padded className="bg-muted mb-3">
+            <p className="text-ink text-sm font-semibold">
+              Dibatalkan{order.cancelledByName ? ` oleh ${order.cancelledByName}` : ""}
+              {order.cancelledAt ? ` · ${formatDateTime(order.cancelledAt)}` : ""}
+            </p>
+            {order.cancelReason && <p className="text-ink-muted mt-0.5 text-sm">Alasan: {order.cancelReason}</p>}
           </Card>
         )}
 

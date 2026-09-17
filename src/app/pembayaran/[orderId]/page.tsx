@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getOrderDetail } from "@/lib/orders/get-order-detail";
 import { getActiveMenu } from "@/lib/menu/get-active-menu";
 import { getSettings } from "@/lib/settings/get-settings";
@@ -13,6 +13,8 @@ export default async function PembayaranPage({
   const { orderId } = await params;
   const order = await getOrderDetail(orderId);
   if (!order) notFound();
+  // A cancelled order has nothing left to act on — show its record instead.
+  if (order.status === "CANCELLED") redirect(`/riwayat-pesanan/${order.id}`);
 
   const [menu, settings, orderAktifIndicator] = await Promise.all([
     getActiveMenu(),

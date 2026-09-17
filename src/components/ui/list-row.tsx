@@ -23,6 +23,7 @@ export function ListRow({
   asLink,
   roomy = false,
   dense = false,
+  noDivider = false,
   className,
 }: {
   children: ReactNode;
@@ -30,12 +31,17 @@ export function ListRow({
   asLink?: string;
   roomy?: boolean;
   dense?: boolean;
+  // For a row wrapped together with a sibling control (e.g. Order Aktif's
+  // "Batal" button) — the wrapper draws the divider instead, since
+  // `last:` would otherwise match every row inside its own wrapper.
+  noDivider?: boolean;
   className?: string;
 }) {
   const padding = roomy ? "py-4" : dense ? "py-2" : "py-3";
   const gap = dense ? "gap-2" : "gap-3";
   const shared = cn(
-    "flex w-full items-center border-b border-border px-4 text-left last:border-b-0",
+    "flex w-full items-center px-4 text-left",
+    !noDivider && "border-b border-border last:border-b-0",
     gap,
     padding,
     className,

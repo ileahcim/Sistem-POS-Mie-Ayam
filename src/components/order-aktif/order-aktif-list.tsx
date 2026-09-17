@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { NoOrdersIcon } from "@/components/ui/empty-state-icons";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { OrderRow } from "./order-row";
+import { CancelOrderButton } from "./cancel-order-sheet";
 
 const CHANNEL_LABEL: Record<UnpaidServedOrder["channel"], string> = {
   DINE_IN: "",
@@ -78,6 +79,7 @@ export function OrderAktifList({
                 prepBaseMinutes={prepBaseMinutes}
                 prepMinutesPerPortion={prepMinutesPerPortion}
                 onTap={() => router.push(`/order-aktif/${order.id}`)}
+                onCancelled={() => router.refresh()}
               />
             ))
           )}
@@ -90,14 +92,22 @@ export function OrderAktifList({
             </h2>
             <Card>
               {unpaidServed.map((order) => (
-                <ListRow key={order.id} onClick={() => router.push(`/order-aktif/${order.id}`)} dense>
-                  <span className="w-14 shrink-0 text-lg font-bold text-ink">
-                    {formatQueueLabel(order.queueNumber, order.queueSuffix)}
-                  </span>
-                  <span className="text-ink flex-1 text-sm font-semibold">
-                    {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
-                  </span>
-                </ListRow>
+                <div key={order.id} className="border-border flex items-center border-b last:border-b-0">
+                  <ListRow onClick={() => router.push(`/order-aktif/${order.id}`)} dense noDivider className="min-w-0 flex-1">
+                    <span className="w-14 shrink-0 text-lg font-bold text-ink">
+                      {formatQueueLabel(order.queueNumber, order.queueSuffix)}
+                    </span>
+                    <span className="text-ink flex-1 text-sm font-semibold">
+                      {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
+                    </span>
+                  </ListRow>
+                  <CancelOrderButton
+                    compact
+                    orderId={order.id}
+                    orderLabel={formatQueueLabel(order.queueNumber, order.queueSuffix)}
+                    onCancelled={() => router.refresh()}
+                  />
+                </div>
               ))}
             </Card>
           </div>

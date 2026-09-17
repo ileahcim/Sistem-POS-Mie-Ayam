@@ -2,6 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { wibDateRange, localDateStr } from "@/lib/timezone";
 import { DELIVERY_FEE_PER_FOOD_ITEM } from "./pricing";
 
+const HISTORY_STATUSES = ["PAID", "VOID", "RECEIVABLE", "CANCELLED"] as const;
+export type HistoryStatus = (typeof HISTORY_STATUSES)[number];
+
 export type OrderHistoryRow = {
   id: string;
   orderNumber: number;
@@ -12,7 +15,7 @@ export type OrderHistoryRow = {
   tableLabel: string | null;
   customerName: string | null;
   total: number;
-  status: "PAID" | "VOID" | "RECEIVABLE";
+  status: HistoryStatus;
 };
 
 export type OrderHistoryFilter = {
@@ -33,7 +36,7 @@ export function clampHistoryFilterForRole(filter: OrderHistoryFilter, isOwner: b
 }
 
 // Riwayat Pesanan only lists orders that have actually concluded (paid,
-// voided, or marked as receivable at shift close) — an OPEN order is still
+// voided, cancelled while still unpaid, or marked as receivable at shift close) — an OPEN order is still
 // live business tracked on Order Aktif, not history yet.
 export async function getOrderHistory(filter: OrderHistoryFilter): Promise<OrderHistoryRow[]> {
   const { start } = wibDateRange(filter.dateFrom);
@@ -43,7 +46,7 @@ export async function getOrderHistory(filter: OrderHistoryFilter): Promise<Order
 
   const orders = await prisma.order.findMany({
     where: {
-      status: { in: ["PAID", "VOID", "RECEIVABLE"] },
+      status: { in: [...HISTORY_STATUSES] },
       createdAt: { gte: start, lt: end },
       ...(search
         ? {
@@ -74,7 +77,7 @@ export async function getOrderHistory(filter: OrderHistoryFilter): Promise<Order
       tableLabel: order.tableLabel,
       customerName: order.customerName,
       total: subtotal + deliveryFee,
-      status: order.status as "PAID" | "VOID" | "RECEIVABLE",
+      status: order.status as HistoryStatus,
     };
   });
 }

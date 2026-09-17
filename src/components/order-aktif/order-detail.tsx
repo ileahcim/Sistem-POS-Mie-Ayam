@@ -19,6 +19,7 @@ import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { AddItemsPanel } from "./add-items-panel";
 import { SplitAndPayButton } from "./split-and-pay-sheet";
+import { CancelOrderButton } from "./cancel-order-sheet";
 import { markServed } from "@/app/order-aktif/actions";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
@@ -138,6 +139,16 @@ export function OrderDetail({
         {canAddItems && (
           <div className="mt-3">
             <AddItemsPanel orderId={order.id} menu={menu} onAdded={() => router.refresh()} />
+          </div>
+        )}
+
+        {order.status === "OPEN" && (
+          <div className="mt-6">
+            <CancelOrderButton
+              orderId={order.id}
+              orderLabel={order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : null}
+              onCancelled={() => router.push("/order-aktif")}
+            />
           </div>
         )}
 

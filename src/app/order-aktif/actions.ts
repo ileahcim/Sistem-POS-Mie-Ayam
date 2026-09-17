@@ -15,6 +15,28 @@ export async function markServed(orderId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+// "Batalkan Order" — an OPEN (unpaid) order entered by mistake, or the
+// customer changed their mind. Any logged-in user may do this (CASHIER
+// included): no money has moved yet, unlike a VOID, which stays OWNER-only.
+// A short reason is still required so the cancellation is traceable later
+// in Riwayat Pesanan. The status check lives inside the update's WHERE so a
+// concurrent payment can never be overwritten into a cancellation.
+export async function cancelOrder(orderId: string, reason: string): Promise<ActionResult> {
+  const user = await requireUser();
+
+  const trimmed = reason.trim();
+  if (!trimmed) return { ok: false, error: "Isi alasan pembatalan." };
+
+  const result = await prisma.order.updateMany({
+    where: { id: orderId, status: "OPEN" },
+    data: { status: "CANCELLED", cancelReason: trimmed, cancelledById: user.id, cancelledAt: new Date() },
+  });
+  if (result.count === 0) {
+    return { ok: false, error: "Order ini sudah dibayar/tidak aktif — tidak bisa dibatalkan." };
+  }
+  return { ok: true };
+}
+
 // New items only — existing lines on a saved order are never edited or
 // removed here (that requires an OWNER void with a reason, or belongs on a
 // new order once the current one is PAID). See OrderDetail's UI: this is

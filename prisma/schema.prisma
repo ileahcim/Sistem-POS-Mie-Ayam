@@ -40,6 +40,7 @@ model User {
   expensesCreated Expense[]
   ordersCreated   Order[]     @relation("OrderCreatedBy")
   ordersVoided    Order[]     @relation("OrderVoidedBy")
+  ordersCancelled Order[]     @relation("OrderCancelledBy")
   mieLedgerEntriesCreated MieLedgerEntry[]
 }
 
@@ -237,6 +238,11 @@ enum OrderStatus {
   PAID // frozen, no further edits
   VOID // cancelled, requires OWNER + reason
   RECEIVABLE // "piutang" — resolved at shift-close time without collecting cash
+  // "Batal" — an unpaid (OPEN) order cancelled before any money moved
+  // (wrong input, customer changed their mind). Deliberately separate from
+  // VOID: any logged-in user (CASHIER too) may do it, reason still
+  // required. See cancelOrder in order-aktif/actions.ts.
+  CANCELLED
 }
 
 enum PaymentMethod {
@@ -308,6 +314,14 @@ model Order {
   voidedById String?
   voidedBy   User?   @relation("OrderVoidedBy", fields: [voidedById], references: [id])
   voidedAt   DateTime?
+
+  // Set only for status CANCELLED — kept apart from the void* columns
+  // above on purpose so a "Batal" (cashier, unpaid) is never mistaken for a
+  // "Void" (OWNER) when tracing history.
+  cancelReason  String?
+  cancelledById String?
+  cancelledBy   User?     @relation("OrderCancelledBy", fields: [cancelledById], references: [id])
+  cancelledAt   DateTime?
 
   items OrderItem[]
 

@@ -20,7 +20,7 @@ export default async function RiwayatDetailPage({ params }: { params: Promise<{ 
   // Riwayat only ever shows a concluded order — same status set as
   // getOrderHistory's own list query — so a still-OPEN order id (it belongs
   // on Order Aktif, not here) 404s instead of leaking a half-built view.
-  const isSettled = order.status === "PAID" || order.status === "VOID" || order.status === "RECEIVABLE";
+  const isSettled = order.status !== "OPEN";
   if (!isSettled) notFound();
 
   const isOwner = user?.role === "OWNER";
