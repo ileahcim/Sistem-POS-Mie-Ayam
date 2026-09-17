@@ -40,6 +40,7 @@ model User {
   expensesCreated Expense[]
   ordersCreated   Order[]     @relation("OrderCreatedBy")
   ordersVoided    Order[]     @relation("OrderVoidedBy")
+  mieLedgerEntriesCreated MieLedgerEntry[]
 }
 
 // ---------------------------------------------------------------------------
@@ -385,4 +386,75 @@ model ComboCache {
   items Json
 
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Catatan Mi Mentah — raw noodle production sales ledger. Fully separate
+// from the POS/cashier: money here never touches Shift/Expense/Order or any
+// omzet number the POS side computes. OWNER only. See CLAUDE.md "Catatan Mi
+// Mentah" for the full brief this was built from.
+// ---------------------------------------------------------------------------
+
+enum MieProductType {
+  MIE_KERITING
+  MIE_LURUS
+  PANGSIT
+  CUSTOM
+}
+
+enum MieLedgerKind {
+  ORDER
+  PAYMENT
+  OPENING_BALANCE
+}
+
+model MieCustomer {
+  id       String  @id @default(cuid())
+  name     String
+  note     String? // free text — useful for telling two "Budi"s apart
+  isActive Boolean @default(true) // soft delete, same convention as Product/AddonOption
+
+  createdAt DateTime @default(now())
+
+  entries MieLedgerEntry[]
+}
+
+// One editable default Rp/kg per fixed product — the starting suggestion
+// before any customer-specific history exists (see MieLedgerEntry's price
+// autofill rule below). Null until the owner sets it (never guessed/seeded
+// — same "don't invent a money number" rule as Product.costPrice). No row
+// for CUSTOM: a one-off request is priced fresh every time, never remembered.
+model MieProductDefault {
+  productType       MieProductType @id
+  defaultPricePerKg Int?
+}
+
+// A single unified ledger, not separate Order/Payment tables — the
+// customer detail page's "riwayat lengkap ... dengan kolom saldo berjalan"
+// reads naturally as ONE chronological list, and it's the only way to
+// honor the hard rule that balance is ALWAYS a sum over rows, never a
+// stored number: ORDER and OPENING_BALANCE add to the balance, PAYMENT
+// subtracts — `amount` itself is always stored positive, the sign is
+// applied by `kind` wherever balance is computed (see get-mie-customers.ts).
+model MieLedgerEntry {
+  id         String      @id @default(cuid())
+  customerId String
+  customer   MieCustomer @relation(fields: [customerId], references: [id])
+
+  kind MieLedgerKind
+
+  // ORDER-only fields — null for PAYMENT/OPENING_BALANCE.
+  productType MieProductType?
+  customLabel String? // filled only when productType == CUSTOM
+  kg          Float?
+  pricePerKg  Int? // snapshot at order time — never re-read from MieProductDefault later
+
+  amount Int // Rupiah, always positive — see `kind` comment above for sign
+
+  date DateTime // business date — owner-settable, defaults to today (not necessarily createdAt)
+  note String?
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
 }

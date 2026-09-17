@@ -51,6 +51,15 @@ export function NoExpenseIcon() {
   );
 }
 
+export function NoMieCustomerIcon() {
+  return (
+    <svg {...shared}>
+      <circle cx="20" cy="14" r="6" />
+      <path d="M9 34c0-6 5-10 11-10s11 4 11 10" />
+    </svg>
+  );
+}
+
 export function NoHistoryIcon() {
   return (
     <svg {...shared}>
