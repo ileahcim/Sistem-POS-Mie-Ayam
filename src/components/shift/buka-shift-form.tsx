@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 
-export function BukaShiftForm() {
+export function BukaShiftForm({ isOwner }: { isOwner: boolean }) {
   const router = useRouter();
   const [openingCash, setOpeningCash] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
@@ -52,11 +52,20 @@ export function BukaShiftForm() {
 
       {/* Pre-order tidak butuh shift terbuka (order borongan lewat WhatsApp
           malam hari saat warung tutup) — jadi harus tetap bisa dijangkau
-          dari sini, satu-satunya layar yang pasti kebuka sebelum shift ada. */}
-      <div className="flex items-center gap-2">
+          dari sini, satu-satunya layar yang pasti kebuka sebelum shift ada.
+          Catatan Mi Mentah juga tidak butuh shift (uangnya terpisah total
+          dari kasir — lihat CLAUDE.md "Catatan Mi Mentah") dan sering
+          dicatat pagi hari sebelum warung buka, jadi butuh jalan masuk yang
+          sama — tapi OWNER only, sama seperti /note sendiri. */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
         <Link href="/pesanan-terjadwal" className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink">
           Pesanan Terjadwal
         </Link>
+        {isOwner && (
+          <Link href="/note" className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink">
+            Note (Mi Mentah)
+          </Link>
+        )}
         <SignOutButton />
       </div>
     </div>
