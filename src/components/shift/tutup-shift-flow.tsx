@@ -10,7 +10,8 @@ import { PriceText } from "@/components/ui/price-text";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
-import { voidUnpaidOrder, markOrderReceivable, addExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
+import { markOrderReceivable, addExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
+import { CancelOrderButton } from "@/components/order-aktif/cancel-order-sheet";
 
 type Step = "warning" | "unpaid" | "expenses" | "count" | "result";
 
@@ -20,28 +21,20 @@ const CHANNEL_LABEL: Record<UnpaidOrderForClose["channel"], string> = {
   ANTAR: "Antar",
 };
 
+// "Batalkan" here is the exact same Batalkan Order path as Order Aktif
+// (CancelOrderButton -> cancelOrder): any cashier, reason required, status
+// CANCELLED. VOID is reserved for already-PAID orders (OWNER only).
 function UnpaidOrderRow({
   order,
-  canVoid,
   onResolved,
 }: {
   order: UnpaidOrderForClose;
-  canVoid: boolean;
   onResolved: (orderId: string) => void;
 }) {
-  const [mode, setMode] = useState<"idle" | "void" | "receivable">("idle");
+  const [mode, setMode] = useState<"idle" | "receivable">("idle");
   const [text, setText] = useState(order.customerName ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function confirmVoid() {
-    setSaving(true);
-    setError(null);
-    const result = await voidUnpaidOrder(order.id, text);
-    setSaving(false);
-    if (!result.ok) return setError(result.error);
-    onResolved(order.id);
-  }
 
   async function confirmReceivable() {
     setSaving(true);
@@ -64,11 +57,12 @@ function UnpaidOrderRow({
 
       {mode === "idle" && (
         <div className="mt-3 flex gap-2">
-          {canVoid && (
-            <Button variant="danger" fullWidth onClick={() => setMode("void")}>
-              Batalkan
-            </Button>
-          )}
+          <CancelOrderButton
+            size="inline"
+            orderId={order.id}
+            orderLabel={formatQueueLabel(order.queueNumber, order.queueSuffix)}
+            onCancelled={() => onResolved(order.id)}
+          />
           <Button
             variant="secondary"
             fullWidth
@@ -77,27 +71,6 @@ function UnpaidOrderRow({
           >
             Tandai Piutang
           </Button>
-        </div>
-      )}
-
-      {mode === "void" && (
-        <div className="mt-3 flex flex-col gap-2">
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Alasan pembatalan"
-            className="rounded-input border-border h-11 border px-3 text-sm"
-          />
-          {error && <p className="text-danger text-sm">{error}</p>}
-          <div className="flex gap-2">
-            <Button variant="secondary" fullWidth onClick={() => setMode("idle")}>
-              Batal
-            </Button>
-            <Button variant="danger" fullWidth disabled={saving || !text.trim()} onClick={confirmVoid}>
-              {saving ? "Memproses..." : "Konfirmasi Batalkan"}
-            </Button>
-          </div>
         </div>
       )}
 
@@ -134,11 +107,9 @@ function UnpaidOrderRow({
 export function TutupShiftFlow({
   initialUnpaidOrders,
   initialExpenses,
-  userRole,
 }: {
   initialUnpaidOrders: UnpaidOrderForClose[];
   initialExpenses: ShiftExpense[];
-  userRole: "OWNER" | "CASHIER";
 }) {
   const [unpaidOrders, setUnpaidOrders] = useState(initialUnpaidOrders);
   const [step, setStep] = useState<Step>(initialUnpaidOrders.length > 0 ? "warning" : "expenses");
@@ -211,7 +182,6 @@ export function TutupShiftFlow({
             <UnpaidOrderRow
               key={order.id}
               order={order}
-              canVoid={userRole === "OWNER"}
               onResolved={handleOrderResolved}
             />
           ))}

@@ -102,7 +102,7 @@ export function OrderAktifList({
                     </span>
                   </ListRow>
                   <CancelOrderButton
-                    compact
+                    size="compact"
                     orderId={order.id}
                     orderLabel={formatQueueLabel(order.queueNumber, order.queueSuffix)}
                     onCancelled={() => router.refresh()}

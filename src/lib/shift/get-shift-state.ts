@@ -32,8 +32,8 @@ export type UnpaidOrderForClose = {
   total: number;
 };
 
-// Orders that block a shift close: anything not yet resolved to PAID, VOID,
-// or RECEIVABLE. Total is recomputed the same way get-order-detail does
+// Orders that block a shift close: anything not yet resolved to PAID,
+// CANCELLED, or RECEIVABLE. Total is recomputed the same way get-order-detail does
 // (subtotal + Antar delivery fee) so the close screen shows real amounts.
 export async function getUnpaidOrdersForShift(shiftId: string): Promise<UnpaidOrderForClose[]> {
   const orders = await prisma.order.findMany({

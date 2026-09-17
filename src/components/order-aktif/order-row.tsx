@@ -64,7 +64,7 @@ export function OrderRow({
       </ListRow>
       {order.status === "OPEN" ? (
         <CancelOrderButton
-          compact
+          size="compact"
           orderId={order.id}
           orderLabel={order.queueNumber != null ? queueLabel : null}
           onCancelled={onCancelled}

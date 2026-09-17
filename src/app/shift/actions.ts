@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireUser, requireRole } from "@/lib/auth/get-current-user";
+import { requireUser } from "@/lib/auth/get-current-user";
 import { DELIVERY_FEE_PER_FOOD_ITEM } from "@/lib/orders/pricing";
 import { refreshComboCache } from "@/lib/combo/refresh-combo-cache";
 
@@ -32,23 +32,6 @@ export async function addExpense(description: string, amount: number): Promise<A
 
   await prisma.expense.create({
     data: { shiftId: shift.id, description: description.trim(), amount, createdById: user.id },
-  });
-  return { ok: true };
-}
-
-// "Batalkan" during shift close — a void, so it follows the same rule as
-// any other void: reason required, OWNER only.
-export async function voidUnpaidOrder(orderId: string, reason: string): Promise<ActionResult> {
-  const user = await requireRole("OWNER");
-
-  if (!reason.trim()) return { ok: false, error: "Isi alasan pembatalan." };
-
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order || order.status !== "OPEN") return { ok: false, error: "Order tidak valid." };
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { status: "VOID", voidReason: reason.trim(), voidedById: user.id, voidedAt: new Date() },
   });
   return { ok: true };
 }
