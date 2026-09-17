@@ -27,6 +27,14 @@ export const MIE_FIXED_PRODUCT_TYPES: Exclude<MieProductType, "CUSTOM">[] = [
   "PANGSIT",
 ];
 
+// Tap-first presets for recording while standing in the production area
+// (CLAUDE.md "Catatan Mi Mentah"). "Mie Pasar" is the daily market order:
+// Mi Keriting at the price the owner specified — a deliberate fixed preset,
+// not the per-customer autofill.
+export const MIE_PASAR_PRESET = { productType: "MIE_KERITING", pricePerKg: 14000 } as const;
+export const MIE_KG_PRESETS = [5, 10, 15, 20];
+export const MIE_PAYMENT_PRESETS = [50000, 100000, 200000, 500000];
+
 export type MieLedgerEntryDTO = {
   id: string;
   kind: MieLedgerKind;

@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import { Card } from "@/components/ui/card";
-import { ListRow } from "@/components/ui/list-row";
+import Link from "next/link";
+import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoMieCustomerIcon } from "@/components/ui/empty-state-icons";
@@ -20,15 +21,34 @@ function sortRows(rows: MieCustomerRow[], mode: SortMode): MieCustomerRow[] {
   return copy;
 }
 
+// Each card: the name/balance area opens the customer page; active
+// customers also get "+ Pesanan" / "+ Bayar" right on the card, landing on
+// the form with this customer already selected — no detour via the detail
+// page when recording standing up.
 function CustomerRows({ rows }: { rows: MieCustomerRow[] }) {
   return rows.map((c) => (
-    <ListRow key={c.id} roomy asLink={`/note/pelanggan/${c.id}`}>
-      <div className="min-w-0 flex-1">
-        <p className="text-ink text-base font-semibold">{c.name}</p>
-        {c.note && <p className="text-ink-muted text-sm">{c.note}</p>}
-      </div>
-      <PriceText amount={c.balance} weight="primary" />
-    </ListRow>
+    <div
+      key={c.id}
+      className="border-border flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3 last:border-b-0"
+    >
+      <Link href={`/note/pelanggan/${c.id}`} className="flex min-h-12 min-w-[12rem] flex-1 items-center gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="text-ink block text-base font-semibold">{c.name}</span>
+          {c.note && <span className="text-ink-muted block text-sm">{c.note}</span>}
+        </span>
+        <PriceText amount={c.balance} weight="primary" />
+      </Link>
+      {c.isActive && (
+        <div className="flex shrink-0 gap-2">
+          <LinkButton href={`/note/pesanan/baru?customerId=${c.id}`} variant="ghost">
+            + Pesanan
+          </LinkButton>
+          <LinkButton href={`/note/pembayaran/baru?customerId=${c.id}`} variant="secondary">
+            + Bayar
+          </LinkButton>
+        </div>
+      )}
+    </div>
   ));
 }
 

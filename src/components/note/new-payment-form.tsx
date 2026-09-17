@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { cn } from "@/components/ui/cn";
+import { MIE_PAYMENT_PRESETS } from "@/lib/mie/types";
 
 // Payments are deliberately NOT tied to a specific order — picking a
 // customer and typing an amount is the whole flow (see CLAUDE.md-worthy
@@ -30,6 +32,35 @@ export function NewPaymentForm({
   const router = useRouter();
   const [customerId, setCustomerId] = useState(initialCustomerId ?? customers[0]?.id ?? "");
   const [amount, setAmount] = useState<number | "">("");
+  // "Lunas penuh" follows the selected customer: switching customer while
+  // it's on re-fills that customer's own remaining balance.
+  const [payFull, setPayFull] = useState(false);
+
+  const balanceOf = (id: string) => customers.find((c) => c.id === id)?.balance ?? 0;
+  const selectedBalance = balanceOf(customerId);
+
+  function chooseCustomer(id: string) {
+    setCustomerId(id);
+    if (payFull) {
+      const next = balanceOf(id);
+      if (next > 0) setAmount(next);
+      else {
+        setAmount("");
+        setPayFull(false);
+      }
+    }
+  }
+
+  function choosePreset(value: number) {
+    setAmount(value);
+    setPayFull(false);
+  }
+
+  function chooseFull() {
+    if (selectedBalance <= 0) return;
+    setAmount(selectedBalance);
+    setPayFull(true);
+  }
   const [date, setDate] = useState(todayDateStr());
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -80,7 +111,7 @@ export function NewPaymentForm({
                 <span className="text-ink-muted text-sm font-medium">Pelanggan</span>
                 <select
                   value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
+                  onChange={(e) => chooseCustomer(e.target.value)}
                   className="rounded-input border-border h-12 border px-3 text-base"
                 >
                   {customers.map((c) => (
@@ -94,8 +125,50 @@ export function NewPaymentForm({
 
             <label className="flex flex-col gap-1">
               <span className="text-ink-muted text-sm font-medium">Nominal dibayar</span>
-              <RupiahInput value={amount} onChange={setAmount} placeholder="0" className="h-12 text-base" />
+              <RupiahInput
+                value={amount}
+                onChange={(v) => {
+                  setAmount(v);
+                  setPayFull(false);
+                }}
+                placeholder="0"
+                className="h-12 text-base"
+              />
             </label>
+
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Pilih cepat nominal">
+              {MIE_PAYMENT_PRESETS.map((preset) => {
+                const active = !payFull && amount === preset;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => choosePreset(preset)}
+                    aria-pressed={active}
+                    className={cn(
+                      "rounded-pill h-12 min-w-20 px-4 text-base font-semibold",
+                      active ? "bg-primary text-white" : "bg-muted text-ink",
+                    )}
+                  >
+                    {preset / 1000}rb
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={chooseFull}
+                disabled={selectedBalance <= 0}
+                aria-pressed={payFull}
+                className={cn(
+                  "rounded-pill h-12 px-4 text-base font-semibold disabled:opacity-40",
+                  payFull ? "bg-primary text-white" : "border-primary text-primary border",
+                )}
+              >
+                {selectedBalance > 0
+                  ? `Lunas penuh · Rp${selectedBalance.toLocaleString("id-ID")}`
+                  : "Lunas penuh (tidak ada utang)"}
+              </button>
+            </div>
 
             <label className="flex flex-col gap-1">
               <span className="text-ink-muted text-sm font-medium">Tanggal</span>

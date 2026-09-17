@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import type { MieProductType } from "@/lib/mie/types";
-import { MIE_FIXED_PRODUCT_TYPES, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
+import { MIE_FIXED_PRODUCT_TYPES, MIE_KG_PRESETS, MIE_PASAR_PRESET, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
 import { createMieOrder, getMieAutofillPrice } from "@/app/note/actions";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
@@ -33,6 +33,10 @@ export function NewOrderForm({
   const [kg, setKg] = useState("");
   const [pricePerKg, setPricePerKg] = useState<number | "">("");
   const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
+  // While the "Mie Pasar" preset is on, its fixed price must survive a
+  // customer change (the owner often taps the preset first, then picks the
+  // customer) — the per-customer autofill stays out of the way.
+  const [pasarPreset, setPasarPreset] = useState(false);
   const [date, setDate] = useState(todayDateStr());
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -54,7 +58,15 @@ export function NewOrderForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId, productType]);
 
+  function applyPasarPreset() {
+    setProductType(MIE_PASAR_PRESET.productType);
+    setPricePerKg(MIE_PASAR_PRESET.pricePerKg);
+    setPriceManuallyEdited(true);
+    setPasarPreset(true);
+  }
+
   function handleProductTypeChange(next: MieProductType) {
+    setPasarPreset(false);
     setProductType(next);
     setPriceManuallyEdited(false);
     if (next === "CUSTOM") setPricePerKg("");
@@ -102,6 +114,27 @@ export function NewOrderForm({
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-md flex-col gap-3">
+          <button
+            type="button"
+            onClick={applyPasarPreset}
+            aria-pressed={pasarPreset}
+            className={cn(
+              "rounded-card flex min-h-16 w-full items-center justify-between gap-3 border-2 px-4 py-3 text-left",
+              pasarPreset ? "border-primary bg-primary-soft" : "border-border bg-surface",
+            )}
+          >
+            <span className="flex flex-col">
+              <span className="text-ink text-base font-bold">Mie Pasar</span>
+              <span className="text-ink-muted text-sm">
+                {MIE_PRODUCT_LABEL[MIE_PASAR_PRESET.productType]} · Rp
+                {MIE_PASAR_PRESET.pricePerKg.toLocaleString("id-ID")}/kg
+              </span>
+            </span>
+            <span className={cn("text-sm font-semibold", pasarPreset ? "text-primary-strong" : "text-primary")}>
+              {pasarPreset ? "Dipakai ✓" : "Pakai"}
+            </span>
+          </button>
+
           <Card padded className="flex flex-col gap-3">
             {customers.length === 0 ? (
               <p className="text-ink-muted text-sm">
@@ -118,7 +151,7 @@ export function NewOrderForm({
                   value={customerId}
                   onChange={(e) => {
                     setCustomerId(e.target.value);
-                    setPriceManuallyEdited(false);
+                    if (!pasarPreset) setPriceManuallyEdited(false);
                   }}
                   className="rounded-input border-border h-12 border px-3 text-base"
                 >
@@ -192,11 +225,29 @@ export function NewOrderForm({
                   onChange={(v) => {
                     setPricePerKg(v);
                     setPriceManuallyEdited(true);
+                    if (v !== MIE_PASAR_PRESET.pricePerKg) setPasarPreset(false);
                   }}
                   placeholder="0"
                   className="h-12 text-base"
                 />
               </label>
+            </div>
+
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Pilih cepat jumlah kg">
+              {MIE_KG_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setKg(String(preset))}
+                  aria-pressed={kgValid && kgNumber === preset}
+                  className={cn(
+                    "rounded-pill h-12 min-w-16 px-4 text-base font-semibold",
+                    kgValid && kgNumber === preset ? "bg-primary text-white" : "bg-muted text-ink",
+                  )}
+                >
+                  {preset} kg
+                </button>
+              ))}
             </div>
 
             {kgValid && pricePerKg !== "" && (
