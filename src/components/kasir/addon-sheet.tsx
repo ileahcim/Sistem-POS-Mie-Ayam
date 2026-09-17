@@ -150,11 +150,19 @@ export function AddonSheet({
                         ) : (
                           <span className="text-sm font-medium text-ink-muted">Gratis</span>
                         )}
+                        {/* An optional single-choice group (e.g. "Jenis Bakso":
+                            nothing picked = plain Bakso) must be un-pickable
+                            again — a native radio can't be unchecked, so a
+                            tap on the already-checked option clears it.
+                            onChange never fires in that case, onClick does. */}
                         <input
                           type="radio"
                           name={group.id}
                           checked={checked}
                           onChange={() => selectSingle(optionToGroup.get(opt.id) ?? group, opt.id)}
+                          onClick={() => {
+                            if (checked && !isRequired(group)) setOptionQty(opt.id, 0);
+                          }}
                           className="text-primary h-5 w-5 accent-current"
                         />
                       </span>

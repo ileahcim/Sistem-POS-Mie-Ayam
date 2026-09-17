@@ -39,12 +39,12 @@ export const NAMED_COMBOS: NamedCombo[] = [
   {
     displayName: "Bakso Telur Komplit",
     productName: "Bakso",
-    addonKeys: ["Jenis Bakso::Telur", "Topping Bakso::Pangsit", "Topping Bakso::Ceker"],
+    addonKeys: ["Jenis Bakso::Upgrade ke Telur", "Topping Bakso::Pangsit", "Topping Bakso::Ceker"],
   },
   {
     displayName: "Bakso Urat Ceker",
     productName: "Bakso",
-    addonKeys: ["Jenis Bakso::Urat", "Topping Bakso::Ceker"],
+    addonKeys: ["Jenis Bakso::Upgrade ke Urat", "Topping Bakso::Ceker"],
   },
   {
     displayName: "Pangsit Rebus Komplit",

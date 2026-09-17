@@ -105,14 +105,18 @@ const addonGroups: AddonGroupSeed[] = [
     ],
   },
   {
+    // Optional single-choice: picking nothing = plain Bakso at the base
+    // price (the most common order), so there's no "Biasa" option to tap.
+    // The old "Biasa" row on existing databases is soft-deleted by
+    // migration 20260917100200_bakso_jenis_optional, which also renamed
+    // "Urat"/"Telur" to the names below in place.
     name: "Jenis Bakso",
-    minSelect: 1,
+    minSelect: 0,
     maxSelect: 1,
     appliesTo: ["Bakso"],
     options: [
-      { name: "Biasa", price: 0 },
-      { name: "Urat", price: 3000 },
-      { name: "Telur", price: 5000 },
+      { name: "Upgrade ke Urat", price: 3000 },
+      { name: "Upgrade ke Telur", price: 5000 },
     ],
   },
   {
@@ -318,11 +322,21 @@ function verifySeedPrices(
     {
       label: "Bakso Telur Komplit (Telur, Pangsit, Ceker)",
       actual: priceOf("Bakso", [
-        "Jenis Bakso::Telur",
+        "Jenis Bakso::Upgrade ke Telur",
         "Topping Bakso::Pangsit",
         "Topping Bakso::Ceker",
       ]),
       expected: 22000,
+    },
+    {
+      label: "Bakso polos (Jenis Bakso tidak dipilih)",
+      actual: priceOf("Bakso", []),
+      expected: 13000,
+    },
+    {
+      label: "Bakso Urat Ceker",
+      actual: priceOf("Bakso", ["Jenis Bakso::Upgrade ke Urat", "Topping Bakso::Ceker"]),
+      expected: 18000,
     },
     {
       label: "Mie Ayam Bakso Urat",

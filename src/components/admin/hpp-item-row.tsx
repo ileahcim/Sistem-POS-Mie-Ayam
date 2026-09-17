@@ -88,9 +88,11 @@ export function HppItemRow({ item }: { item: HppItem }) {
           />
         </label>
         <span className="text-ink-muted text-sm">
-          {margin != null
-            ? `Untung Rp${margin.toLocaleString("id-ID")}${marginPercent != null ? ` (${marginPercent}%)` : ""}`
-            : "—"}
+          {item.price === 0
+            ? "Harga dasar, tidak ada markup"
+            : margin != null
+              ? `Untung Rp${margin.toLocaleString("id-ID")}${marginPercent != null ? ` (${marginPercent}%)` : ""}`
+              : "—"}
         </span>
       </div>
 
