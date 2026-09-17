@@ -50,7 +50,9 @@ Buka/tutup shift dikerjakan **pemilik**, bukan karyawan — jadi layar shift bol
 ## Menu & harga
 
 - Menu = produk base + add-on (bukan produk terpisah per kombinasi).
-- **Bakso Urat Ceker harga yang benar adalah 18.000** (Bakso 13.000 + Jenis "Urat" +3.000 + Topping "Ceker" +2.000). Menu cetak fisik salah ketik jadi 19.000 — sistem kita menghitung dari base+addon jadi otomatis benar (18.000), tidak perlu koreksi kode apa pun untuk ini.
+- **Bakso Urat Ceker harga yang benar adalah 18.000** (Bakso 13.000 + Jenis Bakso "Upgrade ke Urat" +3.000 + Topping "Ceker" +2.000). Menu cetak fisik salah ketik jadi 19.000 — sistem kita menghitung dari base+addon jadi otomatis benar (18.000), tidak perlu koreksi kode apa pun untuk ini.
+- **Grup "Jenis Bakso" opsional** (min 0, maks 1): isinya cuma "Upgrade ke Urat" (+3.000) dan "Upgrade ke Telur" (+5.000). Tidak memilih apa pun = Bakso biasa Rp13.000 — sengaja **tidak ada** opsi "Biasa", supaya pesanan bakso polos (yang paling sering) tidak butuh tap ekstra. Opsi "Biasa" lama di-soft-delete (`isActive=false`) oleh migrasi `20260917100200_bakso_jenis_optional`, yang juga mengganti nama "Urat"/"Telur" **di tempat** (id tetap, jadi `comboKey`, `ComboCache`, dan snapshot order lama tetap cocok). Saat migrasi dibuat, belum ada satu pun order yang memakai "Biasa", jadi tidak ada data historis yang perlu dipindah. Di layar add-on, opsi pilih-satu yang opsional bisa di-tap lagi untuk batal memilih.
+- Halaman HPP: item dengan harga jual Rp0 menampilkan "Harga dasar, tidak ada markup", bukan angka untung/persentase yang membingungkan.
 - Urutan kategori di layar kasir: Makanan, Minuman Racik, Kulkas, Lain-lain, Frozen (paling bawah).
 - Channel: Dine In, Bungkus, Antar — **tidak ada** GoFood/GrabFood/ShopeeFood. Pesanan dari aplikasi ojol tidak pernah diinput ke POS ini sama sekali.
 - Meja: K1, K2 (kursi), L1, L2, L3 (lesehan) — label persis ini, bukan nomor 1-5.
@@ -63,10 +65,12 @@ Buka/tutup shift dikerjakan **pemilik**, bukan karyawan — jadi layar shift bol
 - Nama tamu: **opsional**, field bebas (`Order.customerName`) — bisa diisi nama orang atau catatan lain yang berguna buat kasir, tidak wajib diisi.
 - Order berstatus `PAID` beku, tidak bisa diedit. Kalau pelanggan nambah setelah bayar, itu **order baru**, bukan tambahan ke order lama.
 - Void wajib isi alasan, hanya role **OWNER**.
+- **"Batalkan Order" (status `CANCELLED`, label "Batal") — terpisah dari Void.** Khusus order `OPEN` (belum dibayar): salah input, pelanggan tidak jadi, order dobel. **Boleh CASHIER** (belum ada uang yang tersentuh), tetap wajib alasan (ada tombol alasan cepat + isian bebas). Kolomnya sendiri (`cancelReason`/`cancelledById`/`cancelledAt`), tidak memakai kolom `void*`. Tombolnya ada di baris Order Aktif (tombol "Batal") dan di halaman detail order. Order yang dibatalkan hilang dari Order Aktif, tetap tercatat di Riwayat Pesanan dengan status Batal + alasan + siapa yang membatalkan, dan tidak pernah dihitung sebagai penjualan (semua hitungan cuma membaca `PAID`). Action: `cancelOrder` di `src/app/order-aktif/actions.ts` — status dicek di dalam `WHERE` update supaya tidak bisa menimpa order yang barusan dibayar.
+- **Bungkus & Antar selesai begitu dibayar.** `payOrder` otomatis mengisi `servedAt` (= `paidAt`) untuk channel Bungkus/Antar, jadi order langsung hilang dari Order Aktif tanpa tap "Sudah Disajikan"; tombol itu juga tidak ditampilkan untuk Bungkus/Antar yang belum dibayar. **Dine In tidak berubah** — tetap dua langkah (bayar dan disajikan independen), karena di Dine In makanan biasanya keluar duluan.
 - Harga, nama produk, dan HPP di-snapshot ke `OrderItem` saat transaksi — laporan lama tidak pernah dihitung ulang dari tabel Product.
 - `costPrice` diisi manual oleh owner (estimasi). Tidak ada sistem stok/BOM — di luar scope.
 
-## Split payment ("Pisahkan & Bayar") — diputuskan, belum dibangun
+## Split payment ("Pisahkan & Bayar") — sudah dibangun
 
 Kasus rombongan yang duduk di satu meja tapi mau bayar terpisah:
 - **Tidak** ada fitur gabung order / pindah meja.
@@ -74,7 +78,7 @@ Kasus rombongan yang duduk di satu meja tapi mau bayar terpisah:
 - Order induk tetap terbuka dengan sisa item yang tidak dipindah.
 - Aturan keras: **satu order = satu pembayaran = satu struk**. Jangan pernah membuat order yang bisa dibayar berkali-kali.
 - Ini kasus jarang — jangan sampai menambah langkah di alur pembayaran normal (single order, bayar sekali) untuk mengakomodasi ini.
-- Belum diimplementasi — bangun saat diminta, bukan sekarang.
+- **Tampilan: dua panel berdampingan** (di layar sempit bertumpuk, panel kanan di bawah): kiri "Tetap di order ini", kanan "Dipisah & dibayar sekarang" (kosong di awal: "Belum ada item dipilih"), masing-masing dengan subtotal sendiri. Tap kartu di kiri = pindahkan 1 porsi ke kanan, tap kartu di kanan = kembalikan 1 porsi; kartu hilang dari panel begitu qty-nya 0. **Tanpa teks instruksi** — bentuk dua panel sudah cukup jelas. Animasi perpindahan cuma transform+opacity, singkat. Tombol "Pisahkan & Lanjut Bayar" aktif kalau panel kanan terisi (dan panel kiri masih menyisakan minimal 1 item — server menolak memindah semuanya; untuk itu pakai alur bayar biasa). Ini menggantikan versi lama (satu daftar dengan stepper − 0 +) yang terlalu ribet dipakai cepat.
 
 ## Ongkir (channel Antar)
 
@@ -88,6 +92,7 @@ Kasus rombongan yang duduk di satu meja tapi mau bayar terpisah:
 - Item dengan nama + add-on identik digabung jadi satu baris dengan qty.
 - Khusus channel Antar: tombol **"Print Daftar"** terpisah, dipakai **sebelum** bayar — kotak centang kosong di kiri tiap nama menu, qty dicetak besar, **tanpa harga/total** (ini daftar packing, bukan bukti bayar). Dibangun Tahap 8.
 - Nama warung, alamat, telepon, footer struk **selalu** dari tabel `Setting` (singleton), tidak pernah di-hardcode di kode.
+- **Printer fisik (Blueprint ECO80D) — urutan tes saat unit datang.** Seller mengonfirmasi printer ini mendukung **BT 2.0 (Classic/SPP) dan BT 5.0 (BLE)**. Coba implementasi **Web Bluetooth dulu** (`src/lib/printing/printers/web-bluetooth-printer.ts` — lewat BLE, lebih simpel, tanpa app perantara). Kalau gagal connect atau tidak stabil, baru pindah ke **RawBT** (`rawbt-printer.ts`, lewat Classic/SPP dengan app RawBT di tablet) yang sudah disiapkan sebagai cadangan. Dua-duanya masih stub sampai unit fisik ada.
 
 ## Pembayaran
 
