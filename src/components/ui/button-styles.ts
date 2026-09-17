@@ -1,7 +1,7 @@
 import { cn } from "./cn";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-export type ButtonSize = "default" | "large";
+export type ButtonSize = "default" | "large" | "compact";
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary: "bg-primary text-white font-bold disabled:bg-muted disabled:text-ink-faint",
@@ -13,6 +13,9 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
 const SIZE_CLASS: Record<ButtonSize, string> = {
   default: "h-12 px-5 text-base",
   large: "h-14 px-6 text-base",
+  // Same 48px touch height, narrower — for buttons sharing the app header
+  // row with the title on a phone-width screen.
+  compact: "h-12 px-4 text-sm whitespace-nowrap",
 };
 
 // Plain utility, deliberately NOT in a "use client" file — a Server

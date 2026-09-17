@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { MockPrinterOverlay } from "@/components/printing/mock-printer-overlay";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { SheetMotionProvider } from "@/components/ui/sheet-motion";
+import { getSheetBlurEnabled } from "@/lib/settings/get-settings";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -47,15 +49,18 @@ export const viewport: Viewport = {
 // this is the correct default for the whole tree, not a per-page opt-in.
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const sheetBlurEnabled = await getSheetBlurEnabled();
   return (
     <html
       lang="id"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
-        <MockPrinterOverlay />
+        <SheetMotionProvider blurEnabled={sheetBlurEnabled}>
+          {children}
+          <MockPrinterOverlay />
+        </SheetMotionProvider>
         <ServiceWorkerRegister />
       </body>
     </html>

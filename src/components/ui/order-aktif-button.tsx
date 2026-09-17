@@ -15,7 +15,7 @@ export function OrderAktifButton({ activeCount, lateCount }: { activeCount: numb
     <Link
       href="/order-aktif"
       className={cn(
-        "rounded-pill relative flex h-12 shrink-0 items-center px-4 text-sm font-semibold",
+        "rounded-pill relative flex h-12 shrink-0 items-center px-3 text-sm font-semibold whitespace-nowrap sm:px-4",
         isLate ? "bg-danger text-white" : "bg-muted text-ink",
       )}
     >

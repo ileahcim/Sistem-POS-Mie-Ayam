@@ -5,14 +5,13 @@ import { useRouter } from "next/navigation";
 import { todayDateStr, dateInputToIso } from "@/lib/mie/date-input";
 import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { createMiePayment } from "@/app/note/actions";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { cn } from "@/components/ui/cn";
 import { MIE_PAYMENT_PRESETS } from "@/lib/mie/types";
 
@@ -23,11 +22,11 @@ import { MIE_PAYMENT_PRESETS } from "@/lib/mie/types";
 export function NewPaymentForm({
   customers,
   initialCustomerId,
-  orderAktifIndicator,
+  nav,
 }: {
   customers: MieCustomerRow[];
   initialCustomerId?: string;
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   const router = useRouter();
   const [customerId, setCustomerId] = useState(initialCustomerId ?? customers[0]?.id ?? "");
@@ -84,16 +83,15 @@ export function NewPaymentForm({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Pembayaran Baru</h1>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton activeCount={orderAktifIndicator.activeCount} lateCount={orderAktifIndicator.lateCount} />
-          <LinkButton href="/note" variant="secondary">
+      <AppHeader
+        nav={nav}
+        title="Pembayaran Baru"
+        actions={
+          <LinkButton href="/note" variant="secondary" size="compact">
             Batal
           </LinkButton>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-md flex-col gap-3">

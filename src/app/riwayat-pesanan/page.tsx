@@ -1,6 +1,6 @@
 import { getOrderHistory, clampHistoryFilterForRole } from "@/lib/orders/get-order-history";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { localDateStr } from "@/lib/timezone";
 import { RiwayatPesananScreen } from "@/components/riwayat-pesanan/riwayat-pesanan-screen";
 
@@ -21,9 +21,9 @@ export default async function RiwayatPesananPage({
     isOwner,
   );
 
-  const [orders, orderAktifIndicator] = await Promise.all([getOrderHistory(filter), getOrderAktifIndicator()]);
+  const [orders, nav] = await Promise.all([getOrderHistory(filter), getHeaderNav()]);
 
   return (
-    <RiwayatPesananScreen orders={orders} filter={filter} isOwner={isOwner} orderAktifIndicator={orderAktifIndicator} />
+    <RiwayatPesananScreen orders={orders} filter={filter} isOwner={isOwner} nav={nav} />
   );
 }

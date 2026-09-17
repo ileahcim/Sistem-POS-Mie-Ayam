@@ -9,8 +9,10 @@ import { RupiahInput } from "@/components/ui/rupiah-input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoExpenseIcon } from "@/components/ui/empty-state-icons";
 import { addExpense } from "@/app/shift/actions";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
+import { AppHeader } from "@/components/ui/app-header";
 
-export function PengeluaranForm({ initialExpenses }: { initialExpenses: ShiftExpense[] }) {
+export function PengeluaranForm({ initialExpenses, nav }: { initialExpenses: ShiftExpense[]; nav: HeaderNav }) {
   const [expenses, setExpenses] = useState(initialExpenses);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number | "">("");
@@ -29,8 +31,9 @@ export function PengeluaranForm({ initialExpenses }: { initialExpenses: ShiftExp
   }
 
   return (
-    <div className="bg-canvas flex h-dvh flex-col gap-3 p-4">
-      <h1 className="text-xl font-bold text-ink">Pengeluaran Shift Ini</h1>
+    <div className="bg-canvas flex h-dvh flex-col">
+      <AppHeader nav={nav} title="Pengeluaran Shift Ini" />
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
       <p className="text-ink-muted text-sm">
         Opsional — kalau lupa dicatat di sini, tetap bisa diinput sekaligus saat tutup shift nanti.
       </p>
@@ -69,6 +72,7 @@ export function PengeluaranForm({ initialExpenses }: { initialExpenses: ShiftExp
           + Tambah Pengeluaran
         </Button>
       </Card>
+      </div>
     </div>
   );
 }

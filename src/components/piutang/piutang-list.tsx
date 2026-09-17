@@ -1,13 +1,11 @@
 import type { ReceivableOrder } from "@/lib/orders/get-receivable-orders";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
-import { LinkButton } from "@/components/ui/link-button";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { PriceText } from "@/components/ui/price-text";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoDebtIcon } from "@/components/ui/empty-state-icons";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 
@@ -17,24 +15,14 @@ function formatDate(iso: string): string {
 
 export function PiutangList({
   orders,
-  orderAktifIndicator,
+  nav,
 }: {
   orders: ReceivableOrder[];
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Piutang</h1>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton
-            activeCount={orderAktifIndicator.activeCount}
-            lateCount={orderAktifIndicator.lateCount}
-          />
-          <LinkButton href="/kasir" variant="secondary">Ke Kasir</LinkButton>
-        </div>
-      </div>
+      <AppHeader nav={nav} title="Piutang" />
 
       <div className="flex-1 overflow-y-auto p-4">
         <Card>

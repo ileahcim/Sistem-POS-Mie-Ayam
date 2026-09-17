@@ -9,19 +9,23 @@ const CHANNELS: { value: ChannelType; label: string }[] = [
 ];
 
 // No transitions here on purpose — channel/table pick must feel instant.
+// No background/border of its own: it sits inside a header surface (Kasir)
+// or gets one from the caller via className (Pre-order).
 export function ChannelTableBar({
   channel,
   tableLabel,
   onChannel,
   onTableLabel,
+  className,
 }: {
+  className?: string;
   channel: ChannelType | null;
   tableLabel: TableLabel | null;
   onChannel: (c: ChannelType) => void;
   onTableLabel: (t: TableLabel) => void;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-surface px-3 py-1.5">
+    <div className={cn("flex min-w-0 items-center gap-1.5 overflow-x-auto", className)}>
       {CHANNELS.map((c) => (
         <button
           key={c.value}

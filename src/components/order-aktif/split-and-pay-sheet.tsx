@@ -6,6 +6,7 @@ import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { OrderDetail, OrderDetailItem } from "@/lib/orders/get-order-detail";
 import { splitAndPay } from "@/app/order-aktif/actions";
 import { Sheet } from "@/components/ui/sheet";
+import { HoverTint, ITEM_TAP, sheetItemMotion, useSheetMotionPrefs } from "@/components/ui/sheet-motion";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
 import { cn } from "@/components/ui/cn";
@@ -23,30 +24,39 @@ function detailLine(item: OrderDetailItem): string {
   return [groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes].filter(Boolean).join(" · ");
 }
 
+const MOVE = { duration: 0.18, ease: "easeOut" } as const;
+
 // One tappable cart-style card. Tapping moves exactly one portion to the
 // other panel; the card stays put with its number changed while qty > 0,
-// and leaves (fade + slight scale) when it hits 0. Transform/opacity only.
+// and leaves (fade + slight scale) when it hits 0. Cards present when the
+// sheet opens stagger in with the shared sheet pattern (`introIndex`);
+// cards that appear later because of a tap use the short move animation.
 function SplitCard({
   item,
   qty,
   side,
+  introIndex,
   onTap,
 }: {
   item: OrderDetailItem;
   qty: number;
   side: Side;
+  introIndex: number | null;
   onTap: () => void;
 }) {
   const detail = detailLine(item);
+  const prefs = useSheetMotionPrefs();
+  const intro = introIndex != null ? sheetItemMotion(prefs, introIndex) : null;
   return (
     <motion.button
       type="button"
       layout
-      initial={{ opacity: 0, scale: 0.96, x: side === "split" ? -16 : 16 }}
-      animate={{ opacity: 1, scale: 1, x: 0 }}
-      exit={{ opacity: 0, scale: 0.94 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
+      initial={intro ? intro.initial : { opacity: 0, scale: 0.96, x: side === "split" ? -16 : 16 }}
+      animate={intro ? intro.animate : { opacity: 1, scale: 1, x: 0 }}
+      exit={{ opacity: 0, scale: 0.94, transition: MOVE }}
+      whileHover="hover"
+      whileTap={prefs.reduced ? undefined : ITEM_TAP}
+      transition={intro ? intro.transition : MOVE}
       onClick={onTap}
       aria-label={
         side === "stay"
@@ -54,7 +64,7 @@ function SplitCard({
           : `Kembalikan 1 ${item.productName} ke order ini`
       }
       className={cn(
-        "rounded-card flex min-h-14 w-full flex-col gap-0.5 border p-3 text-left",
+        "rounded-card relative flex min-h-14 w-full flex-col gap-0.5 overflow-hidden border p-3 text-left",
         side === "split" ? "border-primary bg-primary-soft" : "border-border bg-surface",
       )}
     >
@@ -74,6 +84,7 @@ function SplitCard({
         <PriceText amount={unitTotalOf(item) * qty} weight="secondary" />
       </span>
       {detail && <span className="text-ink-muted text-sm">{detail}</span>}
+      <HoverTint />
     </motion.button>
   );
 }
@@ -91,6 +102,9 @@ function Panel({
   emptyText: string;
   onTap: (itemId: string) => void;
 }) {
+  // Only the cards rendered on the sheet's first frame get the staggered
+  // entrance; from the first tap on, every card change is a move.
+  const [introIds, setIntroIds] = useState(() => entries.map((e) => e.item.id));
   const subtotal = entries.reduce((sum, e) => sum + unitTotalOf(e.item) * e.qty, 0);
   return (
     <section
@@ -109,10 +123,23 @@ function Panel({
         {title}
       </h3>
       <div className="flex flex-1 flex-col gap-2 px-3 pb-3">
-        <AnimatePresence initial={false} mode="popLayout">
-          {entries.map((e) => (
-            <SplitCard key={e.item.id} item={e.item} qty={e.qty} side={side} onTap={() => onTap(e.item.id)} />
-          ))}
+        <AnimatePresence mode="popLayout">
+          {entries.map((e) => {
+            const introIndex = introIds.indexOf(e.item.id);
+            return (
+              <SplitCard
+                key={e.item.id}
+                item={e.item}
+                qty={e.qty}
+                side={side}
+                introIndex={introIndex >= 0 ? introIndex : null}
+                onTap={() => {
+                  setIntroIds([]);
+                  onTap(e.item.id);
+                }}
+              />
+            );
+          })}
         </AnimatePresence>
         {entries.length === 0 && (
           <p className="text-ink-faint flex flex-1 items-center justify-center py-6 text-center text-sm">

@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react";
 import type { MieReportPoint } from "@/lib/mie/get-mie-report";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { bucketMie, type MieGranularity } from "@/lib/mie/bucket-mie";
 import { MIE_FIXED_PRODUCT_TYPES, MIE_PRODUCT_LABEL, type MieProductType } from "@/lib/mie/types";
 import { formatRupiah } from "@/lib/printing/format";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
 
@@ -44,11 +43,11 @@ function Stat({ label, value }: { label: string; value: string }) {
 export function MieReportScreen({
   points,
   today,
-  orderAktifIndicator,
+  nav,
 }: {
   points: MieReportPoint[];
   today: string;
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   const [granularity, setGranularity] = useState<MieGranularity>("harian");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -61,16 +60,15 @@ export function MieReportScreen({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between gap-2 border-b px-4 py-3">
-        <h1 className="min-w-0 text-lg leading-tight font-bold text-ink">Ringkasan Mi Mentah</h1>
-        <div className="flex shrink-0 items-center gap-2">
-          <OrderAktifButton activeCount={orderAktifIndicator.activeCount} lateCount={orderAktifIndicator.lateCount} />
-          <LinkButton href="/note" variant="secondary">
+      <AppHeader
+        nav={nav}
+        title="Ringkasan Mi Mentah"
+        actions={
+          <LinkButton href="/note" variant="secondary" size="compact">
             Kembali
           </LinkButton>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-3xl flex-col gap-4">

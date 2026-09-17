@@ -11,6 +11,12 @@ export async function updateAutoPrintReceipt(autoPrintReceipt: boolean): Promise
   return { ok: true };
 }
 
+export async function updateSheetBlurEnabled(sheetBlurEnabled: boolean): Promise<ActionResult> {
+  await requireRole("OWNER");
+  await prisma.setting.update({ where: { id: "singleton" }, data: { sheetBlurEnabled } });
+  return { ok: true };
+}
+
 // Printed verbatim on every struk/daftar packing header (see
 // receipt-meta.tsx's ReceiptHeader) — never hardcoded in the print
 // components themselves. Address is stored with its line breaks intact

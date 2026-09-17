@@ -2,17 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
 import type { ReceiptData } from "@/lib/printing/types";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
+import { LinkButton } from "@/components/ui/link-button";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
@@ -44,12 +43,12 @@ function formatDateTime(iso: string): string {
 export function RiwayatDetail({
   order,
   receipt,
-  orderAktifIndicator,
+  nav,
   isOwner,
 }: {
   order: OrderDetailData;
   receipt: ReceiptData | null;
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
   isOwner: boolean;
 }) {
   const router = useRouter();
@@ -67,31 +66,22 @@ export function RiwayatDetail({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <div>
-          <h1 className="text-lg font-bold text-ink">
+      <AppHeader
+        nav={nav}
+        title={
+          <>
             {order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : "Pre-order"} ·{" "}
             {CHANNEL_LABEL[order.channel]}
             {order.tableLabel ? ` · ${order.tableLabel}` : ""}
-          </h1>
-          <p className="text-ink-muted text-sm">
-            No. Order {order.orderNumber} · {formatDateTime(order.createdAt)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton
-            activeCount={orderAktifIndicator.activeCount}
-            lateCount={orderAktifIndicator.lateCount}
-          />
-          <Link
-            href="/riwayat-pesanan"
-            className="rounded-pill bg-muted h-10 px-4 text-sm font-medium leading-10 text-ink"
-          >
+          </>
+        }
+        subtitle={`No. Order ${order.orderNumber} · ${formatDateTime(order.createdAt)}`}
+        actions={
+          <LinkButton href="/riwayat-pesanan" variant="secondary" size="compact">
             Kembali
-          </Link>
-        </div>
-      </div>
+          </LinkButton>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">

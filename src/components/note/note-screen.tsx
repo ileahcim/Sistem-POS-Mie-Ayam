@@ -1,10 +1,9 @@
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { MieSummary } from "@/lib/mie/get-mie-summary";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { CustomerList } from "./customer-list";
 
@@ -26,24 +25,15 @@ function SummaryCard({ label, value, detail }: { label: string; value: string; d
 export function NoteScreen({
   customers,
   summary,
-  orderAktifIndicator,
+  nav,
 }: {
   customers: MieCustomerRow[];
   summary: MieSummary;
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Catatan Mi Mentah</h1>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton activeCount={orderAktifIndicator.activeCount} lateCount={orderAktifIndicator.lateCount} />
-          <LinkButton href="/kasir" variant="secondary" className="whitespace-nowrap">
-            Ke Kasir
-          </LinkButton>
-        </div>
-      </div>
+      <AppHeader nav={nav} title="Catatan Mi Mentah" />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">

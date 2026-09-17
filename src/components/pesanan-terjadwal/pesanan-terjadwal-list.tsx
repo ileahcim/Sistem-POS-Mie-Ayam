@@ -2,16 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import type { PreOrderSummary } from "@/lib/orders/get-preorders";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/link-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoScheduleIcon } from "@/components/ui/empty-state-icons";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
-import { SignOutButton } from "@/components/auth/sign-out-button";
+import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 
 const CHANNEL_LABEL: Record<PreOrderSummary["channel"], string> = {
@@ -29,27 +27,24 @@ function formatScheduledFor(iso: string): string {
 // closed) — this page and "+ Buat Pre-order" never check shift state.
 export function PesananTerjadwalList({
   orders,
-  orderAktifIndicator,
+  nav,
 }: {
   orders: PreOrderSummary[];
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   const router = useRouter();
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Pesanan Terjadwal</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <OrderAktifButton
-            activeCount={orderAktifIndicator.activeCount}
-            lateCount={orderAktifIndicator.lateCount}
-          />
-          <LinkButton href="/pesanan-terjadwal/baru" variant="primary">+ Buat Pre-order</LinkButton>
-          <SignOutButton />
-        </div>
-      </div>
+      <AppHeader
+        nav={nav}
+        title="Pesanan Terjadwal"
+        actions={
+          <LinkButton href="/pesanan-terjadwal/baru" variant="primary" size="compact">
+            + Baru
+          </LinkButton>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         <Card>

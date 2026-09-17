@@ -4,27 +4,28 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { MieProductType } from "@/lib/mie/types";
-import { MIE_FIXED_PRODUCT_TYPES, MIE_KG_PRESETS, MIE_PASAR_PRESET, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
+import { MIE_FIXED_PRODUCT_TYPES, MIE_KG_PRESETS, MIE_PASAR_PRODUCT_TYPE, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
 import { createMieOrder, getMieAutofillPrice } from "@/app/note/actions";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { cn } from "@/components/ui/cn";
 import { todayDateStr, dateInputToIso } from "@/lib/mie/date-input";
 
 export function NewOrderForm({
   customers,
   initialCustomerId,
-  orderAktifIndicator,
+  pasarPricePerKg,
+  nav,
 }: {
   customers: MieCustomerRow[];
   initialCustomerId?: string;
-  orderAktifIndicator: OrderAktifIndicator;
+  pasarPricePerKg: number | null;
+  nav: HeaderNav;
 }) {
   const router = useRouter();
   const [customerId, setCustomerId] = useState(initialCustomerId ?? customers[0]?.id ?? "");
@@ -59,8 +60,9 @@ export function NewOrderForm({
   }, [customerId, productType]);
 
   function applyPasarPreset() {
-    setProductType(MIE_PASAR_PRESET.productType);
-    setPricePerKg(MIE_PASAR_PRESET.pricePerKg);
+    if (pasarPricePerKg == null) return;
+    setProductType(MIE_PASAR_PRODUCT_TYPE);
+    setPricePerKg(pasarPricePerKg);
     setPriceManuallyEdited(true);
     setPasarPreset(true);
   }
@@ -101,38 +103,42 @@ export function NewOrderForm({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Pesanan Baru</h1>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton activeCount={orderAktifIndicator.activeCount} lateCount={orderAktifIndicator.lateCount} />
-          <LinkButton href="/note" variant="secondary">
+      <AppHeader
+        nav={nav}
+        title="Pesanan Baru"
+        actions={
+          <LinkButton href="/note" variant="secondary" size="compact">
             Batal
           </LinkButton>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-md flex-col gap-3">
           <button
             type="button"
             onClick={applyPasarPreset}
+            disabled={pasarPricePerKg == null}
             aria-pressed={pasarPreset}
             className={cn(
-              "rounded-card flex min-h-16 w-full items-center justify-between gap-3 border-2 px-4 py-3 text-left",
+              "rounded-card flex min-h-16 w-full items-center justify-between gap-3 border-2 px-4 py-3 text-left disabled:opacity-60",
               pasarPreset ? "border-primary bg-primary-soft" : "border-border bg-surface",
             )}
           >
             <span className="flex flex-col">
               <span className="text-ink text-base font-bold">Mie Pasar</span>
               <span className="text-ink-muted text-sm">
-                {MIE_PRODUCT_LABEL[MIE_PASAR_PRESET.productType]} · Rp
-                {MIE_PASAR_PRESET.pricePerKg.toLocaleString("id-ID")}/kg
+                {MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]} ·{" "}
+                {pasarPricePerKg != null
+                  ? `Rp${pasarPricePerKg.toLocaleString("id-ID")}/kg`
+                  : "harga belum diisi di Harga Produk"}
               </span>
             </span>
-            <span className={cn("text-sm font-semibold", pasarPreset ? "text-primary-strong" : "text-primary")}>
-              {pasarPreset ? "Dipakai ✓" : "Pakai"}
-            </span>
+            {pasarPricePerKg != null && (
+              <span className={cn("text-sm font-semibold", pasarPreset ? "text-primary-strong" : "text-primary")}>
+                {pasarPreset ? "Dipakai ✓" : "Pakai"}
+              </span>
+            )}
           </button>
 
           <Card padded className="flex flex-col gap-3">
@@ -225,7 +231,7 @@ export function NewOrderForm({
                   onChange={(v) => {
                     setPricePerKg(v);
                     setPriceManuallyEdited(true);
-                    if (v !== MIE_PASAR_PRESET.pricePerKg) setPasarPreset(false);
+                    if (v !== pasarPricePerKg) setPasarPreset(false);
                   }}
                   placeholder="0"
                   className="h-12 text-base"

@@ -1,8 +1,8 @@
 import { getReceivableOrders } from "@/lib/orders/get-receivable-orders";
-import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { PiutangList } from "@/components/piutang/piutang-list";
 
 export default async function PiutangPage() {
-  const [orders, orderAktifIndicator] = await Promise.all([getReceivableOrders(), getOrderAktifIndicator()]);
-  return <PiutangList orders={orders} orderAktifIndicator={orderAktifIndicator} />;
+  const [orders, nav] = await Promise.all([getReceivableOrders(), getHeaderNav()]);
+  return <PiutangList orders={orders} nav={nav} />;
 }

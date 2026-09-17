@@ -8,6 +8,7 @@ export type StoreSettings = {
   prepBaseMinutes: number;
   prepMinutesPerPortion: number;
   autoPrintReceipt: boolean;
+  sheetBlurEnabled: boolean;
 };
 
 const FALLBACK: StoreSettings = {
@@ -18,6 +19,7 @@ const FALLBACK: StoreSettings = {
   prepBaseMinutes: 4,
   prepMinutesPerPortion: 1,
   autoPrintReceipt: true,
+  sheetBlurEnabled: true,
 };
 
 // The singleton row is created by prisma/seed.ts, but fall back gracefully
@@ -33,5 +35,21 @@ export async function getSettings(): Promise<StoreSettings> {
     prepBaseMinutes: setting.prepBaseMinutes,
     prepMinutesPerPortion: setting.prepMinutesPerPortion,
     autoPrintReceipt: setting.autoPrintReceipt,
+    sheetBlurEnabled: setting.sheetBlurEnabled,
   };
+}
+
+// Read by the root layout on every request (sheet animation blur switch,
+// see sheet-motion.tsx). Never allowed to break a page: any failure (no
+// row, DB hiccup) just falls back to the default.
+export async function getSheetBlurEnabled(): Promise<boolean> {
+  try {
+    const setting = await prisma.setting.findUnique({
+      where: { id: "singleton" },
+      select: { sheetBlurEnabled: true },
+    });
+    return setting?.sheetBlurEnabled ?? true;
+  } catch {
+    return true;
+  }
 }

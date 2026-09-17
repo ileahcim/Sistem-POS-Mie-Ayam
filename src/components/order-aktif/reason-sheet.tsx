@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { AnimatePresence } from "motion/react";
 import { Sheet } from "@/components/ui/sheet";
+import { SheetItem } from "@/components/ui/sheet-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/cn";
 
@@ -75,34 +76,43 @@ export function ReasonSheet({
             </Button>
           }
         >
-          {notice && <div className="mb-3">{notice}</div>}
-          <p className="text-ink mb-2 text-sm font-bold">Alasan</p>
+          {notice && (
+            <SheetItem index={0} className="mb-3">
+              {notice}
+            </SheetItem>
+          )}
+          <SheetItem index={1}>
+            <p className="text-ink mb-2 text-sm font-bold">Alasan</p>
+          </SheetItem>
           <div className="mb-3 flex flex-wrap gap-2">
-            {quickReasons.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setReason(r)}
-                className={cn(
-                  "rounded-pill h-12 border px-4 text-sm font-semibold",
-                  reason === r ? "border-danger bg-danger-soft text-danger" : "border-border text-ink",
-                )}
-              >
-                {r}
-              </button>
+            {quickReasons.map((r, i) => (
+              <SheetItem key={r} index={2 + i} interactive className="rounded-pill">
+                <button
+                  type="button"
+                  onClick={() => setReason(r)}
+                  className={cn(
+                    "rounded-pill h-12 border px-4 text-sm font-semibold",
+                    reason === r ? "border-danger bg-danger-soft text-danger" : "border-border text-ink",
+                  )}
+                >
+                  {r}
+                </button>
+              </SheetItem>
             ))}
           </div>
-          <label htmlFor={inputId} className="text-ink-muted mb-1 block text-sm">
-            Atau tulis alasan lain
-          </label>
-          <input
-            id={inputId}
-            type="text"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="mis. salah pilih menu"
-            className="rounded-input border-border h-12 w-full border px-3 text-base"
-          />
+          <SheetItem index={2 + quickReasons.length}>
+            <label htmlFor={inputId} className="text-ink-muted mb-1 block text-sm">
+              Atau tulis alasan lain
+            </label>
+            <input
+              id={inputId}
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="mis. salah pilih menu"
+              className="rounded-input border-border h-12 w-full border px-3 text-base"
+            />
+          </SheetItem>
           {footnote && <p className="text-ink-faint mt-3 text-xs">{footnote}</p>}
           {error && <p className="text-danger mt-2 text-sm">{error}</p>}
         </Sheet>

@@ -2,16 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
 import { sameCartLine, expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
-import { SignOutButton } from "@/components/auth/sign-out-button";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
+import { AppHeader } from "@/components/ui/app-header";
+import { LinkButton } from "@/components/ui/link-button";
 import { ChannelTableBar } from "@/components/kasir/channel-table-bar";
 import { CategoryTabs } from "@/components/kasir/category-tabs";
 import { ProductGrid } from "@/components/kasir/product-grid";
@@ -35,11 +33,11 @@ type SheetTarget = { mode: "add"; product: MenuProduct } | { mode: "edit"; produ
 export function PreOrderScreen({
   categories,
   comboShortcuts,
-  orderAktifIndicator,
+  nav,
 }: {
   categories: MenuCategory[];
   comboShortcuts: ComboShortcut[];
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
@@ -175,40 +173,33 @@ export function PreOrderScreen({
 
   return (
     <div className="flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface border-b px-3 py-2">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-ink">Pre-order Baru</h1>
-          <div className="flex items-center gap-2">
-            <OrderAktifButton
-              activeCount={orderAktifIndicator.activeCount}
-              lateCount={orderAktifIndicator.lateCount}
-            />
-            <Link href="/pesanan-terjadwal" className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink">
-              Batal
-            </Link>
-            <SignOutButton />
-          </div>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <label className="text-ink-muted text-sm font-medium" htmlFor="scheduledDate">
-            Kirim
-          </label>
-          <input
-            id="scheduledDate"
-            type="date"
-            value={scheduledDate}
-            onChange={(e) => setScheduledDate(e.target.value)}
-            className="rounded-input border-border h-12 border px-3 text-base"
-          />
-          <input
-            id="scheduledTime"
-            type="time"
-            value={scheduledTime}
-            onChange={(e) => setScheduledTime(e.target.value)}
-            className="rounded-input border-border h-12 border px-3 text-base"
-          />
-        </div>
+      <AppHeader
+        nav={nav}
+        title="Pre-order Baru"
+        actions={
+          <LinkButton href="/pesanan-terjadwal" variant="secondary" size="compact">
+            Batal
+          </LinkButton>
+        }
+      />
+      <div className="border-border bg-surface flex flex-wrap items-center gap-2 border-b px-3 py-2">
+        <label className="text-ink-muted text-sm font-medium" htmlFor="scheduledDate">
+          Kirim
+        </label>
+        <input
+          id="scheduledDate"
+          type="date"
+          value={scheduledDate}
+          onChange={(e) => setScheduledDate(e.target.value)}
+          className="rounded-input border-border h-12 border px-3 text-base"
+        />
+        <input
+          id="scheduledTime"
+          type="time"
+          value={scheduledTime}
+          onChange={(e) => setScheduledTime(e.target.value)}
+          className="rounded-input border-border h-12 border px-3 text-base"
+        />
       </div>
 
       <ChannelTableBar
@@ -216,6 +207,7 @@ export function PreOrderScreen({
         tableLabel={draft.tableLabel}
         onChannel={setChannel}
         onTableLabel={setTableLabel}
+        className="border-border bg-surface border-b px-3 py-1.5"
       />
 
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">

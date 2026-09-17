@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getMieCustomers } from "@/lib/mie/get-mie-customers";
-import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { NewPaymentForm } from "@/components/note/new-payment-form";
 
 export default async function NewMiePaymentPage({
@@ -13,8 +13,8 @@ export default async function NewMiePaymentPage({
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
   const { customerId } = await searchParams;
-  const [customers, orderAktifIndicator] = await Promise.all([getMieCustomers(), getOrderAktifIndicator()]);
+  const [customers, nav] = await Promise.all([getMieCustomers(), getHeaderNav()]);
   return (
-    <NewPaymentForm customers={customers} initialCustomerId={customerId} orderAktifIndicator={orderAktifIndicator} />
+    <NewPaymentForm customers={customers} initialCustomerId={customerId} nav={nav} />
   );
 }

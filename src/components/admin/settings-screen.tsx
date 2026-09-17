@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import type { StoreSettings } from "@/lib/settings/get-settings";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
-import { updateAutoPrintReceipt, updateStoreInfo } from "@/app/admin/settings/actions";
-import { LinkButton } from "@/components/ui/link-button";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
+import { updateAutoPrintReceipt, updateSheetBlurEnabled, updateStoreInfo } from "@/app/admin/settings/actions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { cn } from "@/components/ui/cn";
 
 // "Data Warung" card — name/address/phone printed on every receipt header
@@ -95,93 +94,106 @@ function StoreInfoCard({ settings }: { settings: StoreSettings }) {
   );
 }
 
-// Only the auto-print toggle lives here for now — the rest of `Setting`
-// (store info, prep-time minutes) has no admin UI yet either; this page is
-// a starting point for that, not the full editor, since only the print
-// toggle was actually asked for.
-export function SettingsScreen({
-  settings,
-  orderAktifIndicator,
+// One Nyala/Mati setting, saved immediately on tap (with rollback on
+// failure) — same pattern for every on/off switch on this page.
+function ToggleCard({
+  title,
+  description,
+  initialValue,
+  onSave,
 }: {
-  settings: StoreSettings;
-  orderAktifIndicator: OrderAktifIndicator;
+  title: string;
+  description: ReactNode;
+  initialValue: boolean;
+  onSave: (next: boolean) => Promise<{ ok: boolean }>;
 }) {
-  const [autoPrint, setAutoPrint] = useState(settings.autoPrintReceipt);
+  const router = useRouter();
+  const [value, setValue] = useState(initialValue);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
   async function handleChange(next: boolean) {
-    if (next === autoPrint) return;
-    setAutoPrint(next);
+    if (next === value) return;
+    setValue(next);
     setSaving(true);
     setSavedFlash(false);
     try {
-      const result = await updateAutoPrintReceipt(next);
+      const result = await onSave(next);
       if (!result.ok) {
-        setAutoPrint(!next); // roll back on failure
+        setValue(!next); // roll back on failure
         return;
       }
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 1500);
+      router.refresh();
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Pengaturan</h1>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton
-            activeCount={orderAktifIndicator.activeCount}
-            lateCount={orderAktifIndicator.lateCount}
-          />
-          <LinkButton href="/dashboard" variant="secondary">Ke Dashboard</LinkButton>
-        </div>
+    <Card padded className="flex flex-col gap-2">
+      <div>
+        <p className="text-ink text-base font-semibold">{title}</p>
+        <p className="text-ink-muted text-sm">{description}</p>
       </div>
+      <div className="flex items-center gap-3">
+        <div role="group" aria-label={title} className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold">
+          {[true, false].map((option) => (
+            <button
+              key={String(option)}
+              type="button"
+              onClick={() => handleChange(option)}
+              disabled={saving}
+              aria-pressed={value === option}
+              className={cn(
+                "rounded-pill h-10 px-4",
+                value === option ? "bg-surface text-ink shadow-card" : "text-ink-muted",
+              )}
+            >
+              {option ? "Nyala" : "Mati"}
+            </button>
+          ))}
+        </div>
+        {savedFlash && <p className="text-primary-strong text-sm font-medium">Tersimpan ✓</p>}
+      </div>
+    </Card>
+  );
+}
+
+export function SettingsScreen({
+  settings,
+  nav,
+}: {
+  settings: StoreSettings;
+  nav: HeaderNav;
+}) {
+  return (
+    <div className="bg-canvas flex h-dvh flex-col">
+      <AppHeader nav={nav} title="Pengaturan" />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
           <StoreInfoCard settings={settings} />
 
-          <Card padded className="flex flex-col gap-2">
-            <div>
-              <p className="text-ink text-base font-semibold">Cetak struk otomatis</p>
-              <p className="text-ink-muted text-sm">
-                Nyala: struk langsung tercetak setelah Bayar. Mati: kasir ditanya &ldquo;Cetak struk?&rdquo;
-                dulu — transaksi tetap tersimpan penuh apa pun pilihannya.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold">
-                <button
-                  type="button"
-                  onClick={() => handleChange(true)}
-                  disabled={saving}
-                  className={cn(
-                    "rounded-pill h-10 px-4",
-                    autoPrint ? "bg-surface text-ink shadow-card" : "text-ink-muted",
-                  )}
-                >
-                  Nyala
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleChange(false)}
-                  disabled={saving}
-                  className={cn(
-                    "rounded-pill h-10 px-4",
-                    !autoPrint ? "bg-surface text-ink shadow-card" : "text-ink-muted",
-                  )}
-                >
-                  Mati
-                </button>
-              </div>
-              {savedFlash && <p className="text-primary-strong text-sm font-medium">Tersimpan ✓</p>}
-            </div>
-          </Card>
+          <ToggleCard
+            title="Cetak struk otomatis"
+            description={
+              <>
+                Nyala: struk langsung tercetak setelah Bayar. Mati: kasir ditanya &ldquo;Cetak struk?&rdquo; dulu —
+                transaksi tetap tersimpan penuh apa pun pilihannya.
+              </>
+            }
+            initialValue={settings.autoPrintReceipt}
+            onSave={updateAutoPrintReceipt}
+          />
+
+          <ToggleCard
+            title="Efek blur animasi"
+            description="Efek buram saat menu, pilihan add-on, dan konfirmasi muncul. Matikan kalau tablet terasa tersendat — animasi geraknya tetap ada."
+            initialValue={settings.sheetBlurEnabled}
+            onSave={updateSheetBlurEnabled}
+          />
         </div>
       </div>
     </div>

@@ -291,6 +291,22 @@ export async function updateMieProductDefault(
   return { ok: true };
 }
 
+export async function updateMiePasarPrice(pricePerKg: number): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  if (!Number.isFinite(pricePerKg) || pricePerKg <= 0) {
+    return { ok: false, error: "Harga tidak valid." };
+  }
+
+  await prisma.mieSetting.upsert({
+    where: { id: "singleton" },
+    update: { pasarPricePerKg: Math.round(pricePerKg) },
+    create: { id: "singleton", pasarPricePerKg: Math.round(pricePerKg) },
+  });
+
+  return { ok: true };
+}
+
 // Price autofill for the new-order form: this customer's last price for
 // this exact product if they've ordered it before, else the product's
 // owner-set default (see get-mie-product-defaults.ts) — never for CUSTOM,

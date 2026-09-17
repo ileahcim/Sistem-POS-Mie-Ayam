@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getSettings } from "@/lib/settings/get-settings";
-import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { SettingsScreen } from "@/components/admin/settings-screen";
 
 // OWNER only, checked server-side here — see CLAUDE.md "Server-side
@@ -12,6 +12,6 @@ export default async function SettingsAdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const [settings, orderAktifIndicator] = await Promise.all([getSettings(), getOrderAktifIndicator()]);
-  return <SettingsScreen settings={settings} orderAktifIndicator={orderAktifIndicator} />;
+  const [settings, nav] = await Promise.all([getSettings(), getHeaderNav()]);
+  return <SettingsScreen settings={settings} nav={nav} />;
 }

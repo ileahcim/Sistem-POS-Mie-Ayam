@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getOrderDetail } from "@/lib/orders/get-order-detail";
 import { getActiveMenu } from "@/lib/menu/get-active-menu";
 import { getSettings } from "@/lib/settings/get-settings";
-import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { PembayaranScreen } from "@/components/pembayaran/pembayaran-screen";
 
 export default async function PembayaranPage({
@@ -16,17 +16,17 @@ export default async function PembayaranPage({
   // A cancelled order has nothing left to act on — show its record instead.
   if (order.status === "CANCELLED") redirect(`/riwayat-pesanan/${order.id}`);
 
-  const [menu, settings, orderAktifIndicator] = await Promise.all([
+  const [menu, settings, nav] = await Promise.all([
     getActiveMenu(),
     getSettings(),
-    getOrderAktifIndicator(),
+    getHeaderNav(),
   ]);
   return (
     <PembayaranScreen
       order={order}
       menu={menu}
       autoPrintReceipt={settings.autoPrintReceipt}
-      orderAktifIndicator={orderAktifIndicator}
+      nav={nav}
     />
   );
 }

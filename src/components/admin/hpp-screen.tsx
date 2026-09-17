@@ -1,10 +1,8 @@
 import type { HppSection } from "@/lib/hpp/get-hpp-items";
 import { summarizeHppSections } from "@/lib/hpp/get-hpp-items";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
-import { LinkButton } from "@/components/ui/link-button";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { Card } from "@/components/ui/card";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { HppItemRow } from "./hpp-item-row";
 
 // Server-renderable shell — only the per-row editor (hpp-item-row.tsx)
@@ -13,27 +11,17 @@ import { HppItemRow } from "./hpp-item-row";
 export function HppScreen({
   products,
   addons,
-  orderAktifIndicator,
+  nav,
 }: {
   products: HppSection[];
   addons: HppSection[];
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   const { missing, lowMargin } = summarizeHppSections([...products, ...addons]);
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Isi HPP</h1>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton
-            activeCount={orderAktifIndicator.activeCount}
-            lateCount={orderAktifIndicator.lateCount}
-          />
-          <LinkButton href="/dashboard" variant="secondary">Ke Dashboard</LinkButton>
-        </div>
-      </div>
+      <AppHeader nav={nav} title="Isi HPP" />
 
       {(missing > 0 || lowMargin > 0) && (
         <div className="border-border bg-surface flex flex-col gap-1 border-b px-4 py-3 text-sm">

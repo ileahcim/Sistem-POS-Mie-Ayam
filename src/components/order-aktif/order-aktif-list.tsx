@@ -8,10 +8,10 @@ import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
-import { MainMenu } from "@/components/ui/main-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoOrdersIcon } from "@/components/ui/empty-state-icons";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { OrderRow } from "./order-row";
 import { CancelOrderButton } from "./cancel-order-sheet";
 
@@ -26,13 +26,13 @@ export function OrderAktifList({
   unpaidServed,
   prepBaseMinutes,
   prepMinutesPerPortion,
-  isOwner,
+  nav,
 }: {
   orders: ActiveOrder[];
   unpaidServed: UnpaidServedOrder[];
   prepBaseMinutes: number;
   prepMinutesPerPortion: number;
-  isOwner: boolean;
+  nav: HeaderNav;
 }) {
   const router = useRouter();
   const now = useNow();
@@ -51,14 +51,17 @@ export function OrderAktifList({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
-        <h1 className="text-lg font-bold text-ink">Order Aktif</h1>
-        <div className="flex items-center gap-2">
-          <LinkButton href="/kasir" variant="primary">Ke Kasir</LinkButton>
-          <MainMenu isOwner={isOwner} />
-        </div>
-      </div>
+      <AppHeader
+        nav={nav}
+        title="Order Aktif"
+        lateCount={lateCount}
+        showOrderAktif={false}
+        actions={
+          <LinkButton href="/kasir" variant="primary" size="compact">
+            Ke Kasir
+          </LinkButton>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-3">
         <Card>

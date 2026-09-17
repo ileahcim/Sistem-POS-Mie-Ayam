@@ -10,6 +10,7 @@ import type { ComboShortcut } from "@/lib/combo/types";
 import { MainMenu } from "@/components/ui/main-menu";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { ChannelTableBar } from "./channel-table-bar";
 import { CategoryTabs } from "./category-tabs";
 import { ProductGrid } from "./product-grid";
@@ -24,13 +25,11 @@ type SheetTarget = { mode: "add"; product: MenuProduct } | { mode: "edit"; produ
 export function KasirScreen({
   categories,
   comboShortcuts,
-  isOwner,
-  orderAktifIndicator,
+  nav,
 }: {
   categories: MenuCategory[];
   comboShortcuts: ComboShortcut[];
-  isOwner: boolean;
-  orderAktifIndicator: { activeCount: number; lateCount: number };
+  nav: HeaderNav;
 }) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
@@ -152,9 +151,17 @@ export function KasirScreen({
 
   return (
     <div className="flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="flex items-center justify-between">
-        <div className="min-w-0 flex-1">
+      <LateOrderBanner lateCount={nav.lateCount} />
+      {/* One header surface. Tablet (lg): a single row — Menu, channel/table
+          picks, Order Aktif. Narrower: two clearly separate rows — Menu +
+          title + Order Aktif on top, the channel row full-width below — so
+          the channel buttons are never covered. Same elements, CSS order. */}
+      <header className="border-border bg-surface flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-3 py-2">
+        <div className="order-1">
+          <MainMenu isOwner={nav.isOwner} />
+        </div>
+        <h1 className="text-ink order-2 min-w-0 flex-1 truncate text-lg font-bold lg:hidden">Kasir</h1>
+        <div className="order-4 w-full min-w-0 lg:order-2 lg:w-auto lg:flex-1">
           <ChannelTableBar
             channel={draft.channel}
             tableLabel={draft.tableLabel}
@@ -162,14 +169,10 @@ export function KasirScreen({
             onTableLabel={setTableLabel}
           />
         </div>
-        <div className="border-border bg-surface flex shrink-0 items-center gap-2 border-b px-3">
-          <OrderAktifButton
-            activeCount={orderAktifIndicator.activeCount}
-            lateCount={orderAktifIndicator.lateCount}
-          />
-          <MainMenu isOwner={isOwner} />
+        <div className="order-3">
+          <OrderAktifButton activeCount={nav.activeCount} lateCount={nav.lateCount} />
         </div>
-      </div>
+      </header>
 
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         <div className="bg-canvas flex flex-1 flex-col overflow-hidden">

@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getMieCustomers } from "@/lib/mie/get-mie-customers";
-import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getMiePasarPrice } from "@/lib/mie/get-mie-pasar-price";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { NewOrderForm } from "@/components/note/new-order-form";
 
 export default async function NewMieOrderPage({
@@ -13,6 +14,17 @@ export default async function NewMieOrderPage({
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
   const { customerId } = await searchParams;
-  const [customers, orderAktifIndicator] = await Promise.all([getMieCustomers(), getOrderAktifIndicator()]);
-  return <NewOrderForm customers={customers} initialCustomerId={customerId} orderAktifIndicator={orderAktifIndicator} />;
+  const [customers, pasarPricePerKg, nav] = await Promise.all([
+    getMieCustomers(),
+    getMiePasarPrice(),
+    getHeaderNav(),
+  ]);
+  return (
+    <NewOrderForm
+      customers={customers}
+      initialCustomerId={customerId}
+      pasarPricePerKg={pasarPricePerKg}
+      nav={nav}
+    />
+  );
 }

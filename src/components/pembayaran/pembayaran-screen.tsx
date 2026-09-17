@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { OrderDetail } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { ReceiptData } from "@/lib/printing/types";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { formatRupiah, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
@@ -14,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PriceText } from "@/components/ui/price-text";
 import { cn } from "@/components/ui/cn";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
+import { LinkButton } from "@/components/ui/link-button";
 import { AddItemsPanel } from "@/components/order-aktif/add-items-panel";
 import { SplitAndPayButton } from "@/components/order-aktif/split-and-pay-sheet";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
@@ -33,12 +32,12 @@ export function PembayaranScreen({
   order,
   menu,
   autoPrintReceipt,
-  orderAktifIndicator,
+  nav,
 }: {
   order: OrderDetail;
   menu: MenuCategory[];
   autoPrintReceipt: boolean;
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<PaymentMethod | null>(null);
@@ -90,27 +89,16 @@ export function PembayaranScreen({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <div>
-          <h1 className="text-lg font-bold text-ink">
-            Pembayaran {order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : "(Pre-order)"}
-          </h1>
-          <p className="text-ink-muted text-sm">No. Order {order.orderNumber}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton
-            activeCount={orderAktifIndicator.activeCount}
-            lateCount={orderAktifIndicator.lateCount}
-          />
-          <Link
-            href={`/order-aktif/${order.id}`}
-            className="rounded-pill bg-muted h-10 px-4 text-sm font-medium leading-10 text-ink"
-          >
+      <AppHeader
+        nav={nav}
+        title={`Pembayaran ${order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : "(Pre-order)"}`}
+        subtitle={`No. Order ${order.orderNumber}`}
+        actions={
+          <LinkButton href={`/order-aktif/${order.id}`} variant="secondary" size="compact">
             Kembali
-          </Link>
-        </div>
-      </div>
+          </LinkButton>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         {pendingReceipt ? (

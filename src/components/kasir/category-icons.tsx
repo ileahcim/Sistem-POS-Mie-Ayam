@@ -62,16 +62,12 @@ function FrozenIcon() {
   );
 }
 
-// Full literal class strings (not template-built) so Tailwind's scanner
-// picks them up — see src/app/globals.css for the --color-cat-* tokens
-// these reference. Fixed set matching CLAUDE.md's fixed category list.
-export const CATEGORY_META: Record<
-  string,
-  { Icon: () => JSX.Element; active: string; inactive: string }
-> = {
-  Makanan: { Icon: MakananIcon, active: "bg-cat-makanan text-white", inactive: "bg-cat-makanan-soft text-cat-makanan" },
-  "Minuman Racik": { Icon: MinumanIcon, active: "bg-cat-minuman text-white", inactive: "bg-cat-minuman-soft text-cat-minuman" },
-  Kulkas: { Icon: KulkasIcon, active: "bg-cat-kulkas text-white", inactive: "bg-cat-kulkas-soft text-cat-kulkas" },
-  "Lain-lain": { Icon: LainIcon, active: "bg-cat-lain text-white", inactive: "bg-cat-lain-soft text-cat-lain" },
-  Frozen: { Icon: FrozenIcon, active: "bg-cat-frozen text-white", inactive: "bg-cat-frozen-soft text-cat-frozen" },
+// Fixed set matching CLAUDE.md's fixed category list. Icons only — the tab
+// colors are the same neutral/green for every category (category-tabs.tsx).
+export const CATEGORY_META: Record<string, { Icon: () => JSX.Element }> = {
+  Makanan: { Icon: MakananIcon },
+  "Minuman Racik": { Icon: MinumanIcon },
+  Kulkas: { Icon: KulkasIcon },
+  "Lain-lain": { Icon: LainIcon },
+  Frozen: { Icon: FrozenIcon },
 };

@@ -7,7 +7,7 @@ import { getMarginReport } from "@/lib/dashboard/get-margin-report";
 import { getLowMarginItems } from "@/lib/dashboard/get-low-margin-items";
 import { getChannelBreakdown } from "@/lib/dashboard/get-channel-breakdown";
 import { getReceivableOrders } from "@/lib/orders/get-receivable-orders";
-import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { DashboardScreen } from "@/components/dashboard/dashboard-screen";
 
 // OWNER only, checked server-side here (not just a hidden menu item) — see
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
     lowMarginItems,
     channelBreakdown,
     receivables,
-    orderAktifIndicator,
+    nav,
   ] = await Promise.all([
     getShiftHistory(),
     getOmzetHistory(),
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
     getLowMarginItems(),
     getChannelBreakdown(),
     getReceivableOrders(),
-    getOrderAktifIndicator(),
+    getHeaderNav(),
   ]);
 
   return (
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
       lowMarginItems={lowMarginItems}
       channelBreakdown={channelBreakdown}
       receivables={receivables}
-      orderAktifIndicator={orderAktifIndicator}
+      nav={nav}
     />
   );
 }

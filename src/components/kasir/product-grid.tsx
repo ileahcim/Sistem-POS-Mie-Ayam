@@ -16,7 +16,7 @@ export function ProductGrid({
   return (
     <div
       className={cn(
-        "grid flex-1 auto-rows-min grid-cols-2 gap-2 overflow-y-auto p-2 lg:grid-cols-3",
+        "grid flex-1 auto-rows-min grid-cols-2 gap-2 overflow-y-auto p-2 md:grid-cols-3",
         className,
       )}
     >
@@ -25,6 +25,7 @@ export function ProductGrid({
           key={product.id}
           name={product.name}
           price={product.price}
+          imageUrl={product.imageUrl}
           cartQty={cartQtyByProduct[product.id] ?? 0}
           onTap={() => onTapProduct(product)}
         />

@@ -1,4 +1,7 @@
 import { cn } from "@/components/ui/cn";
+
+// Neutral tabs: every category is the same light grey with dark text, and
+// only the selected one is brand green — icons follow the text color.
 import { CATEGORY_META } from "./category-icons";
 
 export function CategoryTabs({
@@ -20,9 +23,10 @@ export function CategoryTabs({
             key={cat.id}
             type="button"
             onClick={() => onSelect(cat.id)}
+            aria-pressed={isActive}
             className={cn(
               "rounded-pill flex h-12 shrink-0 items-center gap-1.5 whitespace-nowrap px-5 text-base font-semibold",
-              meta ? (isActive ? meta.active : meta.inactive) : isActive ? "bg-ink text-white" : "bg-muted text-ink",
+              isActive ? "bg-primary text-white" : "bg-muted text-ink",
             )}
           >
             {meta && <meta.Icon />}

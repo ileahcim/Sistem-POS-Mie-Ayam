@@ -2,18 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
 import type { PackingListData } from "@/lib/printing/types";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
 import { Badge } from "@/components/ui/badge";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
@@ -37,13 +36,13 @@ export function OrderDetail({
   order,
   menu,
   packingList,
-  orderAktifIndicator,
+  nav,
   isOwner,
 }: {
   order: OrderDetailData;
   menu: MenuCategory[];
   packingList: PackingListData | null;
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
   isOwner: boolean;
 }) {
   const router = useRouter();
@@ -75,28 +74,30 @@ export function OrderDetail({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-3 py-2">
-        <div>
-          <h1 className="text-lg font-bold text-ink">
+      <AppHeader
+        nav={nav}
+        title={
+          <>
             {order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : "Pre-order"} ·{" "}
             {CHANNEL_LABEL[order.channel]}
             {order.tableLabel ? ` · ${order.tableLabel}` : ""}
-          </h1>
-          {order.scheduledFor && (
-            <p className="text-primary-strong text-sm font-medium">
-              Kirim {formatScheduledFor(order.scheduledFor)}
-            </p>
-          )}
-          <p className="text-ink-muted text-sm">
+          </>
+        }
+        subtitle={
+          <>
+            {order.scheduledFor && (
+              <span className="text-primary-strong font-medium">Kirim {formatScheduledFor(order.scheduledFor)} · </span>
+            )}
             No. Order {order.orderNumber}
             {order.customerName ? ` · ${order.customerName}` : ""}
-          </p>
-        </div>
-        <Link href="/order-aktif" className="rounded-pill bg-muted h-10 px-4 text-sm font-medium leading-10 text-ink">
-          Kembali
-        </Link>
-      </div>
+          </>
+        }
+        actions={
+          <LinkButton href="/order-aktif" variant="secondary" size="compact">
+            Kembali
+          </LinkButton>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-3">
         <Card>

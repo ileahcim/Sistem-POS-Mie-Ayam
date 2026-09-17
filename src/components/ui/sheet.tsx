@@ -2,12 +2,14 @@
 
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
+import { sheetPanelMotion, useSheetMotionPrefs } from "./sheet-motion";
 
-// Shared bottom-sheet shell — backdrop fade + panel slide, a drag handle
-// (GoFood-style), and header/body/footer slots. transform + opacity only,
-// nothing that triggers layout reflow, so it stays cheap on entry-level
-// tablet GPUs. AnimatePresence for the exit animation lives in the caller
-// (it needs to keep the Sheet mounted during exit).
+// Shared bottom-sheet shell — backdrop fade + panel spring-in (slight
+// scale + blur, see sheet-motion.tsx for the pattern and its reduced-motion
+// / blur-toggle switches), a drag handle (GoFood-style), and
+// header/body/footer slots. No layout-affecting properties are animated.
+// AnimatePresence for the exit animation lives in the caller (it needs to
+// keep the Sheet mounted during exit).
 export function Sheet({
   title,
   onClose,
@@ -19,6 +21,7 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const motionPrefs = useSheetMotionPrefs();
   return (
     <>
       <motion.div
@@ -31,10 +34,8 @@ export function Sheet({
       />
       <motion.div
         className="rounded-sheet shadow-sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] flex-col bg-surface"
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ duration: 0.22, ease: "easeOut" }}
+        style={{ transformOrigin: "bottom center" }}
+        {...sheetPanelMotion(motionPrefs)}
       >
         <div className="flex justify-center pt-2">
           <div className="h-1 w-10 rounded-pill bg-border" aria-hidden />

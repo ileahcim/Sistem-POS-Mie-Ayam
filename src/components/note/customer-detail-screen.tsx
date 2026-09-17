@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import type { MieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { formatMieEntryLabel, mieEntryReducesDebt } from "@/lib/mie/types";
 import { formatId } from "@/lib/timezone";
 import { deleteMieCustomer, setMieCustomerActive } from "@/app/note/actions";
@@ -16,8 +16,7 @@ import { PriceText } from "@/components/ui/price-text";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoHistoryIcon } from "@/components/ui/empty-state-icons";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { cn } from "@/components/ui/cn";
 import { AdjustmentSheet, EditCustomerSheet, EntrySheet } from "./mie-sheets";
 
@@ -32,10 +31,10 @@ type Entry = MieCustomerDetail["entries"][number];
 // after the edited row updates on its own.
 export function CustomerDetailScreen({
   customer,
-  orderAktifIndicator,
+  nav,
 }: {
   customer: MieCustomerDetail;
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   const router = useRouter();
   const [sheet, setSheet] = useState<"edit" | "adjust" | null>(null);
@@ -68,19 +67,16 @@ export function CustomerDetailScreen({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between gap-2 border-b px-4 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-lg font-bold text-ink">{customer.name}</h1>
-          {!customer.isActive && <Badge variant="neutral">Nonaktif</Badge>}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <OrderAktifButton activeCount={orderAktifIndicator.activeCount} lateCount={orderAktifIndicator.lateCount} />
-          <LinkButton href="/note" variant="secondary">
+      <AppHeader
+        nav={nav}
+        title={customer.name}
+        subtitle={customer.isActive ? undefined : <Badge variant="neutral">Nonaktif</Badge>}
+        actions={
+          <LinkButton href="/note" variant="secondary" size="compact">
             Kembali
           </LinkButton>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">

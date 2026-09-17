@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OrderHistoryRow, OrderHistoryFilter } from "@/lib/orders/get-order-history";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
-import { LinkButton } from "@/components/ui/link-button";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
@@ -12,8 +11,7 @@ import { PriceText } from "@/components/ui/price-text";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoHistoryIcon } from "@/components/ui/empty-state-icons";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 
@@ -49,12 +47,12 @@ export function RiwayatPesananScreen({
   orders,
   filter,
   isOwner,
-  orderAktifIndicator,
+  nav,
 }: {
   orders: OrderHistoryRow[];
   filter: OrderHistoryFilter;
   isOwner: boolean;
-  orderAktifIndicator: OrderAktifIndicator;
+  nav: HeaderNav;
 }) {
   const router = useRouter();
   const [dateFrom, setDateFrom] = useState(filter.dateFrom);
@@ -73,17 +71,7 @@ export function RiwayatPesananScreen({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Riwayat Pesanan</h1>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton
-            activeCount={orderAktifIndicator.activeCount}
-            lateCount={orderAktifIndicator.lateCount}
-          />
-          <LinkButton href="/kasir" variant="secondary">Ke Kasir</LinkButton>
-        </div>
-      </div>
+      <AppHeader nav={nav} title="Riwayat Pesanan" />
 
       <div className="border-border bg-surface flex flex-wrap items-end gap-2 border-b px-4 py-3">
         {isOwner && (

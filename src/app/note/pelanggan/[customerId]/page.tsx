@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getMieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
-import { getOrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { CustomerDetailScreen } from "@/components/note/customer-detail-screen";
 
 export default async function MieCustomerDetailPage({
@@ -13,11 +13,11 @@ export default async function MieCustomerDetailPage({
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
   const { customerId } = await params;
-  const [customer, orderAktifIndicator] = await Promise.all([
+  const [customer, nav] = await Promise.all([
     getMieCustomerDetail(customerId),
-    getOrderAktifIndicator(),
+    getHeaderNav(),
   ]);
   if (!customer) notFound();
 
-  return <CustomerDetailScreen customer={customer} orderAktifIndicator={orderAktifIndicator} />;
+  return <CustomerDetailScreen customer={customer} nav={nav} />;
 }

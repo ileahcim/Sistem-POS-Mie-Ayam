@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MieProductType } from "@/lib/mie/types";
-import { updateMieProductDefault } from "@/app/note/actions";
+import { updateMiePasarPrice, updateMieProductDefault } from "@/app/note/actions";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,13 +12,17 @@ import { Badge } from "@/components/ui/badge";
 // auto-save. Never seeded/guessed (see MieProductDefault in schema.prisma),
 // so a null defaultPricePerKg shows the same "belum diisi" badge as an
 // unfilled Product.costPrice elsewhere in the app.
+// `target` picks what the row saves: a product's default price, or the
+// "Mie Pasar" shortcut price (MieSetting) — same editor for both.
 export function MieProductDefaultRow({
-  productType,
+  target,
   label,
+  hint,
   defaultPricePerKg,
 }: {
-  productType: Exclude<MieProductType, "CUSTOM">;
+  target: { kind: "default"; productType: Exclude<MieProductType, "CUSTOM"> } | { kind: "pasar" };
   label: string;
+  hint?: string;
   defaultPricePerKg: number | null;
 }) {
   const router = useRouter();
@@ -37,7 +41,10 @@ export function MieProductDefaultRow({
     setError(null);
     setSaving(true);
     try {
-      const result = await updateMieProductDefault(productType, Number(value));
+      const result =
+        target.kind === "pasar"
+          ? await updateMiePasarPrice(Number(value))
+          : await updateMieProductDefault(target.productType, Number(value));
       if (!result.ok) {
         setError(result.error);
         return;
@@ -56,6 +63,7 @@ export function MieProductDefaultRow({
         <span className="text-ink text-sm font-semibold">{label}</span>
         {defaultPricePerKg == null && <Badge variant="warning">Belum diisi</Badge>}
       </div>
+      {hint && <p className="text-ink-muted -mt-1 text-xs">{hint}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <RupiahInput value={value} onChange={setValue} placeholder="0" className="h-11 w-40 text-base" />
         <span className="text-ink-muted text-sm">/ kg</span>

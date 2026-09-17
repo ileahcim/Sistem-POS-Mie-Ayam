@@ -2,16 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { createMieCustomer } from "@/app/note/actions";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
-import { OrderAktifButton } from "@/components/ui/order-aktif-button";
-import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { AppHeader } from "@/components/ui/app-header";
 
-export function NewCustomerForm({ orderAktifIndicator }: { orderAktifIndicator: OrderAktifIndicator }) {
+export function NewCustomerForm({ nav }: { nav: HeaderNav }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
@@ -30,16 +29,15 @@ export function NewCustomerForm({ orderAktifIndicator }: { orderAktifIndicator: 
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <LateOrderBanner lateCount={orderAktifIndicator.lateCount} />
-      <div className="border-border bg-surface flex items-center justify-between border-b px-4 py-3">
-        <h1 className="text-lg font-bold text-ink">Pelanggan Baru</h1>
-        <div className="flex items-center gap-2">
-          <OrderAktifButton activeCount={orderAktifIndicator.activeCount} lateCount={orderAktifIndicator.lateCount} />
-          <LinkButton href="/note" variant="secondary">
+      <AppHeader
+        nav={nav}
+        title="Pelanggan Baru"
+        actions={
+          <LinkButton href="/note" variant="secondary" size="compact">
             Batal
           </LinkButton>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-md flex-col gap-3">

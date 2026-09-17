@@ -73,6 +73,12 @@ model Setting {
   // who don't need a receipt.
   autoPrintReceipt Boolean @default(true)
 
+  // Blur part of the sheet/popup entrance animation (filter: blur is
+  // GPU-heavy). Owner can switch it off from /admin/settings if it stutters
+  // on the real tablet — the rest of the spring/stagger animation stays.
+  // Devices with prefers-reduced-motion never get blur or movement at all.
+  sheetBlurEnabled Boolean @default(true)
+
   updatedAt DateTime @updatedAt
 }
 
@@ -448,6 +454,16 @@ model MieCustomer {
 model MieProductDefault {
   productType       MieProductType @id
   defaultPricePerKg Int?
+}
+
+// Singleton for the Note module's own tunables (kept apart from the POS
+// Setting table — Note is a separate world, see CLAUDE.md). pasarPricePerKg
+// is the "Mie Pasar" shortcut price (Mi Keriting) on the new-order form —
+// market prices change often, so it's owner-editable from /note/produk,
+// never a code constant. Null = shortcut shown as "belum diisi".
+model MieSetting {
+  id              String @id @default("singleton")
+  pasarPricePerKg Int?
 }
 
 // A single unified ledger, not separate Order/Payment tables — the

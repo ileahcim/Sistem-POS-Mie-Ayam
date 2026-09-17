@@ -12,6 +12,8 @@ import { cn } from "@/components/ui/cn";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { markOrderReceivable, addExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
 import { CancelOrderButton } from "@/components/order-aktif/cancel-order-sheet";
+import type { HeaderNav } from "@/lib/header/get-header-nav";
+import { AppHeader } from "@/components/ui/app-header";
 
 type Step = "warning" | "unpaid" | "expenses" | "count" | "result";
 
@@ -107,9 +109,11 @@ function UnpaidOrderRow({
 export function TutupShiftFlow({
   initialUnpaidOrders,
   initialExpenses,
+  nav,
 }: {
   initialUnpaidOrders: UnpaidOrderForClose[];
   initialExpenses: ShiftExpense[];
+  nav: HeaderNav;
 }) {
   const [unpaidOrders, setUnpaidOrders] = useState(initialUnpaidOrders);
   const [step, setStep] = useState<Step>(initialUnpaidOrders.length > 0 ? "warning" : "expenses");
@@ -153,8 +157,9 @@ export function TutupShiftFlow({
   const expenseTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
 
   return (
-    <div className="bg-canvas flex h-dvh flex-col overflow-y-auto p-4">
-      <h1 className="mb-4 text-xl font-bold text-ink">Tutup Shift</h1>
+    <div className="bg-canvas flex h-dvh flex-col">
+      <AppHeader nav={nav} title="Tutup Shift" />
+      <div className="flex-1 overflow-y-auto p-4">
 
       {step === "warning" && (
         <div className="flex flex-col gap-3">
@@ -300,6 +305,7 @@ export function TutupShiftFlow({
           </LinkButton>
         </div>
       )}
+      </div>
     </div>
   );
 }

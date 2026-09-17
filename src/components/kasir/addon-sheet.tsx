@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { MenuAddonGroup, MenuProduct } from "@/lib/menu/get-active-menu";
 import type { CartAddon } from "@/lib/cart/types";
 import { Sheet } from "@/components/ui/sheet";
+import { SheetItem } from "@/components/ui/sheet-motion";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
 import { formatRupiah } from "@/lib/printing/format";
@@ -19,6 +20,12 @@ export type AddonSheetResult = {
   notes: string;
   qty: number;
 };
+
+// Stagger order inside the sheet: product header, then every option row
+// top to bottom, then notes and qty. Capped so a product with many options
+// never makes the cashier wait for the last rows to appear.
+const MAX_STAGGER_INDEX = 8;
+const stagger = (i: number) => Math.min(i, MAX_STAGGER_INDEX);
 
 function isRequired(group: MenuAddonGroup) {
   return group.minSelect > 0;
@@ -107,6 +114,8 @@ export function AddonSheet({
     onConfirm({ addons, notes: notes.trim(), qty });
   }
 
+  let optionIndex = 0;
+
   return (
     <Sheet
       title="Custom pembelian"
@@ -117,10 +126,10 @@ export function AddonSheet({
         </Button>
       }
     >
-      <div className="flex items-baseline justify-between border-b border-border pb-3">
+      <SheetItem index={0} className="flex items-baseline justify-between border-b border-border pb-3">
         <span className="text-lg font-bold text-ink">{product.name}</span>
         <PriceText amount={product.price} weight="primary" className="text-lg" />
-      </div>
+      </SheetItem>
 
       {product.addonGroups.map((group) => {
         const isSingle = group.maxSelect === 1;
@@ -136,13 +145,12 @@ export function AddonSheet({
               {group.options.map((opt) => {
                 const optQty = qtyByOption.get(opt.id) ?? 0;
                 const checked = optQty > 0;
+                const itemIndex = stagger(++optionIndex);
 
                 if (isSingle) {
                   return (
-                    <label
-                      key={opt.id}
-                      className="flex min-h-12 cursor-pointer items-center justify-between gap-3 py-2"
-                    >
+                    <SheetItem key={opt.id} index={itemIndex} interactive>
+                    <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 py-2">
                       <span className="text-base text-ink">{opt.name}</span>
                       <span className="flex items-center gap-3">
                         {opt.price > 0 ? (
@@ -167,11 +175,13 @@ export function AddonSheet({
                         />
                       </span>
                     </label>
+                    </SheetItem>
                   );
                 }
 
                 return (
-                  <div key={opt.id} className="flex min-h-12 items-center justify-between gap-3 py-2">
+                  <SheetItem key={opt.id} index={itemIndex} interactive>
+                  <div className="flex min-h-12 items-center justify-between gap-3 py-2">
                     <span className="text-base text-ink">{opt.name}</span>
                     <span className="flex items-center gap-3">
                       {opt.price > 0 ? (
@@ -201,6 +211,7 @@ export function AddonSheet({
                       </span>
                     </span>
                   </div>
+                  </SheetItem>
                 );
               })}
             </div>
@@ -208,7 +219,7 @@ export function AddonSheet({
         );
       })}
 
-      <div className="py-3">
+      <SheetItem index={stagger(optionIndex + 1)} className="py-3">
         <label htmlFor="notes" className="mb-1 block text-sm font-bold text-ink">
           Catatan <span className="font-normal text-ink-muted">· Opsional</span>
         </label>
@@ -220,9 +231,9 @@ export function AddonSheet({
           rows={2}
           className="rounded-input w-full border border-border p-3 text-base"
         />
-      </div>
+      </SheetItem>
 
-      <div className="flex items-center justify-between py-3">
+      <SheetItem index={stagger(optionIndex + 2)} className="flex items-center justify-between py-3">
         <span className="text-sm font-bold text-ink">Jumlah pembelian</span>
         <div className="flex items-center gap-4">
           <button
@@ -243,7 +254,7 @@ export function AddonSheet({
             +
           </button>
         </div>
-      </div>
+      </SheetItem>
     </Sheet>
   );
 }
