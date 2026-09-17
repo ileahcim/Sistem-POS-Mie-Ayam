@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { todayDateStr, dateInputToIso } from "@/lib/mie/date-input";
 import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
@@ -12,11 +13,6 @@ import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
-
-function todayDateStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 // Payments are deliberately NOT tied to a specific order — picking a
 // customer and typing an amount is the whole flow (see CLAUDE.md-worthy
@@ -47,7 +43,7 @@ export function NewPaymentForm({
     const result = await createMiePayment({
       customerId,
       amount: Number(amount),
-      date: new Date(`${date}T00:00:00`).toISOString(),
+      date: dateInputToIso(date),
       note,
     });
     setSaving(false);

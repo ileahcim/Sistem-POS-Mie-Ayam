@@ -420,6 +420,13 @@ enum MieLedgerKind {
   ORDER
   PAYMENT
   OPENING_BALANCE
+  // Manual balance fixes added later from the customer page (forgot to
+  // record something, an old bookkeeping mistake) — always a NEW row, never
+  // an edit of an old one, so the trail stays. Amount is still stored
+  // positive; the kind carries the sign (ADD raises the debt, SUBTRACT
+  // lowers it).
+  CORRECTION_ADD
+  CORRECTION_SUBTRACT
 }
 
 model MieCustomer {

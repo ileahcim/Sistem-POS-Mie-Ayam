@@ -15,13 +15,7 @@ import { RupiahInput } from "@/components/ui/rupiah-input";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { cn } from "@/components/ui/cn";
-
-function todayDateStr(): string {
-  // Device wall-clock date, not a server calendar boundary — same carve-out
-  // as preorder-screen.tsx's date input (see CLAUDE.md "Zona waktu").
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import { todayDateStr, dateInputToIso } from "@/lib/mie/date-input";
 
 export function NewOrderForm({
   customers,
@@ -85,7 +79,7 @@ export function NewOrderForm({
       customLabel,
       kg: kgNumber,
       pricePerKg: Number(pricePerKg),
-      date: new Date(`${date}T00:00:00`).toISOString(),
+      date: dateInputToIso(date),
       note,
     });
     setSaving(false);

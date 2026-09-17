@@ -5,6 +5,7 @@ export type MieCustomerDetail = {
   id: string;
   name: string;
   note: string | null;
+  isActive: boolean;
   balance: number;
   entries: (MieLedgerEntryDTO & { runningBalance: number })[]; // oldest first, balance accumulates down the page
 };
@@ -43,6 +44,7 @@ export async function getMieCustomerDetail(customerId: string): Promise<MieCusto
     id: customer.id,
     name: customer.name,
     note: customer.note,
+    isActive: customer.isActive,
     balance: running,
     entries,
   };

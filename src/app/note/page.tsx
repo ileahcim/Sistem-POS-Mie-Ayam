@@ -14,7 +14,7 @@ export default async function NotePage() {
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
   const [customers, summary, orderAktifIndicator] = await Promise.all([
-    getMieCustomers(),
+    getMieCustomers({ includeInactive: true }),
     getMieSummary(),
     getOrderAktifIndicator(),
   ]);

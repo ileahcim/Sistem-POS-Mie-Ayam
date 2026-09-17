@@ -5,6 +5,7 @@ import { formatMieEntryLabel, mieEntrySignedAmount } from "./types";
 export type MieExportCustomerRow = {
   nama: string;
   keterangan: string;
+  status: string; // "Aktif" / "Nonaktif" — nonaktif customers are exported too, their history still counts
   saldoUtang: number;
 };
 
@@ -27,7 +28,6 @@ export async function getMieExportData(): Promise<{
   entries: MieExportEntryRow[];
 }> {
   const customers = await prisma.mieCustomer.findMany({
-    where: { isActive: true },
     include: {
       entries: {
         include: { createdBy: { select: { name: true } } },
@@ -42,7 +42,12 @@ export async function getMieExportData(): Promise<{
 
   for (const c of customers) {
     const balance = c.entries.reduce((sum, e) => sum + mieEntrySignedAmount(e), 0);
-    customerRows.push({ nama: c.name, keterangan: c.note ?? "", saldoUtang: balance });
+    customerRows.push({
+      nama: c.name,
+      keterangan: c.note ?? "",
+      status: c.isActive ? "Aktif" : "Nonaktif",
+      saldoUtang: balance,
+    });
 
     for (const e of c.entries) {
       entryRows.push({

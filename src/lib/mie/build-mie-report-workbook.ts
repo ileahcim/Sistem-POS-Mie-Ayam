@@ -19,6 +19,7 @@ export async function buildMieReportWorkbook(): Promise<ExcelJS.Workbook> {
   customerSheet.columns = [
     { header: "Nama", key: "nama", width: 24 },
     { header: "Keterangan", key: "keterangan", width: 28 },
+    { header: "Status", key: "status", width: 10 },
     { header: "Saldo Utang", key: "saldoUtang", width: 16, style: { numFmt: MONEY_FORMAT } },
   ];
   customerSheet.addRows(customers);

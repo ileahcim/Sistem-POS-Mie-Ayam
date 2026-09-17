@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { localDateStr, wibDateRange } from "@/lib/timezone";
-import type { MieProductType } from "@/lib/mie/types";
+import type { MieAdjustmentKind, MieProductType } from "@/lib/mie/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -124,6 +124,151 @@ export async function createMiePayment(input: CreateMiePaymentInput): Promise<Ac
     },
   });
 
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Customer edit / nonaktif / hapus
+// ---------------------------------------------------------------------------
+
+export async function updateMieCustomer(customerId: string, name: string, note: string): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  const trimmedName = name.trim();
+  if (!trimmedName) return { ok: false, error: "Nama pelanggan wajib diisi." };
+
+  const result = await prisma.mieCustomer.updateMany({
+    where: { id: customerId },
+    data: { name: trimmedName, note: note.trim() || null },
+  });
+  if (result.count === 0) return { ok: false, error: "Pelanggan tidak ditemukan." };
+  return { ok: true };
+}
+
+// Soft delete (and back) — the ledger rows stay exactly as they are, since
+// the balance is computed from them. A nonaktif customer drops off the main
+// list and the new-order/new-payment pickers, but its page still opens.
+export async function setMieCustomerActive(customerId: string, isActive: boolean): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  const result = await prisma.mieCustomer.updateMany({ where: { id: customerId }, data: { isActive } });
+  if (result.count === 0) return { ok: false, error: "Pelanggan tidak ditemukan." };
+  return { ok: true };
+}
+
+// Permanent delete is only allowed for a customer with zero ledger rows
+// (created by mistake, nothing recorded yet). Checked inside the same
+// transaction as the delete so a row added concurrently can't be orphaned.
+export async function deleteMieCustomer(customerId: string): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  return prisma.$transaction(async (tx) => {
+    const entryCount = await tx.mieLedgerEntry.count({ where: { customerId } });
+    if (entryCount > 0) {
+      return {
+        ok: false as const,
+        error: "Pelanggan ini sudah punya riwayat transaksi — tidak bisa dihapus permanen. Nonaktifkan saja.",
+      };
+    }
+    const result = await tx.mieCustomer.deleteMany({ where: { id: customerId } });
+    if (result.count === 0) return { ok: false as const, error: "Pelanggan tidak ditemukan." };
+    return { ok: true as const };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Koreksi saldo — always a NEW ledger row, never an edit of an old one
+// ---------------------------------------------------------------------------
+
+export type CreateMieAdjustmentInput = {
+  customerId: string;
+  kind: MieAdjustmentKind;
+  amount: number;
+  date: string; // ISO instant, device-local midnight (same as the order/payment forms)
+  note: string;
+};
+
+const ADJUSTMENT_KINDS: MieAdjustmentKind[] = ["OPENING_BALANCE", "CORRECTION_ADD", "CORRECTION_SUBTRACT"];
+
+export async function createMieAdjustment(input: CreateMieAdjustmentInput): Promise<ActionResult> {
+  const user = await requireRole("OWNER");
+
+  if (!ADJUSTMENT_KINDS.includes(input.kind)) return { ok: false, error: "Jenis koreksi tidak valid." };
+  const customer = await prisma.mieCustomer.findUnique({ where: { id: input.customerId } });
+  if (!customer || !customer.isActive) return { ok: false, error: "Pelanggan tidak ditemukan atau nonaktif." };
+  if (!Number.isFinite(input.amount) || input.amount <= 0) return { ok: false, error: "Nominal tidak valid." };
+  // A correction must say why — it's the only trail explaining the row.
+  if (input.kind !== "OPENING_BALANCE" && !input.note.trim()) {
+    return { ok: false, error: "Tulis keterangan koreksinya." };
+  }
+  const date = new Date(input.date);
+  if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
+
+  await prisma.mieLedgerEntry.create({
+    data: {
+      customerId: input.customerId,
+      kind: input.kind,
+      amount: Math.round(input.amount),
+      date,
+      note: input.note.trim() || null,
+      createdById: user.id,
+    },
+  });
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Edit / hapus a ledger row. Every running balance after it simply
+// recomputes on the next read (balance is always a sum over rows).
+// ---------------------------------------------------------------------------
+
+export type UpdateMieEntryInput = {
+  kg?: number; // ORDER only
+  pricePerKg?: number; // ORDER only
+  amount?: number; // non-ORDER only — an ORDER's amount is always kg × price
+  date: string;
+  note: string;
+};
+
+export async function updateMieEntry(entryId: string, input: UpdateMieEntryInput): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  const entry = await prisma.mieLedgerEntry.findUnique({ where: { id: entryId } });
+  if (!entry) return { ok: false, error: "Transaksi tidak ditemukan." };
+
+  const date = new Date(input.date);
+  if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
+  const note = input.note.trim() || null;
+
+  if (entry.kind === "ORDER") {
+    const kg = Number(input.kg);
+    const pricePerKg = Number(input.pricePerKg);
+    if (!Number.isFinite(kg) || kg <= 0) return { ok: false, error: "Jumlah kg tidak valid." };
+    if (!Number.isFinite(pricePerKg) || pricePerKg <= 0) return { ok: false, error: "Harga per kg tidak valid." };
+    await prisma.mieLedgerEntry.update({
+      where: { id: entryId },
+      data: { kg, pricePerKg: Math.round(pricePerKg), amount: Math.round(kg * pricePerKg), date, note },
+    });
+    return { ok: true };
+  }
+
+  const amount = Number(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "Nominal tidak valid." };
+  if ((entry.kind === "CORRECTION_ADD" || entry.kind === "CORRECTION_SUBTRACT") && !note) {
+    return { ok: false, error: "Keterangan koreksi tidak boleh kosong." };
+  }
+  await prisma.mieLedgerEntry.update({
+    where: { id: entryId },
+    data: { amount: Math.round(amount), date, note },
+  });
+  return { ok: true };
+}
+
+export async function deleteMieEntry(entryId: string): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  const result = await prisma.mieLedgerEntry.deleteMany({ where: { id: entryId } });
+  if (result.count === 0) return { ok: false, error: "Transaksi tidak ditemukan." };
   return { ok: true };
 }
 

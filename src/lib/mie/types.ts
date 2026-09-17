@@ -3,7 +3,17 @@
 // Order's channel/status types — never importing the generated Prisma enum
 // directly into a DTO type).
 export type MieProductType = "MIE_KERITING" | "MIE_LURUS" | "PANGSIT" | "CUSTOM";
-export type MieLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE";
+export type MieLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT";
+
+// Kinds that carry a plain amount (no kg/price) and are added from the
+// customer page's "Koreksi Saldo" sheet.
+export type MieAdjustmentKind = "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT";
+
+export const MIE_ADJUSTMENT_LABEL: Record<MieAdjustmentKind, string> = {
+  OPENING_BALANCE: "Utang lama",
+  CORRECTION_ADD: "Koreksi (+)",
+  CORRECTION_SUBTRACT: "Koreksi (−)",
+};
 
 export const MIE_PRODUCT_LABEL: Record<Exclude<MieProductType, "CUSTOM">, string> = {
   MIE_KERITING: "Mi Keriting",
@@ -35,15 +45,21 @@ export type MieLedgerEntryDTO = {
 // never read differently.
 export function formatMieEntryLabel(entry: Pick<MieLedgerEntryDTO, "kind" | "productType" | "customLabel">): string {
   if (entry.kind === "PAYMENT") return "Pembayaran";
-  if (entry.kind === "OPENING_BALANCE") return "Saldo awal";
+  if (entry.kind === "OPENING_BALANCE") return "Saldo awal / utang lama";
+  if (entry.kind === "CORRECTION_ADD") return "Koreksi (+)";
+  if (entry.kind === "CORRECTION_SUBTRACT") return "Koreksi (−)";
   if (entry.productType === "CUSTOM") return entry.customLabel || "Custom";
   return entry.productType ? MIE_PRODUCT_LABEL[entry.productType] : "—";
 }
 
-// ORDER and OPENING_BALANCE add to what the customer owes; PAYMENT reduces
-// it. `amount` is always stored/returned positive — this is the one place
+// ORDER, OPENING_BALANCE and CORRECTION_ADD add to what the customer owes;
+// PAYMENT and CORRECTION_SUBTRACT reduce it. `amount` is always stored/returned positive — this is the one place
 // the sign is decided, so balance math can never disagree between the
 // summary card, the ledger table, and the Excel export.
 export function mieEntrySignedAmount(entry: Pick<MieLedgerEntryDTO, "kind" | "amount">): number {
-  return entry.kind === "PAYMENT" ? -entry.amount : entry.amount;
+  return mieEntryReducesDebt(entry.kind) ? -entry.amount : entry.amount;
+}
+
+export function mieEntryReducesDebt(kind: MieLedgerKind): boolean {
+  return kind === "PAYMENT" || kind === "CORRECTION_SUBTRACT";
 }

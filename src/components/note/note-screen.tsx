@@ -3,13 +3,10 @@ import type { MieSummary } from "@/lib/mie/get-mie-summary";
 import type { OrderAktifIndicator } from "@/lib/orders/get-order-aktif-indicator";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
-import { ListRow } from "@/components/ui/list-row";
-import { PriceText } from "@/components/ui/price-text";
-import { EmptyState } from "@/components/ui/empty-state";
-import { NoMieCustomerIcon } from "@/components/ui/empty-state-icons";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { buttonClassName } from "@/components/ui/button-styles";
+import { CustomerList } from "./customer-list";
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
@@ -76,27 +73,7 @@ export function NoteScreen({
             </a>
           </div>
 
-          <Card>
-            {customers.length === 0 ? (
-              <EmptyState
-                icon={<NoMieCustomerIcon />}
-                title="Belum ada pelanggan"
-                description="Tambahkan pelanggan mi mentah pertama untuk mulai mencatat pesanan dan pembayaran."
-                actionHref="/note/pelanggan/baru"
-                actionLabel="+ Pelanggan"
-              />
-            ) : (
-              customers.map((c) => (
-                <ListRow key={c.id} roomy asLink={`/note/pelanggan/${c.id}`}>
-                  <div className="flex-1">
-                    <p className="text-ink text-base font-semibold">{c.name}</p>
-                    {c.note && <p className="text-ink-muted text-sm">{c.note}</p>}
-                  </div>
-                  <PriceText amount={c.balance} weight="primary" />
-                </ListRow>
-              ))
-            )}
-          </Card>
+          <CustomerList customers={customers} />
         </div>
       </div>
     </div>
