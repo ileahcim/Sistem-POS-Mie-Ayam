@@ -3,11 +3,18 @@ import { getActiveMenu } from "@/lib/menu/get-active-menu";
 import { getOpenShift } from "@/lib/shift/get-shift-state";
 import { getComboShortcuts } from "@/lib/combo/get-combo-shortcuts";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { KasirScreen } from "@/components/kasir/kasir-screen";
 
 export default async function KasirPage() {
-  const openShift = await getOpenShift();
-  if (!openShift) redirect("/shift/buka");
+  const [openShift, user] = await Promise.all([getOpenShift(), getCurrentUser()]);
+  // OWNER may look at Kasir before the shift is open (checking the menu,
+  // prices, an order from last night) — the screen then shows a red banner
+  // and refuses to save. A CASHIER still lands straight on Buka Shift,
+  // since for them there is nothing to do here before the shift exists.
+  // Either way saveOrder() rejects a missing shift server-side; this is
+  // only about which screen you get to look at.
+  if (!openShift && user?.role !== "OWNER") redirect("/shift/buka");
 
   const [categories, comboShortcuts, nav] = await Promise.all([
     getActiveMenu(),
@@ -19,6 +26,7 @@ export default async function KasirPage() {
       categories={categories}
       comboShortcuts={comboShortcuts}
       nav={nav}
+      shiftOpen={!!openShift}
     />
   );
 }

@@ -115,32 +115,6 @@ export function NewOrderForm({
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-md flex-col gap-3">
-          <button
-            type="button"
-            onClick={applyPasarPreset}
-            disabled={pasarPricePerKg == null}
-            aria-pressed={pasarPreset}
-            className={cn(
-              "rounded-card flex min-h-16 w-full items-center justify-between gap-3 border-2 px-4 py-3 text-left disabled:opacity-60",
-              pasarPreset ? "border-primary bg-primary-soft" : "border-border bg-surface",
-            )}
-          >
-            <span className="flex flex-col">
-              <span className="text-ink text-base font-bold">Mie Pasar</span>
-              <span className="text-ink-muted text-sm">
-                {MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]} ·{" "}
-                {pasarPricePerKg != null
-                  ? `Rp${pasarPricePerKg.toLocaleString("id-ID")}/kg`
-                  : "harga belum diisi di Harga Produk"}
-              </span>
-            </span>
-            {pasarPricePerKg != null && (
-              <span className={cn("text-sm font-semibold", pasarPreset ? "text-primary-strong" : "text-primary")}>
-                {pasarPreset ? "Dipakai ✓" : "Pakai"}
-              </span>
-            )}
-          </button>
-
           <Card padded className="flex flex-col gap-3">
             {customers.length === 0 ? (
               <p className="text-ink-muted text-sm">
@@ -180,12 +154,28 @@ export function NewOrderForm({
                     onClick={() => handleProductTypeChange(type)}
                     className={cn(
                       "rounded-pill h-11 px-4 text-sm font-semibold",
-                      productType === type ? "bg-primary text-white" : "bg-muted text-ink-muted",
+                      productType === type && !pasarPreset ? "bg-primary text-white" : "bg-muted text-ink-muted",
                     )}
                   >
                     {MIE_PRODUCT_LABEL[type]}
                   </button>
                 ))}
+                {/* "Mi Pasar" is the daily market order: the same Mi Keriting
+                    row, but priced from Harga Produk instead of this
+                    customer's last price — so it belongs in this row, as one
+                    more choice, not in a separate card above the form. */}
+                <button
+                  type="button"
+                  onClick={applyPasarPreset}
+                  disabled={pasarPricePerKg == null}
+                  title={pasarPricePerKg == null ? "Harga belum diisi di Harga Produk" : undefined}
+                  className={cn(
+                    "rounded-pill h-11 px-4 text-sm font-semibold disabled:opacity-50",
+                    pasarPreset ? "bg-primary text-white" : "bg-muted text-ink-muted",
+                  )}
+                >
+                  Mi Pasar
+                </button>
                 <button
                   type="button"
                   onClick={() => handleProductTypeChange("CUSTOM")}
@@ -197,6 +187,15 @@ export function NewOrderForm({
                   Custom
                 </button>
               </div>
+              {pasarPreset && pasarPricePerKg != null && (
+                <span className="text-ink-muted text-sm">
+                  {MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]}, harga pasar Rp
+                  {pasarPricePerKg.toLocaleString("id-ID")}/kg (dari Harga Produk).
+                </span>
+              )}
+              {pasarPricePerKg == null && (
+                <span className="text-ink-muted text-sm">Harga Mi Pasar belum diisi di halaman Harga Produk.</span>
+              )}
             </div>
 
             {productType === "CUSTOM" && (

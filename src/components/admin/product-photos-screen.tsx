@@ -1,6 +1,7 @@
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { AppHeader } from "@/components/ui/app-header";
 import { Card } from "@/components/ui/card";
+import { LinkButton } from "@/components/ui/link-button";
 import { ProductPhotoRow, type PhotoProduct } from "./product-photo-row";
 
 export function ProductPhotosScreen({
@@ -12,7 +13,15 @@ export function ProductPhotosScreen({
 }) {
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <AppHeader nav={nav} title="Foto Produk" />
+      <AppHeader
+        nav={nav}
+        title="Foto Produk"
+        actions={
+          <LinkButton href="/admin/settings" variant="secondary" size="compact">
+            Kembali
+          </LinkButton>
+        }
+      />
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
           <p className="text-ink-muted text-sm">

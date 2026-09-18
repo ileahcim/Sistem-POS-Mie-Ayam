@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { MieSummary } from "@/lib/mie/get-mie-summary";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
@@ -37,6 +38,20 @@ export function NoteScreen({
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
+          {/* The door to the monitoring screen — first thing on the page and
+              visually lifted, since as a plain ghost button in the row of
+              actions below it read as just another small link. */}
+          <Link
+            href="/note/ringkasan"
+            className="rounded-card border-primary bg-primary-soft flex min-h-16 items-center gap-3 border-2 px-4 py-3"
+          >
+            <span className="flex flex-1 flex-col">
+              <span className="text-ink text-base font-bold">Ringkasan</span>
+              <span className="text-ink-muted text-sm">Omzet, pembayaran, dan rincian per jenis mi</span>
+            </span>
+            <span className="text-primary-strong text-xl font-bold">›</span>
+          </Link>
+
           <div className="flex flex-wrap gap-3">
             <SummaryCard
               label="Total Piutang"
@@ -59,17 +74,16 @@ export function NoteScreen({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {/* The grey buttons blended into the page background, so every
+                non-primary one here carries a visible border now. */}
             <LinkButton href="/note/pesanan/baru" variant="primary">
               + Pesanan
             </LinkButton>
-            <LinkButton href="/note/pembayaran/baru" variant="secondary">
+            <LinkButton href="/note/pembayaran/baru" variant="secondary" className="border-border border">
               + Pembayaran
             </LinkButton>
-            <LinkButton href="/note/pelanggan/baru" variant="secondary">
+            <LinkButton href="/note/pelanggan/baru" variant="secondary" className="border-border border">
               + Pelanggan
-            </LinkButton>
-            <LinkButton href="/note/ringkasan" variant="ghost">
-              Ringkasan
             </LinkButton>
             <LinkButton href="/note/produk" variant="ghost">
               Harga Produk

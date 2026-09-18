@@ -37,10 +37,9 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Acti
   return { ok: true };
 }
 
-// New items only — existing lines on a saved order are never edited or
-// removed here (that requires an OWNER void with a reason, or belongs on a
-// new order once the current one is PAID). See OrderDetail's UI: this is
-// unavailable once status is PAID.
+// Adds new lines to a saved order. Undoing a mis-tap is removeOrderItem
+// below; once the order is PAID neither is available (a paid order is
+// frozen — extra items become a new order).
 export async function addItemsToOrder(orderId: string, items: OrderItemInput[]): Promise<ActionResult> {
   await requireUser();
 
@@ -63,6 +62,61 @@ export async function addItemsToOrder(orderId: string, items: OrderItemInput[]):
   });
 
   return { ok: true };
+}
+
+// Mis-tapped an item onto a saved order (adding was already possible, undoing
+// it was not). Only while the order is still OPEN — a PAID order is frozen
+// (CLAUDE.md "Order & status"), and emptying an order entirely is
+// "Batalkan Order", not a silent delete, so the last remaining line is
+// refused. `mode: "one"` drops a single portion off a multi-qty line;
+// "all" removes the whole line. The order total is never stored — it's
+// recomputed from the remaining items server-side (getOrderDetail), so
+// there is nothing else to keep in sync here.
+export async function removeOrderItem(
+  orderId: string,
+  orderItemId: string,
+  mode: "one" | "all",
+): Promise<ActionResult> {
+  await requireUser();
+
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) return { ok: false, error: "Order tidak ditemukan." };
+    if (order.status !== "OPEN") {
+      return { ok: false, error: "Order ini sudah dibayar/tidak aktif — tidak bisa diubah." };
+    }
+
+    const item = order.items.find((i) => i.id === orderItemId);
+    if (!item) return { ok: false, error: "Item tidak ditemukan di order ini." };
+
+    const removedQty = mode === "all" ? item.qty : 1;
+    const totalQty = order.items.reduce((sum, i) => sum + i.qty, 0);
+    if (removedQty >= totalQty) {
+      return {
+        ok: false,
+        error: "Order harus menyisakan minimal 1 item. Untuk mengosongkan order, pakai Batalkan Order.",
+      };
+    }
+
+    if (removedQty >= item.qty) {
+      // OrderItemAddon has no cascade in the schema — its snapshot rows go
+      // first, in the same transaction, or the delete hits the FK.
+      await tx.orderItemAddon.deleteMany({ where: { orderItemId: item.id } });
+      await tx.orderItem.delete({ where: { id: item.id } });
+      return { ok: true };
+    }
+
+    const unitTotal = item.lineTotal / item.qty; // exact — lineTotal was always unitTotal * qty
+    const nextQty = item.qty - removedQty;
+    await tx.orderItem.update({
+      where: { id: item.id },
+      data: { qty: nextQty, lineTotal: unitTotal * nextQty },
+    });
+    return { ok: true };
+  });
 }
 
 export type SplitSelection = { orderItemId: string; qty: number };

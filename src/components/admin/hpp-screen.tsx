@@ -3,6 +3,7 @@ import { summarizeHppSections } from "@/lib/hpp/get-hpp-items";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { Card } from "@/components/ui/card";
 import { AppHeader } from "@/components/ui/app-header";
+import { LinkButton } from "@/components/ui/link-button";
 import { HppItemRow } from "./hpp-item-row";
 
 // Server-renderable shell — only the per-row editor (hpp-item-row.tsx)
@@ -21,7 +22,15 @@ export function HppScreen({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <AppHeader nav={nav} title="Isi HPP" />
+      <AppHeader
+        nav={nav}
+        title="Isi HPP"
+        actions={
+          <LinkButton href="/admin/settings" variant="secondary" size="compact">
+            Kembali
+          </LinkButton>
+        }
+      />
 
       {(missing > 0 || lowMargin > 0) && (
         <div className="border-border bg-surface flex flex-col gap-1 border-b px-4 py-3 text-sm">

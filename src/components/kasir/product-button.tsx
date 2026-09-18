@@ -27,7 +27,18 @@ export function ProductButton({
       transition={{ duration: 0.12 }}
       className="rounded-card shadow-card border-border bg-surface relative flex flex-col overflow-hidden border text-left"
     >
-      <ProductImage name={name} imageUrl={imageUrl} className="aspect-[4/3] w-full" />
+      {/* 4:3, but capped: without a max the picture grows with the card, so
+          on a 1366px tablet one photo ate half the screen. The cap keeps at
+          least 2 full product rows visible. Phone (390px) lands at ~137px
+          wide-ratio height anyway, so the cap never changes it. In a short
+          landscape window (phone on its side) the cap tightens further so
+          the categories/cart still fit. */}
+      <ProductImage
+        name={name}
+        imageUrl={imageUrl}
+        className="aspect-[4/3] max-h-[140px] w-full [@media(max-height:500px)]:max-h-[84px]"
+        initialsClassName="text-3xl [@media(max-height:500px)]:text-xl"
+      />
       {cartQty > 0 && (
         <span className="bg-primary shadow-card absolute top-2 right-2 flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-sm font-bold text-white">
           {cartQty}

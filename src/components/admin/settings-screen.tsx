@@ -7,6 +7,7 @@ import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { updateAutoPrintReceipt, updateSheetBlurEnabled, updateStoreInfo } from "@/app/admin/settings/actions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ListRow } from "@/components/ui/list-row";
 import { AppHeader } from "@/components/ui/app-header";
 import { cn } from "@/components/ui/cn";
 
@@ -174,6 +175,26 @@ export function SettingsScreen({
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
+          {/* Set up once and then rarely touched, so they live here instead
+              of taking up room in the main Menu. */}
+          <Card>
+            <p className="text-ink px-4 pt-3 pb-1 text-base font-semibold">Data menu</p>
+            <ListRow asLink="/admin/hpp">
+              <span className="flex flex-1 flex-col">
+                <span className="text-ink text-base font-semibold">Isi HPP</span>
+                <span className="text-ink-muted text-sm">Modal per produk & add-on, dipakai grafik margin.</span>
+              </span>
+              <span className="text-ink-faint text-xl">›</span>
+            </ListRow>
+            <ListRow asLink="/admin/foto-produk">
+              <span className="flex flex-1 flex-col">
+                <span className="text-ink text-base font-semibold">Foto Produk</span>
+                <span className="text-ink-muted text-sm">Unggah foto untuk kartu produk di layar Kasir.</span>
+              </span>
+              <span className="text-ink-faint text-xl">›</span>
+            </ListRow>
+          </Card>
+
           <StoreInfoCard settings={settings} />
 
           <ToggleCard

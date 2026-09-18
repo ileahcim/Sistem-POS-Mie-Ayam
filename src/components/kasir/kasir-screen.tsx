@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
@@ -9,6 +10,9 @@ import { sameCartLine, expandAddonOptionIds, type CartItem } from "@/lib/cart/ty
 import type { ComboShortcut } from "@/lib/combo/types";
 import { MainMenu } from "@/components/ui/main-menu";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
+import { Sheet } from "@/components/ui/sheet";
+import { SheetItem } from "@/components/ui/sheet-motion";
+import { LinkButton } from "@/components/ui/link-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { ChannelTableBar } from "./channel-table-bar";
@@ -26,10 +30,15 @@ export function KasirScreen({
   categories,
   comboShortcuts,
   nav,
+  shiftOpen,
 }: {
   categories: MenuCategory[];
   comboShortcuts: ComboShortcut[];
   nav: HeaderNav;
+  // false only for an OWNER looking at Kasir before opening the shift (a
+  // CASHIER never gets here — see kasir/page.tsx). The screen stays fully
+  // browsable; only saving is blocked, and the server blocks it too.
+  shiftOpen: boolean;
 }) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
@@ -41,6 +50,7 @@ export function KasirScreen({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
+  const [noShiftPopup, setNoShiftPopup] = useState(false);
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? categories[0];
 
@@ -122,6 +132,12 @@ export function KasirScreen({
 
   async function handleSave() {
     if (!draft.channel) return;
+    // UI half of the block only — saveOrder() refuses a missing shift on
+    // the server regardless of what the screen does here.
+    if (!shiftOpen) {
+      setNoShiftPopup(true);
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -152,16 +168,29 @@ export function KasirScreen({
   return (
     <div className="flex h-dvh flex-col">
       <LateOrderBanner lateCount={nav.lateCount} />
+      {!shiftOpen && (
+        <div className="bg-danger flex flex-wrap items-center justify-center gap-3 px-3 py-2 text-white">
+          <span className="text-base font-bold">Kasir belum dibuka — pesanan tidak bisa disimpan</span>
+          <Link
+            href="/shift/buka"
+            className="rounded-pill bg-surface text-danger flex h-10 items-center px-4 text-sm font-bold"
+          >
+            Buka Shift
+          </Link>
+        </div>
+      )}
       {/* One header surface. Tablet (lg): a single row — Menu, channel/table
           picks, Order Aktif. Narrower: two clearly separate rows — Menu +
           title + Order Aktif on top, the channel row full-width below — so
           the channel buttons are never covered. Same elements, CSS order. */}
-      <header className="border-border bg-surface flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-3 py-2">
+      <header className="border-border bg-surface flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-3 py-2 [@media(max-height:500px)]:py-1">
         <div className="order-1">
           <MainMenu isOwner={nav.isOwner} />
         </div>
-        <h1 className="text-ink order-2 min-w-0 flex-1 truncate text-lg font-bold lg:hidden">Kasir</h1>
-        <div className="order-4 w-full min-w-0 lg:order-2 lg:w-auto lg:flex-1">
+        <h1 className="text-ink order-2 min-w-0 flex-1 truncate text-lg font-bold lg:hidden [@media(max-height:500px)]:hidden">
+          Kasir
+        </h1>
+        <div className="order-4 w-full min-w-0 lg:order-2 lg:w-auto lg:flex-1 [@media(max-height:500px)]:order-2 [@media(max-height:500px)]:w-auto [@media(max-height:500px)]:flex-1">
           <ChannelTableBar
             channel={draft.channel}
             tableLabel={draft.tableLabel}
@@ -229,6 +258,26 @@ export function KasirScreen({
             onSave={handleSave}
             onClose={() => setCartSheetOpen(false)}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {noShiftPopup && (
+          <Sheet title="Shift belum dibuka" onClose={() => setNoShiftPopup(false)}>
+            <div className="flex flex-col gap-4 pb-2">
+              <SheetItem index={0}>
+                <p className="text-ink text-base">
+                  Pesanan belum bisa disimpan karena kasir belum dibuka hari ini. Buka shift dulu — isi keranjang
+                  tidak hilang.
+                </p>
+              </SheetItem>
+              <SheetItem index={1}>
+                <LinkButton href="/shift/buka" variant="primary" size="large" fullWidth>
+                  Buka Shift
+                </LinkButton>
+              </SheetItem>
+            </div>
+          </Sheet>
         )}
       </AnimatePresence>
 

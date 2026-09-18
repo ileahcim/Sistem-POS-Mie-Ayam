@@ -27,10 +27,10 @@ export function useSheetMotionPrefs(): SheetMotionPrefs {
   return { reduced, blur: blurEnabled && !reduced };
 }
 
-const SPRING: Transition = { type: "spring", duration: 0.55, bounce: 0.2 };
+const SPRING: Transition = { type: "spring", duration: 0.4, bounce: 0.2 };
 // Opacity/blur must not overshoot (a bouncing blur goes negative = invalid
 // CSS for a frame), so they get the same timing without the bounce.
-const SPRING_NO_BOUNCE: Transition = { type: "spring", duration: 0.55, bounce: 0 };
+const SPRING_NO_BOUNCE: Transition = { type: "spring", duration: 0.4, bounce: 0 };
 const REDUCED_FADE: Transition = { duration: 0.15 };
 
 const BLURRED = "blur(10px)";
@@ -58,7 +58,7 @@ export function sheetItemMotion({ reduced, blur }: SheetMotionPrefs, index: numb
   if (reduced) {
     return { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: REDUCED_FADE };
   }
-  const delay = index * 0.08;
+  const delay = index * 0.05;
   return {
     initial: { opacity: 0, x: 10, scale: 0.95, ...(blur && { filter: BLURRED }) },
     animate: { opacity: 1, x: 0, scale: 1, ...(blur && { filter: SHARP }) },

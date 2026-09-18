@@ -20,7 +20,7 @@ import { AddItemsPanel } from "./add-items-panel";
 import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { CancelOrderButton } from "./cancel-order-sheet";
 import { VoidOrderButton } from "./void-order-sheet";
-import { markServed } from "@/app/order-aktif/actions";
+import { markServed, removeOrderItem } from "@/app/order-aktif/actions";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -30,6 +30,91 @@ const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
 
 function formatScheduledFor(iso: string): string {
   return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
+}
+
+// One line of a saved order. While the order is still unpaid it can be
+// corrected in place (a mis-tapped drink used to be impossible to undo):
+// "− 1 porsi" for a multi-qty line, "Hapus" for the whole line. Deleting
+// asks once inline (no extra sheet) since it's the destructive one; the
+// server recomputes the order total either way.
+function OrderItemRow({
+  orderId,
+  item,
+  editable,
+  canRemove,
+  onChanged,
+}: {
+  orderId: string;
+  item: OrderDetailData["items"][number];
+  editable: boolean;
+  canRemove: boolean;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(mode: "one" | "all") {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await removeOrderItem(orderId, item.id, mode);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setConfirming(false);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5 p-3">
+      <div className="flex justify-between gap-3">
+        <span className="text-base font-semibold text-ink">
+          {item.qty}x {item.productName}
+        </span>
+        <PriceText amount={item.lineTotal} weight="secondary" />
+      </div>
+      {(item.addons.length > 0 || item.notes) && (
+        <span className="text-ink-muted text-sm">
+          {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      )}
+
+      {editable && canRemove && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          {confirming ? (
+            <>
+              <span className="text-ink text-sm font-medium">Hapus baris ini?</span>
+              <Button variant="danger" disabled={busy} onClick={() => run("all")}>
+                {busy ? "Menghapus..." : "Ya, hapus"}
+              </Button>
+              <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
+                Batal
+              </Button>
+            </>
+          ) : (
+            <>
+              {item.qty > 1 && (
+                <Button variant="secondary" disabled={busy} onClick={() => run("one")}>
+                  − 1 porsi
+                </Button>
+              )}
+              <Button variant="secondary" disabled={busy} onClick={() => setConfirming(true)}>
+                Hapus
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+      {error && <p className="text-danger mt-1 text-sm">{error}</p>}
+    </div>
+  );
 }
 
 export function OrderDetail({
@@ -49,7 +134,11 @@ export function OrderDetail({
   const [markingServed, setMarkingServed] = useState(false);
 
   const canAddItems = order.status === "OPEN";
+  const canEditItems = order.status === "OPEN";
   const canPay = order.status === "OPEN";
+  // The last remaining portion can't be removed — an empty order is
+  // "Batalkan Order" (with a reason), not a silent delete.
+  const totalQty = order.items.reduce((sum, i) => sum + i.qty, 0);
   // Bungkus/Antar are marked served automatically at payment (payOrder), so
   // an unpaid one never needs the manual step — only Dine In does. A PAID
   // order still unserved (older data) keeps the button as a way out.
@@ -103,21 +192,14 @@ export function OrderDetail({
         <Card>
           <div className="divide-border flex flex-col divide-y">
             {order.items.map((item) => (
-              <div key={item.id} className="flex flex-col gap-0.5 p-3">
-                <div className="flex justify-between gap-3">
-                  <span className="text-base font-semibold text-ink">
-                    {item.qty}x {item.productName}
-                  </span>
-                  <PriceText amount={item.lineTotal} weight="secondary" />
-                </div>
-                {(item.addons.length > 0 || item.notes) && (
-                  <span className="text-ink-muted text-sm">
-                    {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                )}
-              </div>
+              <OrderItemRow
+                key={item.id}
+                orderId={order.id}
+                item={item}
+                editable={canEditItems}
+                canRemove={totalQty > 1}
+                onChanged={() => router.refresh()}
+              />
             ))}
           </div>
           <div className="border-border bg-canvas flex items-center justify-between rounded-b-card border-t px-3 py-2">

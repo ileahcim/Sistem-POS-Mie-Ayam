@@ -11,6 +11,9 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 // needs to carry the late-order indicator — see CLAUDE.md-worthy brief.
 // "Tutup Shift" is visually set apart (warning tint) since it's the one
 // deliberate, once-a-day action mixed in among the read/navigate-only items.
+// Set-up-once screens (Isi HPP, Foto Produk) deliberately do NOT live here
+// — they sit inside Pengaturan, so this list stays the short list of places
+// actually visited during a shift.
 type MenuEntry = { href: string; label: string; ownerOnly?: boolean; warning?: boolean };
 
 const MENU_ENTRIES: MenuEntry[] = [
@@ -18,8 +21,6 @@ const MENU_ENTRIES: MenuEntry[] = [
   { href: "/order-aktif", label: "Order Aktif" },
   { href: "/riwayat-pesanan", label: "Riwayat Pesanan" },
   { href: "/dashboard", label: "Dashboard", ownerOnly: true },
-  { href: "/admin/hpp", label: "Isi HPP", ownerOnly: true },
-  { href: "/admin/foto-produk", label: "Foto Produk", ownerOnly: true },
   { href: "/note", label: "Note (Mi Mentah)", ownerOnly: true },
   { href: "/admin/settings", label: "Pengaturan", ownerOnly: true },
   { href: "/pesanan-terjadwal", label: "Pesanan Terjadwal" },
