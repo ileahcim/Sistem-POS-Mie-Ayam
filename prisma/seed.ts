@@ -44,7 +44,7 @@ const categories: CategorySeed[] = [
       { name: "Bakso Kecil (3 biji)", price: 5000, costPrice: 3300, costPriceEstimated: true },
       // A whole bowl (noodles, greens, broth) at half size — so half of a
       // full Bakso's Rp10.000 cost, not just the balls. Rp3.000 profit,
-      // same shape as the rest of the menu.
+      // same shape as the rest of the menu. Takes "Topping Bakso" below.
       { name: "Bakso Setengah (4 biji)", price: 8000, costPrice: 5000, costPriceEstimated: true },
     ],
   },
@@ -148,10 +148,12 @@ const addonGroups: AddonGroupSeed[] = [
     ],
   },
   {
+    // Bakso Setengah is a whole (half-size) bowl, so it takes the same
+    // toppings — but not "Jenis Bakso" (owner's call).
     name: "Topping Bakso",
     minSelect: 0,
     maxSelect: null,
-    appliesTo: ["Bakso"],
+    appliesTo: ["Bakso", "Bakso Setengah (4 biji)"],
     options: [
       { name: "Pangsit", price: 2000 },
       { name: "Ceker", price: 2000 },
