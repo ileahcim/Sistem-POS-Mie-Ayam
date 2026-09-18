@@ -24,17 +24,17 @@ export const NAMED_COMBOS: NamedCombo[] = [
   {
     displayName: "Mie Ayam Komplit",
     productName: "Mie Ayam",
-    addonKeys: ["Topping Mie::Bakso", "Topping Mie::Pangsit", "Topping Mie::Ceker"],
+    addonKeys: ["Tambah Bakso::Bakso", "Topping Mie::Pangsit", "Topping Mie::Ceker"],
   },
   {
     displayName: "Mie Ayam Bakso Urat",
     productName: "Mie Ayam",
-    addonKeys: ["Topping Mie::Bakso Urat"],
+    addonKeys: ["Tambah Bakso::Bakso Urat"],
   },
   {
     displayName: "Mie Ayam Bakso Telur",
     productName: "Mie Ayam",
-    addonKeys: ["Topping Mie::Bakso Telur"],
+    addonKeys: ["Tambah Bakso::Bakso Telur"],
   },
   {
     displayName: "Bakso Telur Komplit",
@@ -49,7 +49,7 @@ export const NAMED_COMBOS: NamedCombo[] = [
   {
     displayName: "Pangsit Rebus Komplit",
     productName: "Pangsit Rebus",
-    addonKeys: ["Topping Mie::Ceker", "Topping Mie::Bakso"],
+    addonKeys: ["Topping Mie::Ceker", "Tambah Bakso::Bakso"],
   },
 ];
 

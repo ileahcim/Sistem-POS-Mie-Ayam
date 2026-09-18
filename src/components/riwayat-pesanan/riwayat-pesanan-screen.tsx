@@ -14,6 +14,8 @@ import { NoHistoryIcon } from "@/components/ui/empty-state-icons";
 import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
+import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
+import { DateRangePresets } from "@/components/ui/date-range-presets";
 
 const CHANNEL_LABEL: Record<OrderHistoryRow["channel"], string> = {
   DINE_IN: "Dine In",
@@ -39,19 +41,26 @@ function formatDateTime(iso: string): string {
   return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
 }
 
-// CASHIER's date inputs never render at all (not just disabled) — the
-// server (get-order-history.ts's clampHistoryFilterForRole) already forces
-// the query to today regardless of URL params, so this is purely "don't
-// show controls that couldn't do anything" UX, not the actual boundary.
+// CASHIER's date inputs and quick-range chips never render at all (not just
+// disabled) — the server (get-order-history.ts's clampHistoryFilterForRole)
+// already forces the query to today regardless of URL params, so this is
+// purely "don't show controls that couldn't do anything" UX, not the actual
+// boundary. A cashier session that hand-edits ?from=/&to= still gets today.
+//
+// `today` comes from the server as a Jakarta calendar date (page.tsx's
+// localDateStr), never from the browser clock — the presets are built from
+// it, so a tablet with a wrong timezone can't shift what "Hari ini" means.
 export function RiwayatPesananScreen({
   orders,
   filter,
   isOwner,
+  today,
   nav,
 }: {
   orders: OrderHistoryRow[];
   filter: OrderHistoryFilter;
   isOwner: boolean;
+  today: string;
   nav: HeaderNav;
 }) {
   const router = useRouter();
@@ -59,21 +68,35 @@ export function RiwayatPesananScreen({
   const [dateTo, setDateTo] = useState(filter.dateTo);
   const [search, setSearch] = useState(filter.search);
 
-  function applyFilter() {
+  function pushFilter(range: DateRange, searchText: string) {
     const params = new URLSearchParams();
     if (isOwner) {
-      params.set("from", dateFrom);
-      params.set("to", dateTo);
+      params.set("from", range.from);
+      params.set("to", range.to);
     }
-    if (search.trim()) params.set("q", search.trim());
+    if (searchText.trim()) params.set("q", searchText.trim());
     router.push(`/riwayat-pesanan?${params.toString()}`);
+  }
+
+  function applyFilter() {
+    pushFilter(normalizeRange({ from: dateFrom, to: dateTo }), search);
+  }
+
+  // A preset is a complete answer on its own, so it applies straight away
+  // instead of making the owner tap "Cari" afterwards.
+  function applyPreset(range: DateRange) {
+    setDateFrom(range.from);
+    setDateTo(range.to);
+    pushFilter(range, search);
   }
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
       <AppHeader nav={nav} title="Riwayat Pesanan" />
 
-      <div className="border-border bg-surface flex flex-wrap items-end gap-2 border-b px-4 py-3">
+      <div className="border-border bg-surface flex flex-col gap-2 border-b px-4 py-3">
+        {isOwner && <DateRangePresets today={today} value={{ from: dateFrom, to: dateTo }} onPick={applyPreset} />}
+        <div className="flex flex-wrap items-end gap-2">
         {isOwner && (
           <>
             <label className="flex flex-col gap-1 text-sm">
@@ -108,6 +131,7 @@ export function RiwayatPesananScreen({
           />
         </label>
         <Button variant="primary" onClick={applyFilter}>Cari</Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

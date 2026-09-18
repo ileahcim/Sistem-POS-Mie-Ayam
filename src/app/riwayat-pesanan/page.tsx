@@ -24,6 +24,6 @@ export default async function RiwayatPesananPage({
   const [orders, nav] = await Promise.all([getOrderHistory(filter), getHeaderNav()]);
 
   return (
-    <RiwayatPesananScreen orders={orders} filter={filter} isOwner={isOwner} nav={nav} />
+    <RiwayatPesananScreen orders={orders} filter={filter} isOwner={isOwner} today={today} nav={nav} />
   );
 }

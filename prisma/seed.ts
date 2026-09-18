@@ -7,7 +7,12 @@ import { NAMED_COMBOS } from "../src/lib/combo/named-combos";
 const adapter = new PrismaPg({ connectionString: process.env.DIRECT_URL });
 const prisma = new PrismaClient({ adapter });
 
-type ProductSeed = { name: string; price: number };
+// costPrice/costPriceEstimated are only ever written when the row is first
+// created — the owner edits them from /admin/hpp afterwards and a re-seed
+// must never overwrite that. Most products leave them out entirely (the
+// owner fills every HPP number in by hand); the two half-portion bowls
+// carry the estimate the owner stated when they were added.
+type ProductSeed = { name: string; price: number; costPrice?: number; costPriceEstimated?: boolean };
 type CategorySeed = {
   name: string;
   sortOrder: number;
@@ -34,6 +39,13 @@ const categories: CategorySeed[] = [
       // confused with ordering a full Bakso bowl.
       { name: "Bakso Urat (bijian)", price: 10000 },
       { name: "Bakso Telur (bijian)", price: 10000 },
+      // Loose balls only: 3 x Rp1.100 modal, matching the Rp5.000-per-3
+      // raw price. No bowl, so no noodles/broth in the cost.
+      { name: "Bakso Kecil (3 biji)", price: 5000, costPrice: 3300, costPriceEstimated: true },
+      // A whole bowl (noodles, greens, broth) at half size — so half of a
+      // full Bakso's Rp10.000 cost, not just the balls. Rp3.000 profit,
+      // same shape as the rest of the menu.
+      { name: "Bakso Setengah (4 biji)", price: 8000, costPrice: 5000, costPriceEstimated: true },
     ],
   },
   {
@@ -92,16 +104,32 @@ type AddonGroupSeed = {
 
 const addonGroups: AddonGroupSeed[] = [
   {
+    // The one bakso that goes in the bowl — an upgrade, not a topping, so
+    // at most one and the options replace each other (pick-one renders as
+    // radio buttons). Same rule for all three products, not just Mie Ayam.
+    // Split out of "Topping Mie" by migration
+    // 20260918100000_bakso_upgrade_group_and_half_portions, which MOVES the
+    // option rows so their ids (and every order snapshot / comboKey
+    // referencing them) survive.
+    name: "Tambah Bakso",
+    minSelect: 0,
+    maxSelect: 1,
+    appliesTo: ["Mie Ayam", "Pangsit Rebus", "Ceker"],
+    options: [
+      { name: "Bakso", price: 5000 },
+      { name: "Bakso Urat", price: 8000 },
+      { name: "Bakso Telur", price: 10000 },
+    ],
+  },
+  {
+    // Real toppings: several of the same are fine, so these stay steppers.
     name: "Topping Mie",
     minSelect: 0,
     maxSelect: null,
     appliesTo: ["Mie Ayam", "Pangsit Rebus", "Ceker"],
     options: [
-      { name: "Bakso", price: 5000 },
-      { name: "Bakso Urat", price: 8000 },
       { name: "Pangsit", price: 2000 },
       { name: "Ceker", price: 2000 },
-      { name: "Bakso Telur", price: 10000 },
     ],
   },
   {
@@ -172,6 +200,11 @@ async function main() {
               price: p.price,
               categoryId: category.id,
               sortOrder: index,
+              // Create-only, never in the update branch above — see ProductSeed.
+              ...(p.costPrice !== undefined && {
+                costPrice: p.costPrice,
+                costPriceEstimated: p.costPriceEstimated ?? false,
+              }),
             },
           });
       productByName.set(p.name, { id: product.id, price: product.price });
@@ -180,7 +213,7 @@ async function main() {
 
   const optionByGroupAndName = new Map<string, { id: string; price: number }>();
 
-  for (const group of addonGroups) {
+  for (const [groupIndex, group] of addonGroups.entries()) {
     const addonGroup = await prisma.addonGroup.upsert({
       where: { name: group.name },
       update: { minSelect: group.minSelect, maxSelect: group.maxSelect },
@@ -219,10 +252,13 @@ async function main() {
     for (const productName of group.appliesTo) {
       const product = productByName.get(productName);
       if (!product) throw new Error(`Seed error: product "${productName}" not found for addon group "${group.name}"`);
+      // sortOrder = position in `addonGroups` above, so the sheet always
+      // shows the groups in the order written there (pick-one bakso first,
+      // then the toppings).
       await prisma.productAddonGroup.upsert({
         where: { productId_addonGroupId: { productId: product.id, addonGroupId: addonGroup.id } },
-        update: {},
-        create: { productId: product.id, addonGroupId: addonGroup.id },
+        update: { sortOrder: groupIndex },
+        create: { productId: product.id, addonGroupId: addonGroup.id, sortOrder: groupIndex },
       });
     }
   }
@@ -313,7 +349,7 @@ function verifySeedPrices(
     {
       label: "Mie Ayam Komplit (Bakso, Pangsit, Ceker)",
       actual: priceOf("Mie Ayam", [
-        "Topping Mie::Bakso",
+        "Tambah Bakso::Bakso",
         "Topping Mie::Pangsit",
         "Topping Mie::Ceker",
       ]),
@@ -340,17 +376,17 @@ function verifySeedPrices(
     },
     {
       label: "Mie Ayam Bakso Urat",
-      actual: priceOf("Mie Ayam", ["Topping Mie::Bakso Urat"]),
+      actual: priceOf("Mie Ayam", ["Tambah Bakso::Bakso Urat"]),
       expected: 21000,
     },
     {
       label: "Mie Ayam Bakso Telur (topping)",
-      actual: priceOf("Mie Ayam", ["Topping Mie::Bakso Telur"]),
+      actual: priceOf("Mie Ayam", ["Tambah Bakso::Bakso Telur"]),
       expected: 23000,
     },
     {
       label: "Pangsit Rebus Ceker Bakso",
-      actual: priceOf("Pangsit Rebus", ["Topping Mie::Ceker", "Topping Mie::Bakso"]),
+      actual: priceOf("Pangsit Rebus", ["Topping Mie::Ceker", "Tambah Bakso::Bakso"]),
       expected: 20000,
     },
   ];

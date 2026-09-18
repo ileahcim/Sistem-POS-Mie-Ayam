@@ -1,4 +1,5 @@
 import { formatId } from "@/lib/timezone";
+import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import type { MieReportPoint } from "./get-mie-report";
 import type { MieProductType } from "./types";
 
@@ -16,9 +17,17 @@ export type MieBucket = {
   byType: Record<MieProductType, MieTypeTotals>;
 };
 
-// Most-recent N periods shown, including empty ones (a day with no sales
-// is a real zero, not a missing bar).
-const BUCKET_COUNT: Record<MieGranularity, number> = { harian: 14, mingguan: 8, bulanan: 6 };
+// Default window per granularity — what the screen opens on, and what the
+// Harian/Mingguan/Bulanan buttons snap back to. From there the owner can set
+// any dari–sampai range they like (see defaultRangeFor / bucketMie below).
+// Empty periods inside the range are always drawn (a day with no sales is a
+// real zero, not a missing bar).
+const DEFAULT_BUCKET_COUNT: Record<MieGranularity, number> = { harian: 14, mingguan: 8, bulanan: 6 };
+
+// A safety rail, not a feature: a mistyped year ("2015" in the Dari field)
+// would otherwise try to draw a few thousand daily bars. Past this the oldest
+// periods are dropped, keeping the most recent ones.
+const MAX_BUCKETS = 400;
 
 // Pure calendar-day math on "YYYY-MM-DD" strings that are already Jakarta
 // dates (get-mie-report.ts converts via timezone.ts) — Date.UTC is only a
@@ -86,20 +95,42 @@ function emptyByType(): Record<MieProductType, MieTypeTotals> {
   };
 }
 
-export function bucketMie(points: MieReportPoint[], g: MieGranularity, today: string): MieBucket[] {
-  const count = BUCKET_COUNT[g];
-  const last = bucketStart(today, g);
+// The window each granularity button opens on, ending today.
+export function defaultRangeFor(g: MieGranularity, today: string): DateRange {
+  const start = step(bucketStart(today, g), g, -(DEFAULT_BUCKET_COUNT[g] - 1));
+  return { from: fmt(start), to: today };
+}
+
+// True while the owner hasn't picked a range of their own — used to decide
+// whether switching Harian/Mingguan/Bulanan may move the range.
+export function isDefaultRange(range: DateRange, g: MieGranularity, today: string): boolean {
+  const d = defaultRangeFor(g, today);
+  return range.from === d.from && range.to === d.to;
+}
+
+// Every number on the Ringkasan page comes out of this: points outside the
+// range simply never land in a bucket, so omzet, pembayaran, kg, the per-type
+// breakdown and the chart all follow the selected range together.
+export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: DateRange): MieBucket[] {
+  const { from, to } = normalizeRange(range);
+  const first = bucketStart(from, g);
+  const last = bucketStart(to, g);
+
   const buckets: MieBucket[] = [];
   const byKey = new Map<string, MieBucket>();
-  for (let i = count - 1; i >= 0; i--) {
-    const start = step(last, g, -i);
+  for (let start = first; fmt(start) <= fmt(last); start = step(start, g, 1)) {
     const key = fmt(start);
     const bucket: MieBucket = { key, ...labels(start, g), omzet: 0, payments: 0, kg: 0, byType: emptyByType() };
     buckets.push(bucket);
     byKey.set(key, bucket);
+    if (buckets.length > MAX_BUCKETS + 1) break;
   }
+  while (buckets.length > MAX_BUCKETS) byKey.delete(buckets.shift()!.key);
 
   for (const p of points) {
+    // A partial first/last period (range starting mid-week/mid-month) must
+    // not pull in the days of that period that fall outside the range.
+    if (p.day < from || p.day > to) continue;
     const bucket = byKey.get(fmt(bucketStart(p.day, g)));
     if (!bucket) continue; // outside the visible window
     if (p.kind === "PAYMENT") {
