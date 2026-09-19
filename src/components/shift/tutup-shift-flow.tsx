@@ -268,6 +268,10 @@ export function TutupShiftFlow({
         <div className="flex flex-col gap-3">
           <Card padded className="flex flex-col gap-1">
             <div className="flex justify-between py-1 text-sm text-ink-muted">
+              <span>Modal Awal Laci</span>
+              <PriceText amount={result.openingCash} weight="secondary" />
+            </div>
+            <div className="flex justify-between py-1 text-sm text-ink-muted">
               <span>Penjualan Cash</span>
               <PriceText amount={result.cashSales} weight="secondary" />
             </div>
@@ -279,7 +283,7 @@ export function TutupShiftFlow({
               <span>Total Pengeluaran</span>
               <PriceText amount={result.expenseTotal} weight="secondary" />
             </div>
-            <div className="flex justify-between py-1 text-sm font-semibold text-ink">
+            <div className="border-border mt-2 flex justify-between border-t pt-2 text-sm font-semibold text-ink">
               <span>Uang Seharusnya</span>
               <PriceText amount={result.expectedCash} weight="primary" />
             </div>

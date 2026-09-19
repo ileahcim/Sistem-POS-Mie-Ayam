@@ -89,12 +89,13 @@ export async function buildReportWorkbook(): Promise<ExcelJS.Workbook> {
     { header: "Jam Buka", key: "jamBuka", width: 10 },
     { header: "Jam Tutup", key: "jamTutup", width: 10 },
     { header: "Kasir", key: "kasir", width: 16 },
-    { header: "Modal Awal", key: "openingCash", width: 12, style: { numFmt: MONEY_FORMAT } },
-    { header: "Penjualan Cash", key: "cashSales", width: 14, style: { numFmt: MONEY_FORMAT } },
-    { header: "Penjualan Non-Cash", key: "nonCashSales", width: 16, style: { numFmt: MONEY_FORMAT } },
-    { header: "Pengeluaran", key: "expenseTotal", width: 14, style: { numFmt: MONEY_FORMAT } },
-    { header: "Expected Cash", key: "expectedCash", width: 14, style: { numFmt: MONEY_FORMAT } },
-    { header: "Uang Fisik", key: "countedCash", width: 12, style: { numFmt: MONEY_FORMAT } },
+    // Same order and wording as the Tutup Shift result screen.
+    { header: "Modal Awal Laci", key: "openingCash", width: 16, style: { numFmt: MONEY_FORMAT } },
+    { header: "Penjualan Cash", key: "cashSales", width: 16, style: { numFmt: MONEY_FORMAT } },
+    { header: "Penjualan Non-Cash", key: "nonCashSales", width: 19, style: { numFmt: MONEY_FORMAT } },
+    { header: "Total Pengeluaran", key: "expenseTotal", width: 18, style: { numFmt: MONEY_FORMAT } },
+    { header: "Uang Seharusnya", key: "expectedCash", width: 17, style: { numFmt: MONEY_FORMAT } },
+    { header: "Uang Fisik Dihitung", key: "countedCash", width: 20, style: { numFmt: MONEY_FORMAT } },
     { header: "Selisih", key: "difference", width: 12, style: { numFmt: MONEY_FORMAT } },
   ];
   shiftSheet.addRows(shifts);

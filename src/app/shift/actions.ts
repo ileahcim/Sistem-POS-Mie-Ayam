@@ -54,6 +54,7 @@ export async function markOrderReceivable(orderId: string, customerName: string)
 export type CloseShiftResult =
   | {
       ok: true;
+      openingCash: number;
       cashSales: number;
       nonCashSales: number;
       expenseTotal: number;
@@ -131,5 +132,5 @@ export async function closeShift(countedCash: number): Promise<CloseShiftResult>
     console.error("refreshComboCache failed after shift close:", e);
   }
 
-  return { ok: true, cashSales, nonCashSales, expenseTotal, expectedCash, countedCash, difference };
+  return { ok: true, openingCash: shift.openingCash, cashSales, nonCashSales, expenseTotal, expectedCash, countedCash, difference };
 }

@@ -38,16 +38,19 @@ export function ShiftHistorySection({ shifts }: { shifts: ShiftHistoryRow[] }) {
         {shifts.length === 0 ? (
           <p className="text-ink-faint py-12 text-center">Belum ada shift yang ditutup.</p>
         ) : (
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[880px] text-sm">
             <thead>
+              {/* Same order and wording as the Tutup Shift result screen
+                  (tutup-shift-flow.tsx), so the owner reads one story in both. */}
               <tr className="border-border text-ink-muted border-b text-left">
                 <th className="px-3 py-2 font-medium">Tanggal</th>
                 <th className="px-3 py-2 font-medium">Kasir</th>
-                <th className="px-3 py-2 text-right font-medium">Modal Awal</th>
-                <th className="px-3 py-2 text-right font-medium">Cash</th>
-                <th className="px-3 py-2 text-right font-medium">Pengeluaran</th>
-                <th className="px-3 py-2 text-right font-medium">Expected</th>
-                <th className="px-3 py-2 text-right font-medium">Fisik</th>
+                <th className="px-3 py-2 text-right font-medium">Modal Awal Laci</th>
+                <th className="px-3 py-2 text-right font-medium">Penjualan Cash</th>
+                <th className="px-3 py-2 text-right font-medium">Penjualan Non-Cash</th>
+                <th className="px-3 py-2 text-right font-medium">Total Pengeluaran</th>
+                <th className="px-3 py-2 text-right font-medium">Uang Seharusnya</th>
+                <th className="px-3 py-2 text-right font-medium">Uang Fisik Dihitung</th>
                 <th className="px-3 py-2 text-right font-medium">Selisih</th>
               </tr>
             </thead>
@@ -58,6 +61,7 @@ export function ShiftHistorySection({ shifts }: { shifts: ShiftHistoryRow[] }) {
                   <td className="px-3 py-2 text-ink whitespace-nowrap">{s.openedByName}</td>
                   <td className="px-3 py-2 text-ink-muted text-right tabular-nums">{formatRupiah(s.openingCash)}</td>
                   <td className="px-3 py-2 text-ink-muted text-right tabular-nums">{formatRupiah(s.cashSales)}</td>
+                  <td className="px-3 py-2 text-ink-muted text-right tabular-nums">{formatRupiah(s.nonCashSales)}</td>
                   <td className="px-3 py-2 text-ink-muted text-right tabular-nums">{formatRupiah(s.expenseTotal)}</td>
                   <td className="px-3 py-2 text-ink-muted text-right tabular-nums">{formatRupiah(s.expectedCash)}</td>
                   <td className="px-3 py-2 text-ink-muted text-right tabular-nums">{formatRupiah(s.countedCash)}</td>
