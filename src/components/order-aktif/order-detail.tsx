@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
-import type { PackingListData } from "@/lib/printing/types";
+import type { PackingListData, PrinterDriver } from "@/lib/printing/types";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { Card } from "@/components/ui/card";
@@ -121,17 +121,21 @@ export function OrderDetail({
   order,
   menu,
   packingList,
+  printerDriver,
   nav,
   isOwner,
 }: {
   order: OrderDetailData;
   menu: MenuCategory[];
   packingList: PackingListData | null;
+  printerDriver: PrinterDriver;
   nav: HeaderNav;
   isOwner: boolean;
 }) {
   const router = useRouter();
   const [markingServed, setMarkingServed] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   const canAddItems = order.status === "OPEN";
   const canEditItems = order.status === "OPEN";
@@ -158,7 +162,16 @@ export function OrderDetail({
 
   async function handlePrintDaftar() {
     if (!packingList) return;
-    await getPrinter("mock").printPackingList(packingList);
+    setPrinting(true);
+    setPrintError(null);
+    try {
+      const printResult = await getPrinter(printerDriver).printPackingList(packingList);
+      if (!printResult.ok) setPrintError(printResult.error);
+    } catch (printError) {
+      setPrintError(printError instanceof Error ? printError.message : String(printError));
+    } finally {
+      setPrinting(false);
+    }
   }
 
   return (
@@ -210,9 +223,10 @@ export function OrderDetail({
 
         {canPrintPackingList && (
           <div className="mt-3">
-            <Button variant="secondary" size="large" fullWidth onClick={handlePrintDaftar}>
-              Print Daftar
+            <Button variant="secondary" size="large" fullWidth onClick={handlePrintDaftar} disabled={printing}>
+              {printing ? "Mencetak..." : "Print Daftar"}
             </Button>
+            {printError && <p className="text-danger mt-1 text-sm">Print gagal: {printError}</p>}
           </div>
         )}
 

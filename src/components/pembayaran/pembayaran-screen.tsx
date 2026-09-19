@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { OrderDetail } from "@/lib/orders/get-order-detail";
 import type { MenuCategory } from "@/lib/menu/get-active-menu";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import type { ReceiptData } from "@/lib/printing/types";
+import type { PrinterDriver, ReceiptData } from "@/lib/printing/types";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { formatRupiah, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
@@ -32,17 +32,20 @@ export function PembayaranScreen({
   order,
   menu,
   autoPrintReceipt,
+  printerDriver,
   nav,
 }: {
   order: OrderDetail;
   menu: MenuCategory[];
   autoPrintReceipt: boolean;
+  printerDriver: PrinterDriver;
   nav: HeaderNav;
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
   // Set only when autoPrintReceipt is off and payment just succeeded — the
   // transaction is already fully saved at this point either way (CLAUDE.md
   // "Opsi Print"), this state purely gates whether the PRINT action itself
@@ -65,7 +68,16 @@ export function PembayaranScreen({
         return;
       }
       if (autoPrintReceipt) {
-        await getPrinter("mock").printReceipt(result.receipt);
+        // Print is a best-effort flourish on a concluded payment — a failed
+        // printer must never hold up the already-saved transaction. Honest
+        // PrintResult tells us what happened; we log and move on. An order
+        // without a paper receipt stays re-printable from Riwayat.
+        try {
+          const printResult = await getPrinter(printerDriver).printReceipt(result.receipt);
+          if (!printResult.ok) console.error("Cetak struk gagal:", printResult.error);
+        } catch (printError) {
+          console.error("Cetak struk gagal:", printError);
+        }
         router.push("/order-aktif");
       } else {
         setPendingReceipt(result.receipt);
@@ -79,7 +91,10 @@ export function PembayaranScreen({
     if (shouldPrint && pendingReceipt) {
       setPrinting(true);
       try {
-        await getPrinter("mock").printReceipt(pendingReceipt);
+        const printResult = await getPrinter(printerDriver).printReceipt(pendingReceipt);
+        if (!printResult.ok) setPrintError(printResult.error);
+      } catch (printError) {
+        setPrintError(printError instanceof Error ? printError.message : String(printError));
       } finally {
         setPrinting(false);
       }
@@ -128,6 +143,7 @@ export function PembayaranScreen({
                 {printing ? "Mencetak..." : "Ya, Cetak"}
               </Button>
             </div>
+            {printError && <p className="text-danger text-sm">Cetak gagal: {printError}</p>}
           </div>
         ) : alreadyPaid ? (
           <div className="flex justify-center py-8">

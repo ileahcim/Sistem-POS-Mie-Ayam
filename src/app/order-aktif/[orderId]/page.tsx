@@ -31,6 +31,7 @@ export default async function OrderDetailPage({
       order={order}
       menu={menu}
       packingList={packingList}
+      printerDriver={settings.printerDriver}
       nav={nav}
       isOwner={user?.role === "OWNER"}
     />

@@ -79,6 +79,15 @@ model Setting {
   // Devices with prefers-reduced-motion never get blur or movement at all.
   sheetBlurEnabled Boolean @default(true)
 
+  // Active print driver. "webbluetooth" (Chrome on the POS tablet, no helper
+  // app, no watermark — preferred for the Blueprint ECO80D) is the default;
+  // switch to "rawbt" (Android RawBT app over Classic SPP) if Web Bluetooth
+  // can't pair, or "mock" to preview the receipt on-screen instead of paper.
+  // Owner-tunable from /admin/settings; lives on the singleton so the
+  // server pages can hand the effective driver straight to the client
+  // printer factory instead of the client guessing.
+  printerDriver String @default("webbluetooth")
+
   updatedAt DateTime @updatedAt
 }
 

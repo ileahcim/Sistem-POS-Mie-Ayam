@@ -26,6 +26,7 @@ export default async function PembayaranPage({
       order={order}
       menu={menu}
       autoPrintReceipt={settings.autoPrintReceipt}
+      printerDriver={settings.printerDriver}
       nav={nav}
     />
   );

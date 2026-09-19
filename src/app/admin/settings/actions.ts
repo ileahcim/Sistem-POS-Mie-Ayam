@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
+import type { PrinterDriver } from "@/lib/printing/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -14,6 +15,20 @@ export async function updateAutoPrintReceipt(autoPrintReceipt: boolean): Promise
 export async function updateSheetBlurEnabled(sheetBlurEnabled: boolean): Promise<ActionResult> {
   await requireRole("OWNER");
   await prisma.setting.update({ where: { id: "singleton" }, data: { sheetBlurEnabled } });
+  return { ok: true };
+}
+
+const PRINTER_DRIVERS: PrinterDriver[] = ["mock", "webbluetooth", "rawbt"];
+
+// Which driver the client printer factory will use from now on (see
+// src/lib/printing/get-printer.ts). Whitelist from a single source of truth
+// instead of trusting the client string.
+export async function updatePrinterDriver(driver: PrinterDriver): Promise<ActionResult> {
+  await requireRole("OWNER");
+  if (!PRINTER_DRIVERS.includes(driver)) {
+    return { ok: false, error: "Mode cetak tidak dikenal." };
+  }
+  await prisma.setting.update({ where: { id: "singleton" }, data: { printerDriver: driver } });
   return { ok: true };
 }
 

@@ -33,6 +33,6 @@ export default async function RiwayatDetailPage({ params }: { params: Promise<{ 
   const receipt = order.status === "PAID" ? buildReceiptData(order, settings) : null;
 
   return (
-    <RiwayatDetail order={order} receipt={receipt} nav={nav} isOwner={isOwner} />
+    <RiwayatDetail order={order} receipt={receipt} printerDriver={settings.printerDriver} nav={nav} isOwner={isOwner} />
   );
 }

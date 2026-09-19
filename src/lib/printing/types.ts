@@ -64,6 +64,11 @@ export type PackingListData = {
 
 export type PrintResult = { ok: true } | { ok: false; error: string };
 
+// Which print driver is active. Declared here (not in get-printer.ts) so the
+// server-side StoreSettings type can reference it too — get-printer.ts is a
+// client module and must not leak into server code.
+export type PrinterDriver = "mock" | "webbluetooth" | "rawbt";
+
 export interface Printer {
   printReceipt(data: ReceiptData): Promise<PrintResult>;
   printPackingList(data: PackingListData): Promise<PrintResult>;

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
-import type { ReceiptData } from "@/lib/printing/types";
+import type { PrinterDriver, ReceiptData } from "@/lib/printing/types";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { Card } from "@/components/ui/card";
@@ -43,22 +43,29 @@ function formatDateTime(iso: string): string {
 export function RiwayatDetail({
   order,
   receipt,
+  printerDriver,
   nav,
   isOwner,
 }: {
   order: OrderDetailData;
   receipt: ReceiptData | null;
+  printerDriver: PrinterDriver;
   nav: HeaderNav;
   isOwner: boolean;
 }) {
   const router = useRouter();
   const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   async function handleReprint() {
     if (!receipt) return;
     setPrinting(true);
+    setPrintError(null);
     try {
-      await getPrinter("mock").printReceipt(receipt);
+      const printResult = await getPrinter(printerDriver).printReceipt(receipt);
+      if (!printResult.ok) setPrintError(printResult.error);
+    } catch (printError) {
+      setPrintError(printError instanceof Error ? printError.message : String(printError));
     } finally {
       setPrinting(false);
     }
@@ -174,6 +181,7 @@ export function RiwayatDetail({
               <Button variant="primary" size="large" fullWidth disabled={printing} onClick={handleReprint}>
                 {printing ? "Mencetak..." : "Cetak Ulang Struk"}
               </Button>
+              {printError && <p className="text-danger mt-1 text-sm">Cetak gagal: {printError}</p>}
             </div>
           )}
         </div>

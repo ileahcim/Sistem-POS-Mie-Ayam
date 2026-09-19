@@ -164,6 +164,10 @@ const addonGroups: AddonGroupSeed[] = [
 async function main() {
   // Singleton row — never created twice, never deleted. Placeholder values
   // are meant to be edited from the admin settings page (stage 5), not here.
+  // update:{} (not update:{...}) — a re-seed must never overwrite values the
+  // owner changed in the admin UI, so print settings like printerDriver are
+  // only set in create (fresh installs; `update` is "hands off, happy with
+  // whatever's in the DB").
   await prisma.setting.upsert({
     where: { id: "singleton" },
     update: {},
@@ -171,6 +175,7 @@ async function main() {
       id: "singleton",
       storeName: "Mie Ayam Pangsit dan Bakso Ciptarasa 4 Wonogiri",
       receiptFooter: "Terima kasih!",
+      printerDriver: "webbluetooth",
     },
   });
 
