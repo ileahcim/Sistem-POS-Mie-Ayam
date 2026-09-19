@@ -2,7 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
-import type { PrinterDriver } from "@/lib/printing/types";
+import type { PrinterDriver, PrintTuning } from "@/lib/printing/types";
+import { validatePrintTuning } from "@/lib/printing/tuning";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -37,6 +38,25 @@ export async function updatePrinterDriver(driver: PrinterDriver): Promise<Action
 export async function updatePrintLogo(printLogo: boolean): Promise<ActionResult> {
   await requireRole("OWNER");
   await prisma.setting.update({ where: { id: "singleton" }, data: { printLogo } });
+  return { ok: true };
+}
+
+// Thermal head tuning sent at the start of every print job (see
+// src/lib/printing/tuning.ts). A null field means "send nothing, keep the
+// printer's own value". Ranges are validated here, never trusted from the form.
+export async function updatePrintTuning(tuning: PrintTuning): Promise<ActionResult> {
+  await requireRole("OWNER");
+  const error = validatePrintTuning(tuning);
+  if (error) return { ok: false, error };
+  await prisma.setting.update({
+    where: { id: "singleton" },
+    data: {
+      printDensity: tuning.density ?? null,
+      printHeatDots: tuning.heatDots ?? null,
+      printHeatTime: tuning.heatTime ?? null,
+      printHeatInterval: tuning.heatInterval ?? null,
+    },
+  });
   return { ok: true };
 }
 

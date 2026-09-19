@@ -4,11 +4,12 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { StoreSettings } from "@/lib/settings/get-settings";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import type { PrinterDriver, PrintResult } from "@/lib/printing/types";
+import type { PrinterDriver, PrintResult, PrintTuning } from "@/lib/printing/types";
 import {
   updateAutoPrintReceipt,
   updatePrinterDriver,
   updatePrintLogo,
+  updatePrintTuning,
   updateSheetBlurEnabled,
   updateStoreInfo,
 } from "@/app/admin/settings/actions";
@@ -18,7 +19,8 @@ import {
   isWebBluetoothSupported,
   PRINTER_CHANGED_EVENT,
 } from "@/lib/printing/printers/web-bluetooth-printer";
-import { printColumnTest, printTest } from "@/lib/printing/test-print";
+import { printColumnTest, printSharpnessTest, printTest } from "@/lib/printing/test-print";
+import { PRINT_TUNING_FIELDS, PRINT_TUNING_LIMITS, validatePrintTuning } from "@/lib/printing/tuning";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ListRow } from "@/components/ui/list-row";
@@ -34,6 +36,19 @@ const PRINTER_MODE_LABELS: Record<PrinterDriver, { label: string; helper: string
 function subscribePrinterChanged(onChange: () => void): () => void {
   window.addEventListener(PRINTER_CHANGED_EVENT, onChange);
   return () => window.removeEventListener(PRINTER_CHANGED_EVENT, onChange);
+}
+
+// Pairing state lives in this tablet's localStorage (per-browser), so the
+// label subscribes to it instead of re-rendering from a copied-in value.
+function useConnectedPrinterName(): string | null {
+  return useSyncExternalStore(subscribePrinterChanged, getConnectedPrinterName, () => null);
+}
+
+// What a successful test print honestly proves: the command left this browser.
+function sentMessage(driver: PrinterDriver): string {
+  if (driver === "mock") return "Preview mock muncul di bagian bawah layar.";
+  if (driver === "rawbt") return "Perintah cetak dikirim ke RawBT.";
+  return "Perintah cetak dikirim ke printer Bluetooth.";
 }
 
 // "Data Warung" card — name/address/phone printed on every receipt header
@@ -202,13 +217,7 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
   const [testing, setTesting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  // Pairing state lives in this tablet's localStorage (per-browser), so the
-  // label subscribes to it instead of re-rendering from a copied-in value.
-  const connectedName = useSyncExternalStore(
-    subscribePrinterChanged,
-    getConnectedPrinterName,
-    () => null,
-  );
+  const connectedName = useConnectedPrinterName();
 
   async function handleDriverChange(next: PrinterDriver) {
     if (next === driver) return;
@@ -256,9 +265,7 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
         setStatus(result.error);
         return;
       }
-      if (driver === "mock") setStatus("Preview mock muncul di bagian bawah layar.");
-      else if (driver === "rawbt") setStatus("Perintah cetak dikirim ke RawBT.");
-      else setStatus("Perintah cetak dikirim ke printer Bluetooth.");
+      setStatus(sentMessage(driver));
     } finally {
       setTesting(false);
     }
@@ -313,7 +320,7 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
         </Button>
         <Button
           variant="secondary"
-          onClick={() => handleTest(() => printColumnTest(driver))}
+          onClick={() => handleTest(() => printColumnTest(driver, settings.printTuning))}
           disabled={testing || (isWebBt && !connectedName)}
         >
           Tes Lebar Kolom
@@ -329,6 +336,133 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
       )}
     </Card>
   );
+}
+
+// Thermal head tuning (see src/lib/printing/tuning.ts): bold / double-size
+// text that smears is usually a heating problem, so the owner can try values
+// here — with the Tes Ketajaman strip showing many combinations side by side —
+// without asking for a code change each time. An empty field sends nothing.
+function PrintTuningCard({ settings }: { settings: StoreSettings }) {
+  const router = useRouter();
+  const saved = settings.printTuning;
+  const [values, setValues] = useState<Record<keyof PrintTuning, string>>({
+    density: saved.density?.toString() ?? "",
+    heatTime: saved.heatTime?.toString() ?? "",
+    heatDots: saved.heatDots?.toString() ?? "",
+    heatInterval: saved.heatInterval?.toString() ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const connectedName = useConnectedPrinterName();
+
+  const driver = settings.printerDriver;
+  const isWebBt = driver === "webbluetooth";
+  const parsed: PrintTuning = {
+    density: toNumberOrNull(values.density),
+    heatDots: toNumberOrNull(values.heatDots),
+    heatTime: toNumberOrNull(values.heatTime),
+    heatInterval: toNumberOrNull(values.heatInterval),
+  };
+  const dirty = PRINT_TUNING_FIELDS.some((field) => !Object.is(parsed[field.key], saved[field.key]));
+
+  async function handleSave() {
+    setError(null);
+    const problem = validatePrintTuning(parsed);
+    if (problem) return setError(problem);
+    setSaving(true);
+    try {
+      const result = await updatePrintTuning(parsed);
+      if (!result.ok) return setError(result.error);
+      setSavedFlash(true);
+      window.setTimeout(() => setSavedFlash(false), 1500);
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTest() {
+    setTesting(true);
+    setTestStatus(null);
+    try {
+      const result = await printSharpnessTest(driver, saved);
+      setTestStatus(
+        result.ok
+          ? { ok: true, message: `${sentMessage(driver)} Matikan-nyalakan printer setelah tes.` }
+          : { ok: false, message: result.error },
+      );
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  return (
+    <Card padded className="flex flex-col gap-3">
+      <div>
+        <p className="text-ink text-base font-semibold">Ketajaman cetak</p>
+        <p className="text-ink-muted text-sm">
+          Kalau huruf tebal atau besar di struk meleber, atur seberapa panas printer membakar kertas. Kosongkan
+          semua isian = pakai bawaan printer (tidak ada perintah yang dikirim).
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {PRINT_TUNING_FIELDS.map((field) => (
+          <label key={field.key} className="flex flex-col gap-1">
+            <span className="text-ink-muted text-sm font-medium">{field.label}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={PRINT_TUNING_LIMITS[field.key].min}
+              max={PRINT_TUNING_LIMITS[field.key].max}
+              value={values[field.key]}
+              placeholder={field.placeholder}
+              onChange={(e) => setValues((current) => ({ ...current, [field.key]: e.target.value }))}
+              className="rounded-input border-border h-12 border px-3 text-base"
+            />
+            <span className="text-ink-faint text-xs">{field.command}</span>
+          </label>
+        ))}
+      </div>
+
+      {error && <p className="text-danger text-sm">{error}</p>}
+
+      <div className="flex flex-wrap items-center gap-3">
+        {dirty && (
+          <Button variant="primary" onClick={handleSave} disabled={saving}>
+            {saving ? "Menyimpan..." : "Simpan"}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          onClick={handleTest}
+          disabled={testing || dirty || (isWebBt && !connectedName)}
+        >
+          {testing ? "Mencetak..." : "Tes Ketajaman"}
+        </Button>
+        {!dirty && savedFlash && <p className="text-primary-strong text-sm font-medium">Tersimpan ✓</p>}
+      </div>
+      <p className="text-ink-faint text-xs">
+        Tes Ketajaman mencetak satu lembar: gaya huruf, lalu beberapa kombinasi pemanasan yang masing-masing
+        diberi label angkanya. Pilih baris yang paling tajam, isikan angkanya di sini, Simpan. Kalau ada huruf
+        atau tanda aneh tepat di bawah judul sebuah kombinasi, printer tidak mengenali perintahnya — kosongkan
+        isian. {dirty && "Simpan dulu perubahan sebelum tes."}
+      </p>
+
+      {testStatus && (
+        <p className={cn("text-sm", testStatus.ok ? "text-primary-strong" : "text-danger")}>{testStatus.message}</p>
+      )}
+    </Card>
+  );
+}
+
+// "" → null (leave the printer's own value), otherwise the typed number.
+// Garbage like "abc" becomes NaN, which validatePrintTuning rejects.
+function toNumberOrNull(raw: string): number | null {
+  return raw.trim() === "" ? null : Number(raw);
 }
 
 export function SettingsScreen({
@@ -379,6 +513,8 @@ export function SettingsScreen({
           />
 
           <PrinterCard settings={settings} />
+
+          <PrintTuningCard settings={settings} />
 
           <ToggleCard
             title="Cetak logo di struk"
