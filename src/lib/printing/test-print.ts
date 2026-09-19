@@ -69,7 +69,7 @@ export function buildTestPackingList(settings: TestPrintSettings): PackingListDa
     queueNumber: 8,
     queueSuffix: "",
     printedAt: new Date(),
-    tableLabel: "Meja 3",
+    // No tableLabel: the packing list is Antar-only, and Antar has no table.
     printLogo: settings.printLogo,
     items: [
       {
