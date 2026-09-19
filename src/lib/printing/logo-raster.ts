@@ -1,26 +1,22 @@
 "use client";
 
-// Turns the store's monochrome logo (public/assets/logo-ctr-mono.png — a
-// 1-bit PNG generated once from the full-color artwork, see
-// receipt-meta.tsx) into a 1-bit raster that escpos.ts embeds via GS v 0,
-// so the printed receipt carries the same branding the screen preview
-// shows. Rasterizing runs in the browser (canvas) because the printer
-// clients are the only place the bytes are needed — the server never sees
-// binary pixels, and MockPrinter just shows the on-screen <img> anyway.
+// Turns the thermal logo (public/assets/logo-ctr-thermal.png) into a 1-bit
+// raster that escpos.ts embeds via GS v 0, so the printed receipt carries the
+// same branding the screen preview shows. The PNG is already dot-exact: a
+// 1-bit image made by scripts/make-thermal-logo.py (bowl outline + "CTR" only,
+// thick strokes, 416 dots wide) — the hairline lettering of the full artwork
+// is printed as plain text instead (see receipt-layout.ts). Rasterizing runs
+// in the browser (canvas) because the printer clients are the only place the
+// bytes are needed — the server never sees binary pixels, and MockPrinter just
+// shows the on-screen <img> anyway.
 //
 // Threshold rule: a dot prints where the source pixel is both opaque and
-// dark (luminance < 128). That holds for any PNG, but it's exactly right
-// for this file since it was already hue-classified to black-on-transparent
-// for a 1-bit thermal head.
+// dark (luminance < 128). The image is drawn at its NATIVE size, never
+// scaled: resampling a 1-bit image is exactly what turned thin strokes into
+// blotches before.
 
 import type { LogoRaster } from "./types";
-
-const LOGO_SRC = "/assets/logo-ctr-mono.png";
-// Source is a 1-bit 260w PNG — printing it near native size (264 = the
-// nearest multiple of 8) keeps every hairline stroke intact without the
-// up/down-scaling dropouts that made the old 240-dot downscale look
-// "pecah". ~33mm wide on the 576-dot head.
-const TARGET_WIDTH_DOTS = 264;
+import { RECEIPT_LOGO_SRC } from "./receipt-layout";
 
 let cachePromise: Promise<LogoRaster | null> | null = null;
 
@@ -32,24 +28,21 @@ export function getLogoRaster(): Promise<LogoRaster | null> {
 async function buildLogoRaster(): Promise<LogoRaster | null> {
   try {
     const image = new Image();
-    image.src = LOGO_SRC;
+    image.src = RECEIPT_LOGO_SRC;
     await image.decode();
 
-    const sourceWidth = image.naturalWidth;
-    const sourceHeight = image.naturalHeight;
-    if (!sourceWidth || !sourceHeight) return null;
-
-    const widthDots = TARGET_WIDTH_DOTS;
-    const heightDots = Math.max(1, Math.round((sourceHeight / sourceWidth) * widthDots));
+    const widthDots = image.naturalWidth;
+    const heightDots = image.naturalHeight;
+    // GS v 0 packs 8 horizontal dots per byte, so the width must be a
+    // multiple of 8 (the generator script guarantees it).
+    if (!widthDots || !heightDots || widthDots % 8 !== 0) return null;
 
     const canvas = document.createElement("canvas");
     canvas.width = widthDots;
     canvas.height = heightDots;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return null;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(image, 0, 0, widthDots, heightDots);
+    ctx.drawImage(image, 0, 0);
 
     const imageData = ctx.getImageData(0, 0, widthDots, heightDots);
     const bytesPerRow = widthDots / 8;
@@ -69,7 +62,7 @@ async function buildLogoRaster(): Promise<LogoRaster | null> {
 
     return { widthDots, heightDots, bytes };
   } catch {
-    // Logo load/draw failure is never fatal — print the text header alone.
+    // Logo load/draw failure is never fatal — print without the image.
     return null;
   }
 }

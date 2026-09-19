@@ -8,6 +8,11 @@
 // ESC/POS "Font A" (12x24 dot, the default on this class of printer)
 // columns-per-line for each paper width — 80mm prints 48 columns, 58mm
 // prints 32.
+//
+// Measured on the real ECO80D with the Tes Lebar Kolom (2026-09-20): Font A
+// wraps after exactly 48 columns, i.e. 48 uses the FULL paper width — this is
+// the one width constant for every struk/daftar packing rule and price column,
+// and it must not be reduced to leave a margin.
 export const RECEIPT_PAPER_WIDTH_MM = 80;
 export const RECEIPT_CHARS_PER_LINE = RECEIPT_PAPER_WIDTH_MM >= 80 ? 48 : 32;
 

@@ -1,10 +1,11 @@
-// Builds the raw ESC/POS byte payload for the Blueprint ECO80D (80mm paper,
-// 48 columns per line at Font A) from the framework-agnostic ReceiptData /
-// PackingListData shapes. Single source of truth for "what physically hits
-// the paper" — both WebBluetoothPrinter and RawBtPrinter ship exactly these
-// bytes, and the line layout mirrors src/components/printing/receipt-view.tsx
-// / packing-list-view.tsx so the on-screen preview and the printed paper
-// stay the same "brand" of receipt (see CLAUDE.md "Struk & printer").
+// Renders a printout as raw ESC/POS bytes for the Blueprint ECO80D (80mm
+// paper, 48 columns per line at Font A — measured on the real printer with the
+// Tes Lebar Kolom, and it uses the FULL paper width: never reduce it to a
+// margin). WHAT the paper says (line order, labels, date/time format, which
+// name goes with which price) comes from receipt-layout.ts, which the on-screen
+// preview (paper-view.tsx) reads too; this file only decides how each line is
+// drawn with ESC/POS (bold/size commands, right-aligned prices, the raster
+// logo). Both WebBluetoothPrinter and RawBtPrinter ship exactly these bytes.
 //
 // The web Bluetooth and RawBT raw passes are byte streams, not RawBT text
 // mode, so all text is sanitised to single-byte ASCII first: Indonesian text
@@ -14,31 +15,14 @@
 // (emoji, etc.) become "?". This is the safe-enough choice for a thermal
 // receipt; the copy on the database and screen is never touched.
 
-import type { PackingListData, ReceiptData } from "./types";
-import { formatRupiah, mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
-import { paperRule, RECEIPT_CHARS_PER_LINE } from "./paper";
-import { formatId } from "@/lib/timezone";
-import { formatQueueLabel } from "@/lib/orders/queue-label";
-
-const CHANNEL_LABEL: Record<ReceiptData["channel"], string> = {
-  DINE_IN: "Dine In",
-  BUNGKUS: "Bungkus",
-  ANTAR: "Antar",
-};
-
-const PAYMENT_LABEL: Record<ReceiptData["paymentMethod"], string> = {
-  CASH: "Cash",
-  QRIS: "QRIS",
-  TRANSFER: "Transfer",
-};
-
-function formatTanggal(date: Date): string {
-  return formatId(date, { day: "numeric", month: "short", year: "numeric" });
-}
-
-function formatJam(date: Date): string {
-  return formatId(date, { hour: "2-digit", minute: "2-digit", hour12: false });
-}
+import type { LogoRaster, PackingListData, ReceiptData } from "./types";
+import { RECEIPT_CHARS_PER_LINE } from "./paper";
+import {
+  buildPackingListLayout,
+  buildReceiptLayout,
+  type LayoutLine,
+  type TextRole,
+} from "./receipt-layout";
 
 // Latin-1 and common typographic chars Wisconsin-style folded onto ASCII so
 // a 1-bit thermal code page can actually print them. Anything unmapped
@@ -95,22 +79,6 @@ function buildRasterBytes(widthDots: number, heightDots: number, data: Uint8Arra
   return concat(header, data);
 }
 
-const PRINT_HEAD_DOTS = 576; // 80mm head at 8 dots/mm → 72 columns of 8-dot bytes
-
-// A hairline separator (revisi: separator "=" tebal diganti garis raster 1
-// dot) — a full-width GS v 0 image one dot tall, all dots on. Much thinner
-// than a 12-dot-high "=" character row, so the justify blocks no longer
-// look like they're welded together.
-function buildThinRule(): Uint8Array {
-  const bytesPerRow = PRINT_HEAD_DOTS / 8;
-  const header = Uint8Array.from([
-    0x1d, 0x76, 0x30, 0x00,
-    bytesPerRow & 0xff, 0x00,
-    0x01, 0x00,
-  ]);
-  return concat(header, new Uint8Array(bytesPerRow).fill(0xff));
-}
-
 const INIT = Uint8Array.from([ESC, 0x40]); // ESC @ — reset printer
 const JUSTIFY_LEFT = Uint8Array.from([ESC, 0x61, 0]); // ESC a 0
 const JUSTIFY_CENTER = Uint8Array.from([ESC, 0x61, 1]); // ESC a 1
@@ -124,9 +92,6 @@ const BOLD_OFF = Uint8Array.from([ESC, 0x45, 0]); // ESC E 0
 const FONT_NORMAL = Uint8Array.from([ESC, 0x21, 0x00]);
 const FONT_TITLE = Uint8Array.from([ESC, 0x21, 0x10]);
 const FONT_WIDE_BOLD = Uint8Array.from([ESC, 0x21, 0x28]);
-// 0x01 = Font B (9x17, 64 columns). Only the column test uses it, to tell
-// which font the printer actually has active.
-const FONT_B = Uint8Array.from([ESC, 0x21, 0x01]);
 
 // Feed the paper up n blank lines. The ECO80D's cutter is MANUAL
 // ("Potongan kertas: not supported" in RawBT), so we never send a GS V cut
@@ -174,162 +139,87 @@ function rightLine(label: string, value: string): string {
   return `${label}\n${value.padStart(cols, " ")}`;
 }
 
-// "No. Order" : 67 — label column fixed at 10 chars, same as MetaRow's
-// 10ch monospace width, so the colons line up down the block.
+// "No. Order" : 67 — label column fixed at 10 chars, same as the preview's
+// MetaRow (10ch monospace width), so the colons line up down the block.
 function metaLine(label: string, value: string): string {
   return `${label.padEnd(10)}: ${value}`;
 }
 
-export function buildReceiptBytes(data: ReceiptData): Uint8Array {
-  const items = mergeReceiptItems(data.items);
-  const addressLines = (data.address ?? "").split("\n").filter(Boolean);
-  const tipe =
-    data.channel === "DINE_IN" && data.tableLabel
-      ? `${CHANNEL_LABEL[data.channel]} - ${data.tableLabel}`
-      : CHANNEL_LABEL[data.channel];
+// Thermal emphasis lives here and only here: paper has no font-weight, so the
+// store name is double-height + bold and the Total row double-width + bold.
+// (If the printer turns out to smear bold + double-size together, this is the
+// one place to change — the structure of the paper does not depend on it.)
+function styledText(value: string, role: TextRole): Uint8Array[] {
+  if (role === "title") return [FONT_TITLE, BOLD_ON, line(value), BOLD_OFF, FONT_NORMAL];
+  if (role === "heading") return [BOLD_ON, line(value), BOLD_OFF];
+  return [line(value)];
+}
 
-  const parts: Uint8Array[] = [INIT];
-  // Logo dulu, baru identity teks — persis urutan ReceiptHeader di layar.
-  if (data.logoRaster) {
-    parts.push(JUSTIFY_CENTER, buildRasterBytes(data.logoRaster.widthDots, data.logoRaster.heightDots, data.logoRaster.bytes));
-    parts.push(line("")); // satu baris kosong antara logo dan nama (revisi gap)
-  }
-  // Nama warung: Font A double-height + bold, baris per baris (storeName
-  // boleh mengandung "\n"), lalu reset gaya teks. Persis bold sudah cukup
-  // untuk garis alamat setelahnya.
-  parts.push(
-    JUSTIFY_CENTER,
-    FONT_TITLE,
-    BOLD_ON,
-    line(data.storeName),
-    BOLD_OFF,
-    FONT_NORMAL,
-  );
-  for (const address of addressLines) parts.push(line(address));
-  if (data.phone) parts.push(line(`Tel: ${data.phone}`));
-  parts.push(line("")); // satu baris kosong biar blok alamat tidak mepet ke separator
+// The Total row: label double-width + bold (each glyph two columns wide, so
+// its width is counted twice), value bold, still glued to the right edge.
+function totalRow(label: string, value: string): Uint8Array[] {
+  const spaces = Math.max(1, RECEIPT_CHARS_PER_LINE - label.length * 2 - value.length);
+  return [FONT_WIDE_BOLD, text(label), FONT_NORMAL, text(" ".repeat(spaces)), BOLD_ON, text(value), text("\n"), BOLD_OFF];
+}
 
-  parts.push(
-    JUSTIFY_LEFT,
-    buildThinRule(),
-    line(metaLine("No. Order", String(data.orderNumber))),
-    line(metaLine("Tanggal", formatTanggal(data.printedAt))),
-    line(metaLine("Jam", formatJam(data.printedAt))),
-    line(metaLine("Kasir", data.kasirName)),
-    line(metaLine("Tipe", tipe)),
-    buildThinRule(),
-  );
+function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined): Uint8Array[] {
+  const parts: Uint8Array[] = [];
+  let centered = false;
+  // ESC a only takes effect at the start of a line, and every line here ends
+  // with LF, so switching between lines is always safe.
+  const align = (center: boolean) => {
+    if (center === centered) return;
+    parts.push(center ? JUSTIFY_CENTER : JUSTIFY_LEFT);
+    centered = center;
+  };
 
-  // Nomor antrian sengaja tidak dicetak di struk (order sudah lunas — sama
-  // seperti ReceiptView), jadi item jadi bagian tengah struktur ini.
-  // Revisi: qty diletakkan di depan ("2x Mi Ayam"), addon di-indent 1 spasi.
-  for (const item of items) {
-    parts.push(line(rightLine(`${item.qty}x ${item.productName}`, formatRupiah(item.lineTotal))));
-    if (item.addons.length > 0) {
-      parts.push(line(` ${groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", ")}`));
+  for (const item of lines) {
+    switch (item.kind) {
+      case "logo":
+        align(true);
+        if (logo) parts.push(buildRasterBytes(logo.widthDots, logo.heightDots, logo.bytes));
+        parts.push(line(item.caption));
+        break;
+      case "text":
+        align(item.align === "center");
+        parts.push(...styledText(item.text, item.role));
+        break;
+      case "blank":
+        parts.push(line(""));
+        break;
+      case "rule":
+        align(false);
+        parts.push(line(item.text));
+        break;
+      case "meta":
+        align(false);
+        parts.push(line(metaLine(item.label, item.value)));
+        break;
+      case "pair":
+        align(false);
+        if (item.role === "total") parts.push(...totalRow(item.left, item.right));
+        else parts.push(line(rightLine(item.checkbox ? `[ ] ${item.left}` : item.left, item.right)));
+        break;
+      case "sub":
+        align(false);
+        parts.push(line(` ${item.text}`));
+        break;
     }
-    if (item.notes) parts.push(line(` "${item.notes}"`));
   }
+  return parts;
+}
 
-  parts.push(
-    buildThinRule(),
-    line(`${totalItemCount(items)} item`),
-    line(rightLine("Subtotal", formatRupiah(data.subtotal))),
-  );
-  if (data.deliveryFee > 0) {
-    parts.push(line(paperRule("-")), line(rightLine("Ongkir", formatRupiah(data.deliveryFee))));
-  }
-  parts.push(line(paperRule("-")));
+// After the last line: feed the paper up so the cut/tear edge clears the print.
+const END_FEED_LINES = 5;
 
-  // Baris Total: label double-width + tebal (setara ~2x), nominal tebal,
-  // tetap rata kanan terhadap kolom harga. Lebar label dihitung dua kali
-  // karena tiap glif selebar 2 kolom normal.
-  const totalLabel = "Total";
-  const totalValue = formatRupiah(data.total);
-  const totalSpaces = Math.max(1, RECEIPT_CHARS_PER_LINE - totalLabel.length * 2 - totalValue.length);
-  parts.push(
-    FONT_WIDE_BOLD,
-    text(totalLabel),
-    FONT_NORMAL,
-    text(" ".repeat(totalSpaces)),
-    BOLD_ON,
-    text(totalValue),
-    text("\n"),
-    BOLD_OFF,
-    line(paperRule("-")),
-    line(rightLine(`Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.cashTendered ?? data.total))),
-  );
-  if (data.changeGiven != null && data.changeGiven > 0) {
-    parts.push(line(rightLine("Kembali", formatRupiah(data.changeGiven))));
-  }
-
-  // Footer ditengah, tebal, dipisahkan garis tipis — revisi: teks footer +1
-  // ukuran & bold, dan feed akhir lebih panjang biar ada jeda sebelum
-  // pemotongan manual (margin bawah).
-  parts.push(
-    buildThinRule(),
-    JUSTIFY_CENTER,
-    BOLD_ON,
-    line(data.footerNote ?? "Terima kasih!"),
-    BOLD_OFF,
-    feed(5),
-  );
-
-  return concat(...parts);
+export function buildReceiptBytes(data: ReceiptData): Uint8Array {
+  return concat(INIT, ...renderLayout(buildReceiptLayout(data), data.logoRaster), feed(END_FEED_LINES));
 }
 
 export function buildPackingListBytes(data: PackingListData): Uint8Array {
-  const addressLines = (data.address ?? "").split("\n").filter(Boolean);
-  const parts: Uint8Array[] = [INIT];
-  if (data.logoRaster) {
-    parts.push(JUSTIFY_CENTER, buildRasterBytes(data.logoRaster.widthDots, data.logoRaster.heightDots, data.logoRaster.bytes));
-    parts.push(line(""));
-  }
-  parts.push(
-    JUSTIFY_CENTER,
-    FONT_TITLE,
-    BOLD_ON,
-    line(data.storeName),
-    BOLD_OFF,
-    FONT_NORMAL,
-  );
-  for (const address of addressLines) parts.push(line(address));
-  if (data.phone) parts.push(line(`Tel: ${data.phone}`));
-  parts.push(line(""));
-
-  parts.push(
-    JUSTIFY_LEFT,
-    buildThinRule(),
-    line(metaLine("No. Order", String(data.orderNumber))),
-    line(
-      metaLine("Antrian", data.queueNumber != null ? formatQueueLabel(data.queueNumber, data.queueSuffix) : "Belum dibayar"),
-    ),
-    line(metaLine("Tanggal", formatTanggal(data.printedAt))),
-    line(metaLine("Jam", formatJam(data.printedAt))),
-    line(metaLine("Tipe", `Antar${data.tableLabel ? ` - ${data.tableLabel}` : ""}`)),
-    buildThinRule(),
-  );
-
-  // Daftar packing = checklist rakit order, belum ada pembayaran apa pun —
-  // tidak ada harga, tidak ada total. Kotak centang "[ ]" di kiri, qty
-  // dicetak rata kanan (angka yang disetor dapur pas merakit). Addon/note
-  // di-indent 1 spasi, sama ringan dengan struk.
-  for (const item of data.items) {
-    parts.push(line(rightLine(`[ ] ${item.productName}`, `x${item.qty}`)));
-    if (item.addons.length > 0) parts.push(line(` ${item.addons.join(", ")}`));
-    if (item.notes) parts.push(line(` "${item.notes}"`));
-  }
-  parts.push(
-    buildThinRule(),
-    JUSTIFY_CENTER,
-    BOLD_ON,
-    line("Bukan bukti bayar"),
-    BOLD_OFF,
-    feed(5),
-  );
-
-  return concat(...parts);
+  return concat(INIT, ...renderLayout(buildPackingListLayout(data), data.logoRaster), feed(END_FEED_LINES));
 }
+
 // "1234567890" repeated — count the last digit on the first physical row to
 // read how many columns really fit before the printer wraps.
 function digitRuler(cols: number): string {
@@ -350,19 +240,22 @@ function edgeMarker(width: number): string {
 
 // Hardware diagnostic page, NOT a receipt (Pengaturan → "Tes Lebar Kolom").
 // It goes through the same byte pipeline as a struk, so what it shows on
-// paper is what a real struk gets. It answers, per section:
-//  T0/T1/T2  how many columns fit in the printer's default font, Font A and
-//            Font B (no ESC ! is sent before T0, so T0 is the power-on font);
-//  T3        where a 47/48/49-column row wraps, and whether a full 48-column
-//            row followed by LF leaves an extra blank row;
-//  T4        whether the size commands the struk uses (double-height title,
-//            double-width Total) are really undone before the next row;
-//  T5        whether the 576-dot hairline is as wide as 48 text columns;
-//  T6        numbered full-width rows shaped like the item block (a short
-//            add-on-like row between full rows) — left number must equal the
-//            right number. Each row also prints its byte offset, and "*"
-//            marks a row that straddles a 512-byte BLE frame boundary, so a
-//            glitch can be tied to (or ruled out from) frame chunking.
+// paper is what a real struk gets. Measured on the real ECO80D (2026-09-20):
+// Font A = 48 columns (T0 = T1: the power-on font is Font A), a 48-column row
+// + LF leaves no extra blank row, the size commands are undone, and no byte is
+// lost across 512-byte BLE frames. Kept so the check can be repeated after any
+// change to the print pipeline or on a second printer. Per section:
+//  T0/T1  how many columns fit in the default font (no ESC ! sent before T0)
+//         and in Font A — count the last digit on the first physical row;
+//  T2     where a 47/48/49-column row wraps, and whether a full 48-column row
+//         followed by LF leaves an extra blank row;
+//  T3     whether the size commands the struk uses (double-height title,
+//         double-width Total) are really undone before the next row;
+//  T4     numbered full-width rows shaped like the item block (a short
+//         add-on-like row between full rows) — left number must equal the
+//         right number. Each row also prints its byte offset, and "*" marks a
+//         row that straddles a 512-byte BLE frame boundary.
+// (Font B via ESC ! 1 is not tested: this printer ignores that font bit.)
 export function buildColumnTestBytes(): Uint8Array {
   const cols = RECEIPT_CHARS_PER_LINE;
   const parts: Uint8Array[] = [];
@@ -374,45 +267,23 @@ export function buildColumnTestBytes(): Uint8Array {
 
   push(line("[T0] font bawaan (tanpa ESC !)"), line(digitRuler(60)), line(markRuler(60)));
   push(FONT_NORMAL, line("[T1] Font A (ESC ! 0)"), line(digitRuler(60)), line(markRuler(60)));
-  push(FONT_B, line("[T2] Font B (ESC ! 1)"), line(digitRuler(80)), line(markRuler(80)), FONT_NORMAL);
 
   push(
-    line("[T3] batas lebar (< kolom 1, > ujung)"),
+    line("[T2] batas lebar (< kolom 1, > ujung)"),
     line("47:"),
     line(edgeMarker(47)),
     line("48:"),
     line(edgeMarker(48)),
     line("49:"),
     line(edgeMarker(49)),
-    line("akhir T3"),
+    line("akhir T2"),
   );
 
   // Same command sequences as the real struk: header title, then the Total row.
-  const totalValue = "Rp47.000";
-  push(
-    line("[T4] setelah huruf besar (harus 48)"),
-    JUSTIFY_CENTER,
-    FONT_TITLE,
-    BOLD_ON,
-    line("NAMA 2xTINGGI"),
-    BOLD_OFF,
-    FONT_NORMAL,
-    JUSTIFY_LEFT,
-    line(edgeMarker(cols)),
-    FONT_WIDE_BOLD,
-    text("Total"),
-    FONT_NORMAL,
-    text(" ".repeat(Math.max(1, cols - "Total".length * 2 - totalValue.length))),
-    BOLD_ON,
-    text(totalValue),
-    text("\n"),
-    BOLD_OFF,
-    line(edgeMarker(cols)),
-  );
+  push(line("[T3] setelah huruf besar (harus 48)"), JUSTIFY_CENTER, ...styledText("NAMA 2xTINGGI", "title"), JUSTIFY_LEFT);
+  push(line(edgeMarker(cols)), ...totalRow("Total", "Rp47.000"), line(edgeMarker(cols)));
 
-  push(line("[T5] garis 576 dot vs teks 48 kolom"), buildThinRule(), line(edgeMarker(cols)), buildThinRule());
-
-  push(line("[T6] nomor kiri harus = nomor kanan"));
+  push(line("[T4] nomor kiri harus = nomor kanan"));
   for (let n = 1; n <= 24; n++) {
     const tag = String(n).padStart(2, "0");
     const start = size();
@@ -423,6 +294,6 @@ export function buildColumnTestBytes(): Uint8Array {
     if (n % 5 === 1) push(line(" (baris pendek, tanpa kanan)"));
   }
 
-  push(feed(5));
+  push(feed(END_FEED_LINES));
   return concat(...parts);
 }

@@ -22,7 +22,7 @@ export type ReceiptItem = {
 
 // 1-bit raster of the store logo, ready for ESC/POS GS v 0 (bytes are
 // row-major, each row = widthDots/8 bytes, 8 horizontal dots per byte, bit0
-// leftmost). Built in the browser from public/assets/logo-ctr-mono.png by
+// leftmost). Built in the browser from public/assets/logo-ctr-thermal.png by
 // logo-raster.ts and attached by the client printers right before the bytes
 // are dispatched — it never ships from the server (see escpos.ts).
 export type LogoRaster = {

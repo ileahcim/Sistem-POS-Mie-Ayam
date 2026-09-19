@@ -37,7 +37,7 @@ function subscribePrinterChanged(onChange: () => void): () => void {
 }
 
 // "Data Warung" card — name/address/phone printed on every receipt header
-// (see receipt-meta.tsx). Same explicit Simpan + "Tersimpan ✓" flash
+// (see receipt-layout.ts). Same explicit Simpan + "Tersimpan ✓" flash
 // pattern as the auto-print toggle below, not silent auto-save.
 function StoreInfoCard({ settings }: { settings: StoreSettings }) {
   const initialAddress = settings.address ?? "";

@@ -41,7 +41,7 @@ export async function updatePrintLogo(printLogo: boolean): Promise<ActionResult>
 }
 
 // Printed verbatim on every struk/daftar packing header (see
-// receipt-meta.tsx's ReceiptHeader) — never hardcoded in the print
+// receipt-layout.ts's headerLines) — never hardcoded in the print
 // components themselves. Address is stored with its line breaks intact
 // (a textarea in the UI) so a two-line address prints as two lines.
 export async function updateStoreInfo(input: {
