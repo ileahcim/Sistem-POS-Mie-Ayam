@@ -2,6 +2,21 @@
 
 *Sesi: opencode · 19 Sep 2026 · dibangun di atas implementasi awal Copilot (lihat `update_versi_copilot.md`).*
 
+## Revisi layout struk + toggle logo (commit `60d25c3`, deploy sukses)
+
+Revisi hasil cetak sesuai 14 poin agar mendekati mock printer, plus pengaturan baru "Cetak logo di struk":
+
+- **Nama warung**: Font A **double-height + bold** (`ESC ! 0x10` + `ESC E 1`) untuk nama warung di struk & daftar packing; baris alamat tetap ukuran normal.
+- **Gap**: 1 baris kosong antara logo dan nama warung, dan 1 baris kosong di bawah blok alamat sebelum separator.
+- **Separator**: garis `=` tebal (12 dot per karakter) diganti **thin raster line** (`GS v 0` lebar 576 dot, tinggi 1 dot) di semua batas major; garis `-` taksir tetap karakter.
+- **Item**: format jadi `2x Mi Ayam` (qty di depan) + harga rata kanan; addon/catatan indent 2 → **1 spasi**.
+- **Baris Total**: label **"Total" double-width + bold** (`ESC ! 0x28`, lebar kolom dihitung 2×) + nominal **bold**, tetap rata kanan terhadap kolom harga (menggantikan `TOTAL` bold lama).
+- **Footer**: "Terima kasih!" ditengah + **bold**, dipisah thin rule; feed akhir 3 → **5** (margin bawah lebih lega untuk pemotongan manual).
+- **Logo**: lebar raster 240 → **264 dot** (multiple-of-8 + *near native* 260px sumber — meniadakan dropout garis halus akibat up/downscale; `imageSmoothingQuality = "high"`), ~33mm.
+- **Toggle "Cetak logo di struk"**: kolom `Setting.printLogo Boolean @default(true)` (migrasi `20260919110000_print_logo` sudah di-deploy) + `updatePrintLogo` di actions + `ToggleCard` di `/admin/settings` tepat di bawah kartu Printer. `withLogo()` kini menghormati `printLogo === false` → `logoRaster: null`. `ReceiptData`/`PackingListData` + kedua builder (`buildReceiptData`/`buildPackingListData`) membawa `printLogo` dari settings.
+- **Pelajaran**: file `src/lib/settings/get-settings.ts` yang tidak ter-stage sempat membuat deploy gagal (perbaikan `5c7ed24`) — selalu `git status` sebelum commit.
+- Verifikasi: `tsc --noEmit` bersih, eslint bersih, `npm run build` sukses, deploy Vercel Production `state: success`.
+
 ## Ringkasan
 
 Menyalakan pencetakan fisik ke printer thermal **Blueprint ECO80D** (80mm, kertas termal, cutter **manual**). Arsitektur final:
@@ -17,11 +32,11 @@ Menyalakan pencetakan fisik ke printer thermal **Blueprint ECO80D** (80mm, kerta
 
 - `buildReceiptBytes(data)` / `buildPackingListBytes(data)` → `Uint8Array` ESC/POS.
 - 48 kolom Font A (memakai `RECEIPT_CHARS_PER_LINE` dari `paper.ts`).
-- Layout struk = desain final `ReceiptView`: header warung, `No. Order`, `Tanggal`, `Jam`, `Kasir`, `Tipe`; item `Nama xQty` + harga rata kanan; add-ons indented; `Subtotal` / `Ongkir` / `TOTAL` / `Bayar` / `Kembali`; footer `centeredRule`. **Tanpa Antrian di struk** (order sudah lunas — konsisten dengan `ReceiptView`).
+- Layout struk = desain final `ReceiptView`: header warung (nama **double-height+bold**), `No. Order`, `Tanggal`, `Jam`, `Kasir`, `Tipe`; item `2x Mi Ayam` + harga rata kanan; add-ons indented 1 spasi; `Subtotal` / `Ongkir` / `Total` (double-width) / `Bayar` / `Kembali`; footer tebal ditengah. **Tanpa Antrian di struk** (order sudah lunas — konsisten dengan `ReceiptView`).
 - Daftar packing memakai `formatQueueLabel(...)` untuk baris Antrian dan **tanpa harga** (checklist `[ ]`), seperti `PackingListView`.
 - Channel → `CHANNEL_LABEL`, metode bayar → `PAYMENT_LABEL`.
 - **Sanitizer ASCII**: teks diubah ke byte ASCII; latin-1/typografi (é, –, “”, …) dipetakan ke pasangan ASCII terdekat, sisanya → `?`; `\r` dibuang; `\n` dipertahankan (dipakai sendiri untuk baris). `TextEncoder` tidak dipakai — tiap code unit = 1 kolom, mencegah garble kode halaman.
-- Perintah: `ESC @`, `ESC a n`, `ESC E n`, `ESC d n` (feed 3). **Tanpa `GS V` cut** — cutter ECO80D manual.
+- Perintah: `ESC @`, `ESC a n`, `ESC E n`, `ESC ! n` (gaya: double-height judul, double-width+bold Total), `ESC d n` (feed 5). **Tanpa `GS V` cut** — cutter ECO80D manual. Separator blok memakai thin raster `GS v 0` (1 dot), bukan baris karakter `=`.
 - `rightLine()` menangani overflow: label+value > 48 kolom dipecah dua baris, value rata kanan.
 - **Logo**: bila `data.logoRaster` ada, imagenya dikirim sebagai `GS v 0` (bitmap 1-bit, 8 bit horizontal per byte, bit0-kiri, row-major) sebelum blok nama warung — layout menyamai `ReceiptHeader` di layar; tanpa logo (gagal rasterisasi atau data dari server) header turun ke teks-saja.
 
@@ -36,7 +51,7 @@ Menyalakan pencetakan fisik ke printer thermal **Blueprint ECO80D** (80mm, kerta
 
 ### `src/lib/printing/logo-raster.ts`
 
-- Rasterisasi logo warung (`public/assets/logo-ctr-mono.png`, PNG 1-bit 260×232) via canvas ke lebar 240 dot (±30mm pada printhead 576 dot), threshold opacity+luminance, hasil cache sekali per sesi.
+- Rasterisasi logo warung (`public/assets/logo-ctr-mono.png`, PNG 1-bit 260×232) via canvas ke lebar **264 dot** (multiple of 8 terdekat dari native 260px — menghindari dropout garis halus; `imageSmoothingQuality: "high"`), threshold opacity+luminance, hasil cache sekali per sesi.
 - `withLogo(data)` memasang `logoRaster` ke payload cetak di sisi driver (dipakai Web Bluetooth & RawBT); gagal menggambar → `null` → header teks-saja (tidak pernah fatal).
 - `types.ts`: `LogoRaster` + `logoRaster?: LogoRaster | null` opsional di `ReceiptData`/`PackingListData` (hanya dipakai di klien; data server tidak pernah membawa pixel — kelakuan ini = preview layar vs kertas tetap konsisten).
 
