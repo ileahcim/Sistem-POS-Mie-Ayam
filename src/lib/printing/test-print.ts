@@ -7,20 +7,30 @@
 // hardware test therefore proves the real auto-print will work too.
 
 import type { PackingListData, PrinterDriver, ReceiptData, PrintResult } from "./types";
+import type { StoreSettings } from "@/lib/settings/get-settings";
 import { getPrinter } from "./get-printer";
 
-// Mirrors the original /print-preview sample source. Kasir/Tanggal dibikin
-// fixed bertitel agar hasil print-menunjang kepastian tes hardware.
-export function buildTestReceipt(): ReceiptData {
+// The warung identity on a test print comes from the Setting table, exactly
+// like a real struk (see buildReceiptData / buildPackingListData) — a test
+// must never print a made-up shop name on real paper. Only the order lines
+// below are sample data.
+type TestPrintSettings = Pick<StoreSettings, "storeName" | "address" | "phone" | "receiptFooter" | "printLogo">;
+
+// printedAt is a raw instant (new Date()), which is always timezone-safe:
+// escpos.ts and ReceiptView render it through formatId (explicit
+// Asia/Jakarta), so the test prints the current WIB time whatever the
+// tablet's OS timezone is set to. No cashTendered/changeGiven: the real
+// struk never has a "Kembali" line (CLAUDE.md "Pembayaran").
+export function buildTestReceipt(settings: TestPrintSettings): ReceiptData {
   return {
-    storeName: "Mi Ayam Gacoan",
-    address: "Jl. Merdeka No. 12",
-    phone: "0812-3456-7890",
+    storeName: settings.storeName,
+    address: settings.address,
+    phone: settings.phone,
     orderNumber: 88,
     queueNumber: 8,
     queueSuffix: "",
     channel: "BUNGKUS",
-    printedAt: new Date(2026, 8, 19, 12, 5),
+    printedAt: new Date(),
     kasirName: "Budi",
     items: [
       {
@@ -44,22 +54,22 @@ export function buildTestReceipt(): ReceiptData {
     deliveryFee: 0,
     total: 39000,
     paymentMethod: "CASH",
-    cashTendered: 50000,
-    changeGiven: 11000,
-    footerNote: "Terima kasih, setia dah!",
+    footerNote: settings.receiptFooter,
+    printLogo: settings.printLogo,
   };
 }
 
-export function buildTestPackingList(): PackingListData {
+export function buildTestPackingList(settings: TestPrintSettings): PackingListData {
   return {
-    storeName: "Mi Ayam Gacoan",
-    address: "Jl. Merdeka No. 12",
-    phone: "0812-3456-7890",
+    storeName: settings.storeName,
+    address: settings.address,
+    phone: settings.phone,
     orderNumber: 88,
     queueNumber: 8,
     queueSuffix: "",
-    printedAt: new Date(2026, 8, 19, 12, 5),
+    printedAt: new Date(),
     tableLabel: "Meja 3",
+    printLogo: settings.printLogo,
     items: [
       {
         productName: "Mi Ayam Spesial",
@@ -72,10 +82,10 @@ export function buildTestPackingList(): PackingListData {
   };
 }
 
-export async function printTest(driver: PrinterDriver): Promise<PrintResult> {
-  return getPrinter(driver).printReceipt(buildTestReceipt());
+export async function printTest(driver: PrinterDriver, settings: TestPrintSettings): Promise<PrintResult> {
+  return getPrinter(driver).printReceipt(buildTestReceipt(settings));
 }
 
-export async function printPackingListTest(driver: PrinterDriver): Promise<PrintResult> {
-  return getPrinter(driver).printPackingList(buildTestPackingList());
+export async function printPackingListTest(driver: PrinterDriver, settings: TestPrintSettings): Promise<PrintResult> {
+  return getPrinter(driver).printPackingList(buildTestPackingList(settings));
 }

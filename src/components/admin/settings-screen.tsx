@@ -251,7 +251,7 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
     setTesting(true);
     setStatus(null);
     try {
-      const result = await printTest(driver);
+      const result = await printTest(driver, settings);
       if (!result.ok) {
         setStatus(result.error);
         return;
