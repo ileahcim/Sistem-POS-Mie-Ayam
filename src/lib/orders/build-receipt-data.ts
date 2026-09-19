@@ -39,5 +39,6 @@ export function buildReceiptData(order: OrderDetail, settings: StoreSettings): R
     cashTendered: order.cashTendered,
     changeGiven: order.changeGiven,
     footerNote: settings.receiptFooter,
+    printLogo: settings.printLogo,
   };
 }

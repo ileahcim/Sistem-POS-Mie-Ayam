@@ -32,6 +32,14 @@ export async function updatePrinterDriver(driver: PrinterDriver): Promise<Action
   return { ok: true };
 }
 
+// Print the store logo on the struk/daftar packing header or not — same
+// on/off pattern as the other booleans on this page.
+export async function updatePrintLogo(printLogo: boolean): Promise<ActionResult> {
+  await requireRole("OWNER");
+  await prisma.setting.update({ where: { id: "singleton" }, data: { printLogo } });
+  return { ok: true };
+}
+
 // Printed verbatim on every struk/daftar packing header (see
 // receipt-meta.tsx's ReceiptHeader) — never hardcoded in the print
 // components themselves. Address is stored with its line breaks intact

@@ -88,6 +88,12 @@ model Setting {
   // printer factory instead of the client guessing.
   printerDriver String @default("webbluetooth")
 
+  // On (default): the store logo (public/assets/logo-ctr-mono.png) is
+  // rasterised into the struk/daftar packing header. Off: text-only header
+  // for a leaner paper output. Owner-tunable from /admin/settings; the
+  // "logonya pecah di printer" escape hatch without touching code.
+  printLogo Boolean @default(true)
+
   updatedAt DateTime @updatedAt
 }
 

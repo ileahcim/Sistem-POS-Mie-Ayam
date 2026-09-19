@@ -43,6 +43,10 @@ export type ReceiptData = {
   channel: ReceiptChannel;
   tableLabel?: string | null;
   logoRaster?: LogoRaster | null;
+  // Owner-toggle: false menghapus logo dari struk (setelan "Cetak logo di
+  // struk" di Pengaturan). Undefined/true = logo ikut dicetak. Dinolongkan
+  // oleh logo-raster.ts withLogo, bukan di escpos.
+  printLogo?: boolean;
   items: ReceiptItem[];
   subtotal: number;
   deliveryFee: number; // 0 when not applicable — still fine to compute a total from
@@ -72,6 +76,7 @@ export type PackingListData = {
   printedAt: Date;
   tableLabel?: string | null;
   logoRaster?: LogoRaster | null;
+  printLogo?: boolean;
   items: PackingListItem[];
 };
 

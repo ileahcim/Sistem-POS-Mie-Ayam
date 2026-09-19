@@ -16,7 +16,11 @@
 import type { LogoRaster } from "./types";
 
 const LOGO_SRC = "/assets/logo-ctr-mono.png";
-const TARGET_WIDTH_DOTS = 240; // multiple of 8; ~30mm on the 576-dot head
+// Source is a 1-bit 260w PNG — printing it near native size (264 = the
+// nearest multiple of 8) keeps every hairline stroke intact without the
+// up/down-scaling dropouts that made the old 240-dot downscale look
+// "pecah". ~33mm wide on the 576-dot head.
+const TARGET_WIDTH_DOTS = 264;
 
 let cachePromise: Promise<LogoRaster | null> | null = null;
 
@@ -43,6 +47,8 @@ async function buildLogoRaster(): Promise<LogoRaster | null> {
     canvas.height = heightDots;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.drawImage(image, 0, 0, widthDots, heightDots);
 
     const imageData = ctx.getImageData(0, 0, widthDots, heightDots);
@@ -69,11 +75,13 @@ async function buildLogoRaster(): Promise<LogoRaster | null> {
 }
 
 // Attach the precomputed (once per session) raster to a print payload. Any
-// real-data fields are untouched; if the logo can't be rasterized the field
+// real-data fields are untouched; if the logo can't be rasterized — or the
+// owner switched it off with the "Cetak logo di struk" setting — the field
 // is simply left null and escpos.ts falls back to a text-only header.
-export async function withLogo<T extends { logoRaster?: LogoRaster | null }>(
+export async function withLogo<T extends { logoRaster?: LogoRaster | null; printLogo?: boolean }>(
   data: T,
 ): Promise<T & { logoRaster: LogoRaster | null }> {
+  if (data.printLogo === false) return { ...data, logoRaster: null };
   const raster = await getLogoRaster();
   return { ...data, logoRaster: raster };
 }

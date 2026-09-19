@@ -176,6 +176,7 @@ async function main() {
       storeName: "Mie Ayam Pangsit dan Bakso Ciptarasa 4 Wonogiri",
       receiptFooter: "Terima kasih!",
       printerDriver: "webbluetooth",
+      printLogo: true,
     },
   });
 

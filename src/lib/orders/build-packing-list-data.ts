@@ -15,6 +15,7 @@ export function buildPackingListData(order: OrderDetail, settings: StoreSettings
     queueSuffix: order.queueSuffix,
     printedAt: new Date(),
     tableLabel: order.tableLabel,
+    printLogo: settings.printLogo,
     items: order.items.map((item) => ({
       productName: item.productName,
       addons: groupAddonsForPrint(item.addons).map(formatAddonWithQty),

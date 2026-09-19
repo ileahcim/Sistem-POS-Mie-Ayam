@@ -8,6 +8,7 @@ import type { PrinterDriver } from "@/lib/printing/types";
 import {
   updateAutoPrintReceipt,
   updatePrinterDriver,
+  updatePrintLogo,
   updateSheetBlurEnabled,
   updateStoreInfo,
 } from "@/app/admin/settings/actions";
@@ -367,6 +368,13 @@ export function SettingsScreen({
           />
 
           <PrinterCard settings={settings} />
+
+          <ToggleCard
+            title="Cetak logo di struk"
+            description="Nyala: logo warung ikut tercetak di bagian atas struk & daftar packing. Mati: header berisi teks saja — lega kalau hasil logo di kertas printer kurang tajam."
+            initialValue={settings.printLogo}
+            onSave={updatePrintLogo}
+          />
 
           <ToggleCard
             title="Efek blur animasi"

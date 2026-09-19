@@ -16,7 +16,7 @@
 
 import type { PackingListData, ReceiptData } from "./types";
 import { formatRupiah, mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
-import { paperRule, centeredRule, RECEIPT_CHARS_PER_LINE } from "./paper";
+import { paperRule, RECEIPT_CHARS_PER_LINE } from "./paper";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 
@@ -95,11 +95,35 @@ function buildRasterBytes(widthDots: number, heightDots: number, data: Uint8Arra
   return concat(header, data);
 }
 
+const PRINT_HEAD_DOTS = 576; // 80mm head at 8 dots/mm → 72 columns of 8-dot bytes
+
+// A hairline separator (revisi: separator "=" tebal diganti garis raster 1
+// dot) — a full-width GS v 0 image one dot tall, all dots on. Much thinner
+// than a 12-dot-high "=" character row, so the justify blocks no longer
+// look like they're welded together.
+function buildThinRule(): Uint8Array {
+  const bytesPerRow = PRINT_HEAD_DOTS / 8;
+  const header = Uint8Array.from([
+    0x1d, 0x76, 0x30, 0x00,
+    bytesPerRow & 0xff, 0x00,
+    0x01, 0x00,
+  ]);
+  return concat(header, new Uint8Array(bytesPerRow).fill(0xff));
+}
+
 const INIT = Uint8Array.from([ESC, 0x40]); // ESC @ — reset printer
 const JUSTIFY_LEFT = Uint8Array.from([ESC, 0x61, 0]); // ESC a 0
 const JUSTIFY_CENTER = Uint8Array.from([ESC, 0x61, 1]); // ESC a 1
 const BOLD_ON = Uint8Array.from([ESC, 0x45, 1]); // ESC E 1
 const BOLD_OFF = Uint8Array.from([ESC, 0x45, 0]); // ESC E 0
+
+// ESC ! character-style. Applies until the next ESC !:
+// 0x00 = Font A normal, 0x10 = Font A double-height, 0x28 = Font A
+// double-width + bold. Used for the store-name heading and the Total row
+// (revisi: nama warung double-height + tebal, Total double-width + tebal).
+const FONT_NORMAL = Uint8Array.from([ESC, 0x21, 0x00]);
+const FONT_TITLE = Uint8Array.from([ESC, 0x21, 0x10]);
+const FONT_WIDE_BOLD = Uint8Array.from([ESC, 0x21, 0x28]);
 
 // Feed the paper up n blank lines. The ECO80D's cutter is MANUAL
 // ("Potongan kertas: not supported" in RawBT), so we never send a GS V cut
@@ -165,44 +189,69 @@ export function buildReceiptBytes(data: ReceiptData): Uint8Array {
   // Logo dulu, baru identity teks — persis urutan ReceiptHeader di layar.
   if (data.logoRaster) {
     parts.push(JUSTIFY_CENTER, buildRasterBytes(data.logoRaster.widthDots, data.logoRaster.heightDots, data.logoRaster.bytes));
+    parts.push(line("")); // satu baris kosong antara logo dan nama (revisi gap)
   }
-  parts.push(JUSTIFY_CENTER, BOLD_ON, line(data.storeName), BOLD_OFF);
+  // Nama warung: Font A double-height + bold, baris per baris (storeName
+  // boleh mengandung "\n"), lalu reset gaya teks. Persis bold sudah cukup
+  // untuk garis alamat setelahnya.
+  parts.push(
+    JUSTIFY_CENTER,
+    FONT_TITLE,
+    BOLD_ON,
+    line(data.storeName),
+    BOLD_OFF,
+    FONT_NORMAL,
+  );
   for (const address of addressLines) parts.push(line(address));
   if (data.phone) parts.push(line(`Tel: ${data.phone}`));
+  parts.push(line("")); // satu baris kosong biar blok alamat tidak mepet ke separator
 
   parts.push(
     JUSTIFY_LEFT,
-    line(paperRule("=")),
+    buildThinRule(),
     line(metaLine("No. Order", String(data.orderNumber))),
     line(metaLine("Tanggal", formatTanggal(data.printedAt))),
     line(metaLine("Jam", formatJam(data.printedAt))),
     line(metaLine("Kasir", data.kasirName)),
     line(metaLine("Tipe", tipe)),
-    line(paperRule("=")),
+    buildThinRule(),
   );
 
   // Nomor antrian sengaja tidak dicetak di struk (order sudah lunas — sama
   // seperti ReceiptView), jadi item jadi bagian tengah struktur ini.
+  // Revisi: qty diletakkan di depan ("2x Mi Ayam"), addon di-indent 1 spasi.
   for (const item of items) {
-    parts.push(line(rightLine(`${item.productName} x${item.qty}`, formatRupiah(item.lineTotal))));
+    parts.push(line(rightLine(`${item.qty}x ${item.productName}`, formatRupiah(item.lineTotal))));
     if (item.addons.length > 0) {
-      parts.push(line(`  ${groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", ")}`));
+      parts.push(line(` ${groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", ")}`));
     }
-    if (item.notes) parts.push(line(`  "${item.notes}"`));
+    if (item.notes) parts.push(line(` "${item.notes}"`));
   }
 
   parts.push(
-    line(paperRule("=")),
+    buildThinRule(),
     line(`${totalItemCount(items)} item`),
     line(rightLine("Subtotal", formatRupiah(data.subtotal))),
   );
   if (data.deliveryFee > 0) {
     parts.push(line(paperRule("-")), line(rightLine("Ongkir", formatRupiah(data.deliveryFee))));
   }
+  parts.push(line(paperRule("-")));
+
+  // Baris Total: label double-width + tebal (setara ~2x), nominal tebal,
+  // tetap rata kanan terhadap kolom harga. Lebar label dihitung dua kali
+  // karena tiap glif selebar 2 kolom normal.
+  const totalLabel = "Total";
+  const totalValue = formatRupiah(data.total);
+  const totalSpaces = Math.max(1, RECEIPT_CHARS_PER_LINE - totalLabel.length * 2 - totalValue.length);
   parts.push(
-    line(paperRule("-")),
+    FONT_WIDE_BOLD,
+    text(totalLabel),
+    FONT_NORMAL,
+    text(" ".repeat(totalSpaces)),
     BOLD_ON,
-    line(rightLine("TOTAL", formatRupiah(data.total))),
+    text(totalValue),
+    text("\n"),
     BOLD_OFF,
     line(paperRule("-")),
     line(rightLine(`Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.cashTendered ?? data.total))),
@@ -210,11 +259,17 @@ export function buildReceiptBytes(data: ReceiptData): Uint8Array {
   if (data.changeGiven != null && data.changeGiven > 0) {
     parts.push(line(rightLine("Kembali", formatRupiah(data.changeGiven))));
   }
+
+  // Footer ditengah, tebal, dipisahkan garis tipis — revisi: teks footer +1
+  // ukuran & bold, dan feed akhir lebih panjang biar ada jeda sebelum
+  // pemotongan manual (margin bawah).
   parts.push(
-    line(paperRule("=")),
+    buildThinRule(),
     JUSTIFY_CENTER,
-    line(centeredRule(data.footerNote ?? "Terima kasih!")),
-    feed(3),
+    BOLD_ON,
+    line(data.footerNote ?? "Terima kasih!"),
+    BOLD_OFF,
+    feed(5),
   );
 
   return concat(...parts);
@@ -225,15 +280,23 @@ export function buildPackingListBytes(data: PackingListData): Uint8Array {
   const parts: Uint8Array[] = [INIT];
   if (data.logoRaster) {
     parts.push(JUSTIFY_CENTER, buildRasterBytes(data.logoRaster.widthDots, data.logoRaster.heightDots, data.logoRaster.bytes));
+    parts.push(line(""));
   }
-  parts.push(JUSTIFY_CENTER, BOLD_ON, line(data.storeName), BOLD_OFF);
+  parts.push(
+    JUSTIFY_CENTER,
+    FONT_TITLE,
+    BOLD_ON,
+    line(data.storeName),
+    BOLD_OFF,
+    FONT_NORMAL,
+  );
   for (const address of addressLines) parts.push(line(address));
   if (data.phone) parts.push(line(`Tel: ${data.phone}`));
-  parts.push(BOLD_ON, line("DAFTAR PACKING"), BOLD_OFF);
+  parts.push(line(""));
 
   parts.push(
     JUSTIFY_LEFT,
-    line(paperRule("=")),
+    buildThinRule(),
     line(metaLine("No. Order", String(data.orderNumber))),
     line(
       metaLine("Antrian", data.queueNumber != null ? formatQueueLabel(data.queueNumber, data.queueSuffix) : "Belum dibayar"),
@@ -241,22 +304,25 @@ export function buildPackingListBytes(data: PackingListData): Uint8Array {
     line(metaLine("Tanggal", formatTanggal(data.printedAt))),
     line(metaLine("Jam", formatJam(data.printedAt))),
     line(metaLine("Tipe", `Antar${data.tableLabel ? ` - ${data.tableLabel}` : ""}`)),
-    line(paperRule("=")),
+    buildThinRule(),
   );
 
   // Daftar packing = checklist rakit order, belum ada pembayaran apa pun —
   // tidak ada harga, tidak ada total. Kotak centang "[ ]" di kiri, qty
-  // dicetak rata kanan (angka yang disetor dapur pas merakit).
+  // dicetak rata kanan (angka yang disetor dapur pas merakit). Addon/note
+  // di-indent 1 spasi, sama ringan dengan struk.
   for (const item of data.items) {
     parts.push(line(rightLine(`[ ] ${item.productName}`, `x${item.qty}`)));
-    if (item.addons.length > 0) parts.push(line(`    ${item.addons.join(", ")}`));
-    if (item.notes) parts.push(line(`    "${item.notes}"`));
+    if (item.addons.length > 0) parts.push(line(` ${item.addons.join(", ")}`));
+    if (item.notes) parts.push(line(` "${item.notes}"`));
   }
   parts.push(
-    line(paperRule("=")),
+    buildThinRule(),
     JUSTIFY_CENTER,
+    BOLD_ON,
     line("Bukan bukti bayar"),
-    feed(3),
+    BOLD_OFF,
+    feed(5),
   );
 
   return concat(...parts);
