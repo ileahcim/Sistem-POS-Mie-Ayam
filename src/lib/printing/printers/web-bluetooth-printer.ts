@@ -19,6 +19,8 @@
 //    actually advertises write / write-without-response.
 //  - iOS Safari does not ship the Web Bluetooth API at all; isSupported()
 //    covers that (the tablet here is Android-native Chrome anyway).
+//  - GATT writes are capped at 512 bytes per frame; long receipts are sent
+//    in ≤512-byte chunks with a gap in between (see writeChunked).
 //
 // Every path answers honestly: an async success or a plain-language
 // Indonesian error string, never a throw. Printers are transport pipes and
@@ -198,15 +200,40 @@ function fail(error: unknown): PrintResult {
   };
 }
 
+// A GATT write value can never exceed 512 bytes — Chrome enforces that
+// client-side ("Value can't exceed 512 bytes"), and most thermal BLE
+// firmware buffers one MTU-worth per frame on the 8051 bridge anyway. So the
+// ESC/POS payload (a 50-line receipt is often 1,000+ bytes) is split into
+// ≤512-byte frames with a short beat between them for the bridge's UART
+// buffer to flush before the next frame lands. Without the pause, cheap
+// printer firmware drops bytes and prints garbage.
+const MAX_WRITE_CHUNK = 512;
+// Real MTU (~509 on modern Android/Chrome after negotiation) puts us well
+// under the cap with a round 500; making it smaller than 512 adds nothing
+// except more frames, so keep it at the hard Chrome limit.
+const CHUNK_GAP_MS = 30;
+
+async function writeChunked(bytes: Uint8Array): Promise<void> {
+  for (let offset = 0; offset < bytes.length; offset += MAX_WRITE_CHUNK) {
+    const chunk = bytes.subarray(offset, offset + MAX_WRITE_CHUNK);
+    if (writeCharacteristic?.properties.write) {
+      await writeCharacteristic.writeValue(chunk);
+    } else {
+      // write-without-response path — also chunked to the same bound so a
+      // packet can never overflow the negotiated MTU buffer either.
+      await writeCharacteristic?.writeValueWithoutResponse(chunk);
+    }
+    if (offset + MAX_WRITE_CHUNK < bytes.length) {
+      await new Promise((resolve) => setTimeout(resolve, CHUNK_GAP_MS));
+    }
+  }
+}
+
 async function writeBytes(bytes: Uint8Array): Promise<PrintResult> {
   try {
     await ensureConnected();
     if (!writeCharacteristic) throw new Error("Belum ada printer terhubung.");
-    if (writeCharacteristic.properties.write) {
-      await writeCharacteristic.writeValue(bytes);
-    } else {
-      await writeCharacteristic.writeValueWithoutResponse(bytes);
-    }
+    await writeChunked(bytes);
     return { ok: true };
   } catch (error) {
     writeCharacteristic = null;

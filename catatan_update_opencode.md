@@ -42,6 +42,7 @@ Menyalakan pencetakan fisik ke printer thermal **Blueprint ECO80D** (80mm, kerta
 - `findWriteCharacteristic`: probing UUID service BLE-serial umum (`0xFF00`, `0xFFE0`, `0x18F0`) lalu fallback scan penuh; **hanya** menulis ke karakteristik dengan properti write / writeWithoutResponse.
 - Selalu membalas `{ok, error}` jujur; `isWebBluetoothSupported()` menutup kasus iPhone/Safari/HTTPS.
 - `PRINTER_CHANGED_EVENT` dikirim setiap pairing berhasil — label "Terhubung" di Pengaturan repaint lewat `useSyncExternalStore` (tanpa `useEffect` + `setState`).
+- **Chunking GATT** (`writeChunked`): Chrome menolak `writeValue` > 512 byte ("Value can't exceed 512 bytes"). Payload dipecah jadi frame ≤512 byte dengan jeda 30ms antar frame agar bridge UART printer (kebanyakan chip murah) sempat mengosongkan buffer — tanpa jeda, printer bisa membuang byte.
 
 ### `src/lib/printing/printers/rawbt-printer.ts` *(revisi implementasi Copilot)*
 
