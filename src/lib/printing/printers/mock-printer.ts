@@ -30,4 +30,10 @@ export class MockPrinter implements Printer {
     for (const listener of listeners) listener({ kind: "packing-list", data });
     return { ok: true };
   }
+
+  // Raw bytes only mean something on a physical printer; there is nothing to
+  // draw on screen for them.
+  async printBytes(): Promise<PrintResult> {
+    return { ok: false, error: "Tes ini butuh printer fisik — pilih mode Bluetooth atau RawBT dulu." };
+  }
 }

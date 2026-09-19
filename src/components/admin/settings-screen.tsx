@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { StoreSettings } from "@/lib/settings/get-settings";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import type { PrinterDriver } from "@/lib/printing/types";
+import type { PrinterDriver, PrintResult } from "@/lib/printing/types";
 import {
   updateAutoPrintReceipt,
   updatePrinterDriver,
@@ -18,7 +18,7 @@ import {
   isWebBluetoothSupported,
   PRINTER_CHANGED_EVENT,
 } from "@/lib/printing/printers/web-bluetooth-printer";
-import { printTest } from "@/lib/printing/test-print";
+import { printColumnTest, printTest } from "@/lib/printing/test-print";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ListRow } from "@/components/ui/list-row";
@@ -247,11 +247,11 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
     }
   }
 
-  async function handleTest() {
+  async function handleTest(print: () => Promise<PrintResult>) {
     setTesting(true);
     setStatus(null);
     try {
-      const result = await printTest(driver, settings);
+      const result = await print();
       if (!result.ok) {
         setStatus(result.error);
         return;
@@ -304,8 +304,19 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" onClick={handleTest} disabled={testing || (isWebBt && !connectedName)}>
+        <Button
+          variant="primary"
+          onClick={() => handleTest(() => printTest(driver, settings))}
+          disabled={testing || (isWebBt && !connectedName)}
+        >
           {testing ? "Mencetak..." : "Tes Cetak"}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => handleTest(() => printColumnTest(driver))}
+          disabled={testing || (isWebBt && !connectedName)}
+        >
+          Tes Lebar Kolom
         </Button>
         {isWebBt && connectedName && <p className="text-primary-strong text-sm font-medium">Terhubung: {connectedName}</p>}
         {savedFlash && <p className="text-primary-strong text-sm font-medium">Tersimpan ✓</p>}

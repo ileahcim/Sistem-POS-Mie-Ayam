@@ -61,4 +61,8 @@ export const rawBtPrinter: Printer = {
   async printPackingList(data: PackingListData): Promise<PrintResult> {
     return transmitToRawBt(buildPackingListBytes(await withLogo(data)));
   },
+
+  async printBytes(bytes: Uint8Array): Promise<PrintResult> {
+    return transmitToRawBt(bytes);
+  },
 };

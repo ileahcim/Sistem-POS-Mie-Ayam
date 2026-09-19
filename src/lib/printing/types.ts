@@ -90,4 +90,7 @@ export type PrinterDriver = "mock" | "webbluetooth" | "rawbt";
 export interface Printer {
   printReceipt(data: ReceiptData): Promise<PrintResult>;
   printPackingList(data: PackingListData): Promise<PrintResult>;
+  // Raw ESC/POS bytes, for hardware diagnostics only (Tes Lebar Kolom) — real
+  // receipts always go through printReceipt/printPackingList.
+  printBytes(bytes: Uint8Array): Promise<PrintResult>;
 }

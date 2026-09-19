@@ -249,4 +249,7 @@ export const webBluetoothPrinter: Printer = {
   async printPackingList(data: PackingListData): Promise<PrintResult> {
     return writeBytes(buildPackingListBytes(await withLogo(data)));
   },
+  async printBytes(bytes: Uint8Array): Promise<PrintResult> {
+    return writeBytes(bytes);
+  },
 };

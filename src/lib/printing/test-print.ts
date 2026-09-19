@@ -8,6 +8,7 @@
 
 import type { PackingListData, PrinterDriver, ReceiptData, PrintResult } from "./types";
 import type { StoreSettings } from "@/lib/settings/get-settings";
+import { buildColumnTestBytes } from "./escpos";
 import { getPrinter } from "./get-printer";
 
 // The warung identity on a test print comes from the Setting table, exactly
@@ -88,4 +89,11 @@ export async function printTest(driver: PrinterDriver, settings: TestPrintSettin
 
 export async function printPackingListTest(driver: PrinterDriver, settings: TestPrintSettings): Promise<PrintResult> {
   return getPrinter(driver).printPackingList(buildTestPackingList(settings));
+}
+
+// Hardware diagnostic (see buildColumnTestBytes): measures the real printable
+// width instead of trusting the 48-column assumption. Not a receipt — no
+// warung data, no order.
+export async function printColumnTest(driver: PrinterDriver): Promise<PrintResult> {
+  return getPrinter(driver).printBytes(buildColumnTestBytes());
 }

@@ -124,6 +124,9 @@ const BOLD_OFF = Uint8Array.from([ESC, 0x45, 0]); // ESC E 0
 const FONT_NORMAL = Uint8Array.from([ESC, 0x21, 0x00]);
 const FONT_TITLE = Uint8Array.from([ESC, 0x21, 0x10]);
 const FONT_WIDE_BOLD = Uint8Array.from([ESC, 0x21, 0x28]);
+// 0x01 = Font B (9x17, 64 columns). Only the column test uses it, to tell
+// which font the printer actually has active.
+const FONT_B = Uint8Array.from([ESC, 0x21, 0x01]);
 
 // Feed the paper up n blank lines. The ECO80D's cutter is MANUAL
 // ("Potongan kertas: not supported" in RawBT), so we never send a GS V cut
@@ -325,5 +328,101 @@ export function buildPackingListBytes(data: PackingListData): Uint8Array {
     feed(5),
   );
 
+  return concat(...parts);
+}
+// "1234567890" repeated — count the last digit on the first physical row to
+// read how many columns really fit before the printer wraps.
+function digitRuler(cols: number): string {
+  return "1234567890".repeat(Math.ceil(cols / 10)).slice(0, cols);
+}
+
+// "....5...10...15..." — every number ends exactly on its own column.
+function markRuler(cols: number): string {
+  let out = "";
+  for (let n = 5; n <= cols; n += 5) out += String(n).padStart(5, ".");
+  return out;
+}
+
+// "<-----...----->" exactly `width` wide: "<" is column 1, ">" is the last one.
+function edgeMarker(width: number): string {
+  return `<${"-".repeat(width - 2)}>`;
+}
+
+// Hardware diagnostic page, NOT a receipt (Pengaturan → "Tes Lebar Kolom").
+// It goes through the same byte pipeline as a struk, so what it shows on
+// paper is what a real struk gets. It answers, per section:
+//  T0/T1/T2  how many columns fit in the printer's default font, Font A and
+//            Font B (no ESC ! is sent before T0, so T0 is the power-on font);
+//  T3        where a 47/48/49-column row wraps, and whether a full 48-column
+//            row followed by LF leaves an extra blank row;
+//  T4        whether the size commands the struk uses (double-height title,
+//            double-width Total) are really undone before the next row;
+//  T5        whether the 576-dot hairline is as wide as 48 text columns;
+//  T6        numbered full-width rows shaped like the item block (a short
+//            add-on-like row between full rows) — left number must equal the
+//            right number. Each row also prints its byte offset, and "*"
+//            marks a row that straddles a 512-byte BLE frame boundary, so a
+//            glitch can be tied to (or ruled out from) frame chunking.
+export function buildColumnTestBytes(): Uint8Array {
+  const cols = RECEIPT_CHARS_PER_LINE;
+  const parts: Uint8Array[] = [];
+  const push = (...next: Uint8Array[]) => parts.push(...next);
+  const size = () => parts.reduce((total, part) => total + part.length, 0);
+
+  push(INIT, JUSTIFY_LEFT);
+  push(line("TES LEBAR KOLOM"));
+
+  push(line("[T0] font bawaan (tanpa ESC !)"), line(digitRuler(60)), line(markRuler(60)));
+  push(FONT_NORMAL, line("[T1] Font A (ESC ! 0)"), line(digitRuler(60)), line(markRuler(60)));
+  push(FONT_B, line("[T2] Font B (ESC ! 1)"), line(digitRuler(80)), line(markRuler(80)), FONT_NORMAL);
+
+  push(
+    line("[T3] batas lebar (< kolom 1, > ujung)"),
+    line("47:"),
+    line(edgeMarker(47)),
+    line("48:"),
+    line(edgeMarker(48)),
+    line("49:"),
+    line(edgeMarker(49)),
+    line("akhir T3"),
+  );
+
+  // Same command sequences as the real struk: header title, then the Total row.
+  const totalValue = "Rp47.000";
+  push(
+    line("[T4] setelah huruf besar (harus 48)"),
+    JUSTIFY_CENTER,
+    FONT_TITLE,
+    BOLD_ON,
+    line("NAMA 2xTINGGI"),
+    BOLD_OFF,
+    FONT_NORMAL,
+    JUSTIFY_LEFT,
+    line(edgeMarker(cols)),
+    FONT_WIDE_BOLD,
+    text("Total"),
+    FONT_NORMAL,
+    text(" ".repeat(Math.max(1, cols - "Total".length * 2 - totalValue.length))),
+    BOLD_ON,
+    text(totalValue),
+    text("\n"),
+    BOLD_OFF,
+    line(edgeMarker(cols)),
+  );
+
+  push(line("[T5] garis 576 dot vs teks 48 kolom"), buildThinRule(), line(edgeMarker(cols)), buildThinRule());
+
+  push(line("[T6] nomor kiri harus = nomor kanan"));
+  for (let n = 1; n <= 24; n++) {
+    const tag = String(n).padStart(2, "0");
+    const start = size();
+    const straddlesFrame = Math.floor(start / 512) !== Math.floor((start + cols) / 512);
+    const left = `${tag}${straddlesFrame ? "*" : " "}@${String(start).padStart(4, "0")} `;
+    const right = ` ${tag}`;
+    push(line(`${left}${".".repeat(cols - left.length - right.length)}${right}`));
+    if (n % 5 === 1) push(line(" (baris pendek, tanpa kanan)"));
+  }
+
+  push(feed(5));
   return concat(...parts);
 }
