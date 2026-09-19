@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { PrinterDriver } from "@/lib/printing/types";
 
 export type StoreSettings = {
   storeName: string;
@@ -9,6 +10,7 @@ export type StoreSettings = {
   prepMinutesPerPortion: number;
   autoPrintReceipt: boolean;
   sheetBlurEnabled: boolean;
+  printerDriver: PrinterDriver;
 };
 
 const FALLBACK: StoreSettings = {
@@ -20,10 +22,13 @@ const FALLBACK: StoreSettings = {
   prepMinutesPerPortion: 1,
   autoPrintReceipt: true,
   sheetBlurEnabled: true,
+  printerDriver: "webbluetooth",
 };
 
 // The singleton row is created by prisma/seed.ts, but fall back gracefully
 // rather than crashing the payment flow if it's ever missing.
+// DB column is a plain String; the type union is enforced at write time by
+// updatePrinterDriver's whitelist and at read time by this cast.
 export async function getSettings(): Promise<StoreSettings> {
   const setting = await prisma.setting.findUnique({ where: { id: "singleton" } });
   if (!setting) return FALLBACK;
@@ -36,6 +41,7 @@ export async function getSettings(): Promise<StoreSettings> {
     prepMinutesPerPortion: setting.prepMinutesPerPortion,
     autoPrintReceipt: setting.autoPrintReceipt,
     sheetBlurEnabled: setting.sheetBlurEnabled,
+    printerDriver: setting.printerDriver as PrinterDriver,
   };
 }
 
