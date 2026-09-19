@@ -20,6 +20,17 @@ export type ReceiptItem = {
   lineTotal: number; // (unitPrice + sum(addons.price)) * qty
 };
 
+// 1-bit raster of the store logo, ready for ESC/POS GS v 0 (bytes are
+// row-major, each row = widthDots/8 bytes, 8 horizontal dots per byte, bit0
+// leftmost). Built in the browser from public/assets/logo-ctr-mono.png by
+// logo-raster.ts and attached by the client printers right before the bytes
+// are dispatched — it never ships from the server (see escpos.ts).
+export type LogoRaster = {
+  widthDots: number; // must be a multiple of 8
+  heightDots: number;
+  bytes: Uint8Array;
+};
+
 export type ReceiptData = {
   storeName: string;
   address?: string | null; // may contain "\n" for a second address line
@@ -31,6 +42,7 @@ export type ReceiptData = {
   printedAt: Date;
   channel: ReceiptChannel;
   tableLabel?: string | null;
+  logoRaster?: LogoRaster | null;
   items: ReceiptItem[];
   subtotal: number;
   deliveryFee: number; // 0 when not applicable — still fine to compute a total from
@@ -59,6 +71,7 @@ export type PackingListData = {
   queueSuffix: string;
   printedAt: Date;
   tableLabel?: string | null;
+  logoRaster?: LogoRaster | null;
   items: PackingListItem[];
 };
 

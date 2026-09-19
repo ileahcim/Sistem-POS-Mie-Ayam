@@ -79,6 +79,22 @@ function sanitizeText(value: string): string {
 
 const ESC = 0x1b;
 
+// ESC/POS raster image: GS v 0 m xL xH yL yH d… — x = bytes per row
+// (widthDots/8), y = height in dots, data scanned row-major with each byte
+// packing 8 horizontal dots, bit0 = leftmost. Sorted black dots print first
+// (reversed packing = the classic mistake that renders a mirror image).
+function buildRasterBytes(widthDots: number, heightDots: number, data: Uint8Array): Uint8Array {
+  const bytesPerRow = widthDots / 8;
+  const header = Uint8Array.from([
+    0x1d, 0x76, 0x30, 0x00, // GS v 0, m=0
+    bytesPerRow & 0xff,
+    (bytesPerRow >> 8) & 0xff,
+    heightDots & 0xff,
+    (heightDots >> 8) & 0xff,
+  ]);
+  return concat(header, data);
+}
+
 const INIT = Uint8Array.from([ESC, 0x40]); // ESC @ — reset printer
 const JUSTIFY_LEFT = Uint8Array.from([ESC, 0x61, 0]); // ESC a 0
 const JUSTIFY_CENTER = Uint8Array.from([ESC, 0x61, 1]); // ESC a 1
@@ -145,7 +161,12 @@ export function buildReceiptBytes(data: ReceiptData): Uint8Array {
       ? `${CHANNEL_LABEL[data.channel]} - ${data.tableLabel}`
       : CHANNEL_LABEL[data.channel];
 
-  const parts: Uint8Array[] = [INIT, JUSTIFY_CENTER, BOLD_ON, line(data.storeName), BOLD_OFF];
+  const parts: Uint8Array[] = [INIT];
+  // Logo dulu, baru identity teks — persis urutan ReceiptHeader di layar.
+  if (data.logoRaster) {
+    parts.push(JUSTIFY_CENTER, buildRasterBytes(data.logoRaster.widthDots, data.logoRaster.heightDots, data.logoRaster.bytes));
+  }
+  parts.push(JUSTIFY_CENTER, BOLD_ON, line(data.storeName), BOLD_OFF);
   for (const address of addressLines) parts.push(line(address));
   if (data.phone) parts.push(line(`Tel: ${data.phone}`));
 
@@ -201,7 +222,11 @@ export function buildReceiptBytes(data: ReceiptData): Uint8Array {
 
 export function buildPackingListBytes(data: PackingListData): Uint8Array {
   const addressLines = (data.address ?? "").split("\n").filter(Boolean);
-  const parts: Uint8Array[] = [INIT, JUSTIFY_CENTER, BOLD_ON, line(data.storeName), BOLD_OFF];
+  const parts: Uint8Array[] = [INIT];
+  if (data.logoRaster) {
+    parts.push(JUSTIFY_CENTER, buildRasterBytes(data.logoRaster.widthDots, data.logoRaster.heightDots, data.logoRaster.bytes));
+  }
+  parts.push(JUSTIFY_CENTER, BOLD_ON, line(data.storeName), BOLD_OFF);
   for (const address of addressLines) parts.push(line(address));
   if (data.phone) parts.push(line(`Tel: ${data.phone}`));
   parts.push(BOLD_ON, line("DAFTAR PACKING"), BOLD_OFF);

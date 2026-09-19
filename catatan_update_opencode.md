@@ -23,6 +23,7 @@ Menyalakan pencetakan fisik ke printer thermal **Blueprint ECO80D** (80mm, kerta
 - **Sanitizer ASCII**: teks diubah ke byte ASCII; latin-1/typografi (é, –, “”, …) dipetakan ke pasangan ASCII terdekat, sisanya → `?`; `\r` dibuang; `\n` dipertahankan (dipakai sendiri untuk baris). `TextEncoder` tidak dipakai — tiap code unit = 1 kolom, mencegah garble kode halaman.
 - Perintah: `ESC @`, `ESC a n`, `ESC E n`, `ESC d n` (feed 3). **Tanpa `GS V` cut** — cutter ECO80D manual.
 - `rightLine()` menangani overflow: label+value > 48 kolom dipecah dua baris, value rata kanan.
+- **Logo**: bila `data.logoRaster` ada, imagenya dikirim sebagai `GS v 0` (bitmap 1-bit, 8 bit horizontal per byte, bit0-kiri, row-major) sebelum blok nama warung — layout menyamai `ReceiptHeader` di layar; tanpa logo (gagal rasterisasi atau data dari server) header turun ke teks-saja.
 
 ### `src/lib/printing/test-print.ts` — satu pintu "Tes Printer"
 
@@ -32,6 +33,12 @@ Menyalakan pencetakan fisik ke printer thermal **Blueprint ECO80D** (80mm, kerta
 ### `src/types/web-bluetooth.d.ts`
 
 - Minimal subset tipe Web Bluetooth (Chrome-only; TS `lib.dom` tidak punya API ini). Semua di dalam `declare global` agar terlihat global.
+
+### `src/lib/printing/logo-raster.ts`
+
+- Rasterisasi logo warung (`public/assets/logo-ctr-mono.png`, PNG 1-bit 260×232) via canvas ke lebar 240 dot (±30mm pada printhead 576 dot), threshold opacity+luminance, hasil cache sekali per sesi.
+- `withLogo(data)` memasang `logoRaster` ke payload cetak di sisi driver (dipakai Web Bluetooth & RawBT); gagal menggambar → `null` → header teks-saja (tidak pernah fatal).
+- `types.ts`: `LogoRaster` + `logoRaster?: LogoRaster | null` opsional di `ReceiptData`/`PackingListData` (hanya dipakai di klien; data server tidak pernah membawa pixel — kelakuan ini = preview layar vs kertas tetap konsisten).
 
 ## File diimplementasi ulang / direvisi
 

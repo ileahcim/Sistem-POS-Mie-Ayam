@@ -28,6 +28,7 @@
 
 import type { PackingListData, Printer, PrintResult, ReceiptData } from "../types";
 import { buildPackingListBytes, buildReceiptBytes } from "../escpos";
+import { withLogo } from "../logo-raster";
 
 // Well-known BLE serial / ESC-POS-over-BLE service UUIDs to probe first.
 // 0xFF00 is the most common one on cheap thermal printers; 0xFFE0 is the
@@ -243,9 +244,9 @@ async function writeBytes(bytes: Uint8Array): Promise<PrintResult> {
 
 export const webBluetoothPrinter: Printer = {
   async printReceipt(data: ReceiptData): Promise<PrintResult> {
-    return writeBytes(buildReceiptBytes(data));
+    return writeBytes(buildReceiptBytes(await withLogo(data)));
   },
   async printPackingList(data: PackingListData): Promise<PrintResult> {
-    return writeBytes(buildPackingListBytes(data));
+    return writeBytes(buildPackingListBytes(await withLogo(data)));
   },
 };

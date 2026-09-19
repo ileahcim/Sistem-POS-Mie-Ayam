@@ -20,6 +20,7 @@
 
 import type { PackingListData, Printer, PrintResult, ReceiptData } from "../types";
 import { buildPackingListBytes, buildReceiptBytes } from "../escpos";
+import { withLogo } from "../logo-raster";
 
 function isAndroid(): boolean {
   // userAgentData is unreliable/absent on many devices and in tests; ua
@@ -54,10 +55,10 @@ function transmitToRawBt(bytes: Uint8Array): PrintResult {
 
 export const rawBtPrinter: Printer = {
   async printReceipt(data: ReceiptData): Promise<PrintResult> {
-    return transmitToRawBt(buildReceiptBytes(data));
+    return transmitToRawBt(buildReceiptBytes(await withLogo(data)));
   },
 
   async printPackingList(data: PackingListData): Promise<PrintResult> {
-    return transmitToRawBt(buildPackingListBytes(data));
+    return transmitToRawBt(buildPackingListBytes(await withLogo(data)));
   },
 };
