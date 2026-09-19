@@ -46,16 +46,32 @@ export function PembayaranScreen({
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
-  // Set only when autoPrintReceipt is off and payment just succeeded — the
-  // transaction is already fully saved at this point either way (CLAUDE.md
-  // "Opsi Print"), this state purely gates whether the PRINT action itself
-  // happens before leaving the screen.
+  // Set once the payment succeeded but the paper still needs a decision:
+  // autoPrintReceipt is off (ask "Cetak struk?") or the automatic print
+  // failed (retry / skip, with the reason in printError). The transaction is
+  // already fully saved either way (CLAUDE.md "Opsi Print") — this state only
+  // gates the PRINT action, never the payment.
   const [pendingReceipt, setPendingReceipt] = useState<ReceiptData | null>(null);
   const [printing, setPrinting] = useState(false);
 
   // RECEIVABLE (piutang) is still payable — settling it later is the whole
   // point. Only PAID/VOID actually block the payment UI.
   const alreadyPaid = order.status !== "OPEN" && order.status !== "RECEIVABLE";
+
+  // Outcome of a print attempt as plain text: null when the command went out,
+  // otherwise the reason. Never throws — a printer problem must never turn
+  // into an unhandled error on a payment that is already saved.
+  async function tryPrint(receipt: ReceiptData): Promise<string | null> {
+    try {
+      const printResult = await getPrinter(printerDriver).printReceipt(receipt);
+      if (printResult.ok) return null;
+      console.error("Cetak struk gagal:", printResult.error);
+      return printResult.error;
+    } catch (error) {
+      console.error("Cetak struk gagal:", error);
+      return error instanceof Error ? error.message : String(error);
+    }
+  }
 
   async function handlePay() {
     if (!method) return;
@@ -68,20 +84,17 @@ export function PembayaranScreen({
         return;
       }
       if (autoPrintReceipt) {
-        // Print is a best-effort flourish on a concluded payment — a failed
-        // printer must never hold up the already-saved transaction. Honest
-        // PrintResult tells us what happened; we log and move on. An order
-        // without a paper receipt stays re-printable from Riwayat.
-        try {
-          const printResult = await getPrinter(printerDriver).printReceipt(result.receipt);
-          if (!printResult.ok) console.error("Cetak struk gagal:", printResult.error);
-        } catch (printError) {
-          console.error("Cetak struk gagal:", printError);
+        const failure = await tryPrint(result.receipt);
+        if (failure === null) {
+          router.push("/order-aktif");
+          return;
         }
-        router.push("/order-aktif");
-      } else {
-        setPendingReceipt(result.receipt);
+        // The payment is saved; only the paper failed. Stay here with the
+        // reason on screen (instead of leaving silently, as before) so the
+        // cashier can retry or skip, and the real cause becomes visible.
+        setPrintError(failure);
       }
+      setPendingReceipt(result.receipt);
     } finally {
       setPaying(false);
     }
@@ -90,13 +103,12 @@ export function PembayaranScreen({
   async function handlePrintChoice(shouldPrint: boolean) {
     if (shouldPrint && pendingReceipt) {
       setPrinting(true);
-      try {
-        const printResult = await getPrinter(printerDriver).printReceipt(pendingReceipt);
-        if (!printResult.ok) setPrintError(printResult.error);
-      } catch (printError) {
-        setPrintError(printError instanceof Error ? printError.message : String(printError));
-      } finally {
-        setPrinting(false);
+      setPrintError(null);
+      const failure = await tryPrint(pendingReceipt);
+      setPrinting(false);
+      if (failure !== null) {
+        setPrintError(failure);
+        return; // stay: show why, let the cashier retry or skip
       }
     }
     router.push("/order-aktif");
@@ -119,10 +131,20 @@ export function PembayaranScreen({
         {pendingReceipt ? (
           <div className="flex flex-col items-center gap-4 py-8 text-center">
             <Badge variant="success">Pembayaran berhasil</Badge>
-            <div>
-              <p className="text-ink text-lg font-bold">Cetak struk?</p>
-              <p className="text-ink-muted mt-1 text-sm">Transaksi sudah tersimpan — ini cuma soal cetak kertasnya.</p>
-            </div>
+            {printError ? (
+              <div className="flex flex-col gap-1">
+                <p className="text-danger text-lg font-bold">Struk belum tercetak</p>
+                <p className="text-ink-muted text-sm">
+                  Transaksi sudah tersimpan. Pastikan printer menyala dan Bluetooth tablet aktif, lalu coba lagi.
+                </p>
+                <p className="text-ink-faint text-xs">Penyebab: {printError}</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-ink text-lg font-bold">Cetak struk?</p>
+                <p className="text-ink-muted mt-1 text-sm">Transaksi sudah tersimpan — ini cuma soal cetak kertasnya.</p>
+              </div>
+            )}
             <div className="flex w-full max-w-xs gap-2">
               <Button
                 variant="secondary"
@@ -131,7 +153,7 @@ export function PembayaranScreen({
                 disabled={printing}
                 onClick={() => handlePrintChoice(false)}
               >
-                Tidak
+                {printError ? "Lewati" : "Tidak"}
               </Button>
               <Button
                 variant="primary"
@@ -140,10 +162,9 @@ export function PembayaranScreen({
                 disabled={printing}
                 onClick={() => handlePrintChoice(true)}
               >
-                {printing ? "Mencetak..." : "Ya, Cetak"}
+                {printing ? "Mencetak..." : printError ? "Coba Lagi" : "Ya, Cetak"}
               </Button>
             </div>
-            {printError && <p className="text-danger text-sm">Cetak gagal: {printError}</p>}
           </div>
         ) : alreadyPaid ? (
           <div className="flex justify-center py-8">
