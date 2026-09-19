@@ -17,12 +17,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "POS Mi Ayam",
-  description: "Sistem kasir warung mi ayam",
+  title: "Cipta Rasa",
+  description: "Sistem kasir warung Cipta Rasa",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Mi Ayam",
+    title: "Cipta Rasa",
   },
 };
 
