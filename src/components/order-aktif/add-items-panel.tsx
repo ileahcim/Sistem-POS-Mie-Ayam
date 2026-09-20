@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import type { CartItem } from "@/lib/cart/types";
-import { createLocalId, cartItemLineTotal, expandAddonOptionIds } from "@/lib/cart/types";
+import { cartItemLineTotal, expandAddonOptionIds, upsertCartLine } from "@/lib/cart/types";
+import { sortOrderLines } from "@/lib/orders/line-order";
 import { formatAddonWithQty } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,15 +47,9 @@ export function AddItemsPanel({
       setSheetProduct(product);
       return;
     }
-    setPendingItems((items) => {
-      const existing = items.find((i) => i.productId === product.id && i.addons.length === 0 && !i.notes);
-      if (existing) {
-        return items.map((i) => (i.localId === existing.localId ? { ...i, qty: i.qty + 1 } : i));
-      }
-      return [
-        ...items,
-        {
-          localId: createLocalId(),
+    setPendingItems(
+      (items) =>
+        upsertCartLine(items, {
           productId: product.id,
           productName: product.name,
           unitPrice: product.price,
@@ -62,26 +57,28 @@ export function AddItemsPanel({
           notes: "",
           qty: 1,
           isDeliveryChargeable: product.isDeliveryChargeable,
-        },
-      ];
-    });
+          categorySortOrder: product.categorySortOrder,
+        }).items,
+    );
   }
 
   function handleConfirmSheet(result: AddonSheetResult) {
     if (!sheetProduct) return;
-    setPendingItems((items) => [
-      ...items,
-      {
-        localId: createLocalId(),
-        productId: sheetProduct.id,
-        productName: sheetProduct.name,
-        unitPrice: sheetProduct.price,
-        addons: result.addons,
-        notes: result.notes,
-        qty: result.qty,
-        isDeliveryChargeable: sheetProduct.isDeliveryChargeable,
-      },
-    ]);
+    // Same merge rule as the cart — a second identical customisation bumps
+    // qty instead of adding a twin row.
+    setPendingItems(
+      (items) =>
+        upsertCartLine(items, {
+          productId: sheetProduct.id,
+          productName: sheetProduct.name,
+          unitPrice: sheetProduct.price,
+          addons: result.addons,
+          notes: result.notes,
+          qty: result.qty,
+          isDeliveryChargeable: sheetProduct.isDeliveryChargeable,
+          categorySortOrder: sheetProduct.categorySortOrder,
+        }).items,
+    );
     setSheetProduct(null);
   }
 
@@ -131,7 +128,7 @@ export function AddItemsPanel({
       {pendingItems.length > 0 && (
         <div className="border-border border-t p-3">
           <div className="flex flex-col gap-2">
-            {pendingItems.map((item) => (
+            {sortOrderLines(pendingItems).map((item) => (
               <div key={item.localId} className="flex justify-between text-sm">
                 <span className="text-ink font-medium">
                   {item.qty}x {item.productName}

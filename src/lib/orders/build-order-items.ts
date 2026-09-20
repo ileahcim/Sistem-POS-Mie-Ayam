@@ -11,13 +11,42 @@ export type OrderItemInput = {
 
 export type OrderItemCreateData = Awaited<ReturnType<typeof buildOrderItemsCreateData>>[number];
 
+// Folds identical inputs into one row before anything is written. The cart
+// already merges on screen (upsertCartLine), but the rule that two identical
+// lines are ONE line belongs here too: this is the last point before the
+// rows exist, prices are read once for the whole call so merging can't blur
+// two different prices, and a client that gets it wrong can no longer put a
+// duplicate row into an order.
+export function mergeOrderItemInputs(items: OrderItemInput[]): OrderItemInput[] {
+  const merged: OrderItemInput[] = [];
+  const indexByKey = new Map<string, number>();
+
+  for (const item of items) {
+    const key = [
+      item.productId,
+      (item.notes ?? "").trim(),
+      // Multiset: two Ceker is not the same selection as one.
+      [...item.addonOptionIds].sort().join("_"),
+    ].join("::");
+    const existing = indexByKey.get(key);
+    if (existing != null) merged[existing] = { ...merged[existing], qty: merged[existing].qty + item.qty };
+    else {
+      indexByKey.set(key, merged.length);
+      merged.push({ ...item, notes: (item.notes ?? "").trim() });
+    }
+  }
+
+  return merged;
+}
+
 // Shared by order creation (kasir) and "tambah item" on an existing order —
 // both need the exact same rule: re-read price/name/cost from the DB right
 // now and snapshot it, never trust whatever the client cart displayed.
 // Throws a plain Error with a cashier-facing message on invalid ids so
 // callers can surface it directly.
-export async function buildOrderItemsCreateData(items: OrderItemInput[]) {
-  if (items.length === 0) throw new Error("Tidak ada item.");
+export async function buildOrderItemsCreateData(rawItems: OrderItemInput[]) {
+  if (rawItems.length === 0) throw new Error("Tidak ada item.");
+  const items = mergeOrderItemInputs(rawItems);
 
   const productIds = [...new Set(items.map((i) => i.productId))];
   const products = await prisma.product.findMany({

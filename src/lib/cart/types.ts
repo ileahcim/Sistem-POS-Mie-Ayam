@@ -25,6 +25,9 @@ export type CartItem = {
   notes: string;
   qty: number;
   isDeliveryChargeable: boolean; // snapshot of "is this product's category Makanan"
+  // Category.sortOrder, snapshotted so the cart can be sorted into reading
+  // order without looking the product back up — see lib/orders/line-order.ts.
+  categorySortOrder: number;
 };
 
 export type CartDraft = {
@@ -64,18 +67,66 @@ export function cartItemLineTotal(item: Pick<CartItem, "unitPrice" | "addons" | 
   return cartItemUnitTotal(item) * item.qty;
 }
 
-// Same product + exact same add-on selection + no notes -> a repeat tap
-// should bump qty on the existing line instead of creating a duplicate one.
-// Order-independent on addons (a cart line's addon array order isn't
-// meaningful). Used for both plain-product re-taps and combo shortcut taps.
+// THE merge rule, one definition for every screen: two lines are the same
+// line when the product, the exact add-on selection (option AND its qty),
+// and the note all match. Order-independent on addons (a cart line's addon
+// array order isn't meaningful) and whitespace-independent on the note, so
+// a note typed with a trailing space still merges.
+//
+// Notes used to abort the comparison outright (`if (a.notes || b.notes)
+// return false`), which meant two lines carrying the SAME note never merged
+// — "2x Mie Ayam pedas" came out as two rows of one.
 export function sameCartLine(
   a: Pick<CartItem, "productId" | "addons" | "notes">,
   b: Pick<CartItem, "productId" | "addons" | "notes">,
 ): boolean {
   if (a.productId !== b.productId) return false;
-  if (a.notes || b.notes) return false;
+  if ((a.notes ?? "").trim() !== (b.notes ?? "").trim()) return false;
   if (a.addons.length !== b.addons.length) return false;
   const aIds = [...a.addons.map((x) => `${x.addonOptionId}:${x.qty}`)].sort();
   const bIds = [...b.addons.map((x) => `${x.addonOptionId}:${x.qty}`)].sort();
   return aIds.every((id, i) => id === bIds[i]);
+}
+
+// Puts a line into a cart: folds it into the identical line already there,
+// or appends it. `replacingLocalId` is the line currently being edited — it
+// is lifted out BEFORE the lookup, which is the part that used to be
+// missing: editing one line until it matched another left two identical
+// rows behind, because an edit only ever wrote back in place.
+//
+// Returns the localId the quantity landed on, so the caller can flash the
+// right row. Used by the draft hook and by the "+ Tambah Item" panel, which
+// keeps their behaviour identical by construction.
+export function upsertCartLine(
+  items: CartItem[],
+  raw: Omit<CartItem, "localId">,
+  replacingLocalId: string | null = null,
+): { items: CartItem[]; localId: string } {
+  // Trim once, here, so the note that gets STORED matches the note that was
+  // compared — otherwise merging "pedas" with "pedas " kept the stray space
+  // and printed it on the struk.
+  const incoming = { ...raw, notes: (raw.notes ?? "").trim() };
+  const others = replacingLocalId ? items.filter((i) => i.localId !== replacingLocalId) : items;
+
+  const twin = others.find((i) => sameCartLine(i, incoming));
+  if (twin) {
+    return {
+      items: others.map((i) =>
+        i.localId === twin.localId ? { ...incoming, localId: twin.localId, qty: i.qty + incoming.qty } : i,
+      ),
+      localId: twin.localId,
+    };
+  }
+
+  if (replacingLocalId) {
+    // Edited but still one of a kind: keep it where it was so the row
+    // doesn't jump out from under the finger that just edited it.
+    return {
+      items: items.map((i) => (i.localId === replacingLocalId ? { ...incoming, localId: replacingLocalId } : i)),
+      localId: replacingLocalId,
+    };
+  }
+
+  const localId = createLocalId();
+  return { items: [...items, { ...incoming, localId }], localId };
 }

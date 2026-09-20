@@ -20,12 +20,16 @@ export type MenuProduct = {
   price: number;
   imageUrl: string | null;
   isDeliveryChargeable: boolean; // true only for Makanan-category products
+  // Category.sortOrder, carried down to the product so a cart line can
+  // snapshot it and sort itself — see lib/orders/line-order.ts.
+  categorySortOrder: number;
   addonGroups: MenuAddonGroup[];
 };
 
 export type MenuCategory = {
   id: string;
   name: string;
+  sortOrder: number;
   isKitchenItem: boolean;
   products: MenuProduct[];
 };
@@ -66,6 +70,7 @@ export async function getActiveMenu(): Promise<MenuCategory[]> {
   return categories.map((category) => ({
     id: category.id,
     name: category.name,
+    sortOrder: category.sortOrder,
     isKitchenItem: category.isKitchenItem,
     products: category.products.map((product) => ({
       id: product.id,
@@ -73,6 +78,7 @@ export async function getActiveMenu(): Promise<MenuCategory[]> {
       price: product.price,
       imageUrl: product.imageUrl,
       isDeliveryChargeable: category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME,
+      categorySortOrder: category.sortOrder,
       addonGroups: product.addonGroups.map((pag) => ({
         id: pag.addonGroup.id,
         name: pag.addonGroup.name,

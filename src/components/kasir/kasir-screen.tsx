@@ -6,7 +6,7 @@ import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
-import { sameCartLine, expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
+import { expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import { MainMenu } from "@/components/ui/main-menu";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
@@ -41,8 +41,7 @@ export function KasirScreen({
   shiftOpen: boolean;
 }) {
   const router = useRouter();
-  const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
-    useCartDraft();
+  const { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, clear } = useCartDraft();
   const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? "");
   const [sheetTarget, setSheetTarget] = useState<SheetTarget | null>(null);
   const [lastAddedLocalId, setLastAddedLocalId] = useState<string | null>(null);
@@ -69,14 +68,8 @@ export function KasirScreen({
 
     // Simple item, no customization possible — repeated taps bump qty on
     // the same line instead of piling up identical rows.
-    const existing = draft.items.find(
-      (i) => i.productId === product.id && i.addons.length === 0 && !i.notes,
-    );
-    if (existing) {
-      replaceItem(existing.localId, { ...existing, qty: existing.qty + 1 });
-      setLastAddedLocalId(existing.localId);
-    } else {
-      const localId = addItem({
+    setLastAddedLocalId(
+      upsertItem({
         productId: product.id,
         productName: product.name,
         unitPrice: product.price,
@@ -84,21 +77,14 @@ export function KasirScreen({
         notes: "",
         qty: 1,
         isDeliveryChargeable: product.isDeliveryChargeable,
-      });
-      setLastAddedLocalId(localId);
-    }
+        categorySortOrder: product.categorySortOrder,
+      }),
+    );
   }
 
   function handleTapCombo(item: Omit<CartItem, "localId">) {
     setSavedNotice(null);
-    const existing = draft.items.find((i) => sameCartLine(i, item));
-    if (existing) {
-      replaceItem(existing.localId, { ...existing, qty: existing.qty + item.qty });
-      setLastAddedLocalId(existing.localId);
-    } else {
-      const localId = addItem(item);
-      setLastAddedLocalId(localId);
-    }
+    setLastAddedLocalId(upsertItem(item));
   }
 
   function handleEditItem(item: CartItem) {
@@ -118,15 +104,14 @@ export function KasirScreen({
       notes: result.notes,
       qty: result.qty,
       isDeliveryChargeable: product.isDeliveryChargeable,
+      categorySortOrder: product.categorySortOrder,
     };
 
-    if (sheetTarget.mode === "edit") {
-      replaceItem(sheetTarget.item.localId, item);
-      setLastAddedLocalId(null);
-    } else {
-      const localId = addItem(item);
-      setLastAddedLocalId(localId);
-    }
+    // Adding a second identical customisation merges with the first, and so
+    // does editing one line until it matches another — both go through the
+    // same upsert, so neither can leave a duplicate row behind.
+    const localId = upsertItem(item, sheetTarget.mode === "edit" ? sheetTarget.item.localId : null);
+    setLastAddedLocalId(sheetTarget.mode === "edit" ? null : localId);
     setSheetTarget(null);
   }
 

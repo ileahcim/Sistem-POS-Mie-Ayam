@@ -43,7 +43,7 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Acti
 export async function addItemsToOrder(orderId: string, items: OrderItemInput[]): Promise<ActionResult> {
   await requireUser();
 
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return { ok: false, error: "Order tidak ditemukan." };
   if (order.status !== "OPEN") {
     return { ok: false, error: "Order ini sudah dibayar/tidak aktif — tidak bisa ditambah item." };
@@ -56,10 +56,34 @@ export async function addItemsToOrder(orderId: string, items: OrderItemInput[]):
     return { ok: false, error: e instanceof Error ? e.message : "Gagal memproses item." };
   }
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { items: { create: itemsData } },
-  });
+  // A forgotten portion of something already on the order bumps that line's
+  // qty instead of opening a second identical row — the same rule the cart
+  // follows on screen. The unit-total check is what makes that safe: it
+  // merges only when the added portion costs exactly what the existing line
+  // charges per portion, so a price changed since the order was opened
+  // still gets its own correctly-priced row rather than being back-dated.
+  const toCreate: typeof itemsData = [];
+  const bumps: { id: string; qty: number; lineTotal: number }[] = [];
+  for (const data of itemsData) {
+    const twin = order.items.find(
+      (existing) =>
+        existing.comboKey === data.comboKey &&
+        (existing.notes ?? "") === (data.notes ?? "") &&
+        existing.qty > 0 &&
+        existing.lineTotal / existing.qty === data.lineTotal / data.qty,
+    );
+    if (twin) bumps.push({ id: twin.id, qty: twin.qty + data.qty, lineTotal: twin.lineTotal + data.lineTotal });
+    else toCreate.push(data);
+  }
+
+  await prisma.$transaction([
+    ...bumps.map((bump) =>
+      prisma.orderItem.update({ where: { id: bump.id }, data: { qty: bump.qty, lineTotal: bump.lineTotal } }),
+    ),
+    ...(toCreate.length > 0
+      ? [prisma.order.update({ where: { id: orderId }, data: { items: { create: toCreate } } })]
+      : []),
+  ]);
 
   return { ok: true };
 }

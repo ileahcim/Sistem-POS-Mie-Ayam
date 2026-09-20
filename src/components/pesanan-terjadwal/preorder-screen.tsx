@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
-import { sameCartLine, expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
+import { expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { AppHeader } from "@/components/ui/app-header";
@@ -40,7 +40,7 @@ export function PreOrderScreen({
   nav: HeaderNav;
 }) {
   const router = useRouter();
-  const { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear } =
+  const { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, clear } =
     useCartDraft(PREORDER_STORAGE_KEY);
   const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? "");
   const [sheetTarget, setSheetTarget] = useState<SheetTarget | null>(null);
@@ -66,14 +66,8 @@ export function PreOrderScreen({
       return;
     }
 
-    const existing = draft.items.find(
-      (i) => i.productId === product.id && i.addons.length === 0 && !i.notes,
-    );
-    if (existing) {
-      replaceItem(existing.localId, { ...existing, qty: existing.qty + 1 });
-      setLastAddedLocalId(existing.localId);
-    } else {
-      const localId = addItem({
+    setLastAddedLocalId(
+      upsertItem({
         productId: product.id,
         productName: product.name,
         unitPrice: product.price,
@@ -81,21 +75,14 @@ export function PreOrderScreen({
         notes: "",
         qty: 1,
         isDeliveryChargeable: product.isDeliveryChargeable,
-      });
-      setLastAddedLocalId(localId);
-    }
+        categorySortOrder: product.categorySortOrder,
+      }),
+    );
   }
 
   function handleTapCombo(item: Omit<CartItem, "localId">) {
     setSaveError(null);
-    const existing = draft.items.find((i) => sameCartLine(i, item));
-    if (existing) {
-      replaceItem(existing.localId, { ...existing, qty: existing.qty + item.qty });
-      setLastAddedLocalId(existing.localId);
-    } else {
-      const localId = addItem(item);
-      setLastAddedLocalId(localId);
-    }
+    setLastAddedLocalId(upsertItem(item));
   }
 
   function handleEditItem(item: CartItem) {
@@ -115,15 +102,13 @@ export function PreOrderScreen({
       notes: result.notes,
       qty: result.qty,
       isDeliveryChargeable: product.isDeliveryChargeable,
+      categorySortOrder: product.categorySortOrder,
     };
 
-    if (sheetTarget.mode === "edit") {
-      replaceItem(sheetTarget.item.localId, item);
-      setLastAddedLocalId(null);
-    } else {
-      const localId = addItem(item);
-      setLastAddedLocalId(localId);
-    }
+    // Same upsert as Kasir: a repeat customisation and an edit that ends up
+    // identical to another line both merge instead of duplicating.
+    const localId = upsertItem(item, sheetTarget.mode === "edit" ? sheetTarget.item.localId : null);
+    setLastAddedLocalId(sheetTarget.mode === "edit" ? null : localId);
     setSheetTarget(null);
   }
 

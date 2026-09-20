@@ -39,5 +39,6 @@ export function resolveComboShortcut(
     notes: "",
     qty: 1,
     isDeliveryChargeable: product.isDeliveryChargeable,
+    categorySortOrder: product.categorySortOrder,
   };
 }

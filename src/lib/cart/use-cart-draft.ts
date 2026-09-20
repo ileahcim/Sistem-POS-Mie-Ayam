@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CartDraft, CartItem, ChannelType, TableLabel } from "./types";
-import { createLocalId, emptyCartDraft } from "./types";
+import { emptyCartDraft, upsertCartLine } from "./types";
 
 const DEFAULT_STORAGE_KEY = "pos-mi-ayam:cart-draft";
 
@@ -15,7 +15,14 @@ function loadDraft(storageKey: string): CartDraft {
     if (!raw) return emptyCartDraft();
     const parsed = JSON.parse(raw) as CartDraft;
     if (!Array.isArray(parsed.items)) return emptyCartDraft();
-    return { ...parsed, customerName: parsed.customerName ?? "" };
+    return {
+      ...parsed,
+      customerName: parsed.customerName ?? "",
+      // A draft written by an older build has no categorySortOrder. Default
+      // it rather than letting `undefined` through: NaN in the comparator
+      // would scramble the whole cart, and a draft outlives a deploy.
+      items: parsed.items.map((item) => ({ ...item, categorySortOrder: item.categorySortOrder ?? 0 })),
+    };
   } catch {
     return emptyCartDraft();
   }
@@ -68,20 +75,19 @@ export function useCartDraft(storageKey: string = DEFAULT_STORAGE_KEY) {
     setDraft((d) => ({ ...d, customerName }));
   }, []);
 
-  const addItem = useCallback((item: Omit<CartItem, "localId">) => {
-    const localId = createLocalId();
-    setDraft((d) => ({ ...d, items: [...d.items, { ...item, localId }] }));
-    return localId;
-  }, []);
-
-  // Replaces an existing line in place (used when editing via the addon
-  // sheet) so the cart's row order doesn't jump around.
-  const replaceItem = useCallback((localId: string, item: Omit<CartItem, "localId">) => {
-    setDraft((d) => ({
-      ...d,
-      items: d.items.map((existing) => (existing.localId === localId ? { ...item, localId } : existing)),
-    }));
-  }, []);
+  // The ONE way a line enters the cart, for a plain tap, a combo shortcut, a
+  // confirmed add-on sheet, and an edit alike: upsertCartLine decides whether
+  // it merges with a line already there. Pass the edited line's localId and
+  // that line is taken out of the running first, so an edit that makes two
+  // lines identical merges them. Returns the localId the qty landed on.
+  const upsertItem = useCallback(
+    (item: Omit<CartItem, "localId">, replacingLocalId: string | null = null) => {
+      const result = upsertCartLine(draft.items, item, replacingLocalId);
+      setDraft((d) => ({ ...d, items: result.items }));
+      return result.localId;
+    },
+    [draft.items],
+  );
 
   const removeItem = useCallback((localId: string) => {
     setDraft((d) => ({ ...d, items: d.items.filter((i) => i.localId !== localId) }));
@@ -91,5 +97,5 @@ export function useCartDraft(storageKey: string = DEFAULT_STORAGE_KEY) {
     setDraft(emptyCartDraft());
   }, []);
 
-  return { draft, setChannel, setTableLabel, setCustomerName, addItem, replaceItem, removeItem, clear };
+  return { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, clear };
 }

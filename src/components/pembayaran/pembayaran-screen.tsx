@@ -8,6 +8,7 @@ import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver, ReceiptData } from "@/lib/printing/types";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { formatRupiah, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
+import { sortOrderLines } from "@/lib/orders/line-order";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -174,7 +175,8 @@ export function PembayaranScreen({
           <>
             <Card>
               <div className="divide-border flex flex-col divide-y">
-                {order.items.map((item) => (
+                {/* Same reading order as the cart and the order detail. */}
+                {sortOrderLines(order.items).map((item) => (
                   <div key={item.id} className="flex flex-col gap-1 p-4">
                     <div className="flex justify-between gap-3">
                       <span className="text-base font-semibold text-ink">

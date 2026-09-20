@@ -10,6 +10,10 @@ export type OrderDetailItem = {
   qty: number;
   lineTotal: number;
   isDeliveryChargeable: boolean;
+  // Read live off the product's category (OrderItem doesn't snapshot it) —
+  // it only ever drives the on-screen reading order, see line-order.ts, so
+  // following a later re-ordering of the categories is the right behaviour.
+  categorySortOrder: number;
 };
 
 export type OrderDetail = {
@@ -49,7 +53,13 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      items: { include: { addons: true }, orderBy: { createdAt: "asc" } },
+      // Still creation order: this list also feeds buildReceiptData, and the
+      // printed struk deliberately keeps the order the items were added in.
+      // Screens sort their own copy (sortOrderLines) instead.
+      items: {
+        include: { addons: true, product: { select: { category: { select: { sortOrder: true } } } } },
+        orderBy: { createdAt: "asc" },
+      },
       createdBy: { select: { name: true } },
       cancelledBy: { select: { name: true } },
       voidedBy: { select: { name: true } },
@@ -67,6 +77,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     qty: item.qty,
     lineTotal: item.lineTotal,
     isDeliveryChargeable: item.isDeliveryChargeable,
+    categorySortOrder: item.product.category.sortOrder,
   }));
 
   const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);

@@ -16,6 +16,7 @@ import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
+import { sortOrderLines } from "@/lib/orders/line-order";
 import { AddItemsPanel } from "./add-items-panel";
 import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { CancelOrderButton } from "./cancel-order-sheet";
@@ -204,7 +205,8 @@ export function OrderDetail({
       <div className="flex-1 overflow-y-auto p-3">
         <Card>
           <div className="divide-border flex flex-col divide-y">
-            {order.items.map((item) => (
+            {/* Same reading order as the cart; the struk keeps creation order. */}
+            {sortOrderLines(order.items).map((item) => (
               <OrderItemRow
                 key={item.id}
                 orderId={order.id}
