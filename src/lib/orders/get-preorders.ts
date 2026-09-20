@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatId } from "@/lib/timezone";
 
 export type PreOrderSummary = {
   id: string;
@@ -35,4 +36,48 @@ export async function getUpcomingPreOrders(): Promise<PreOrderSummary[]> {
       .map((i) => (i.qty > 1 ? `${i.productName} x${i.qty}` : i.productName))
       .join(", "),
   }));
+}
+
+export type PreOrderReminder = {
+  id: string;
+  // Already formatted in Asia/Jakarta on the server (see CLAUDE.md "Zona
+  // waktu"): the tablet's own clock must never decide what "jam 18.30"
+  // means, and the client component only ever prints this string.
+  timeLabel: string;
+  // True once the delivery time is today, so the bar can say "hari ini"
+  // instead of repeating the date for the common case.
+  isToday: boolean;
+  dateLabel: string;
+};
+
+// Pre-orders whose delivery time falls inside the next `minutesAhead`
+// minutes — what the red bar on the Kasir screen counts. Same cutoff style
+// as getUpcomingPreOrders: anything already past scheduledFor has moved to
+// Order Aktif on its own, so the window starts at "now" and never looks
+// back. PAID pre-orders still need cooking and delivering, so they count
+// too; only cancelled/void ones drop out.
+export async function getPreOrderReminders(minutesAhead: number): Promise<PreOrderReminder[]> {
+  const now = new Date();
+  const until = new Date(now.getTime() + minutesAhead * 60 * 1000);
+
+  const orders = await prisma.order.findMany({
+    where: {
+      scheduledFor: { gt: now, lte: until },
+      status: { in: ["OPEN", "PAID"] },
+    },
+    orderBy: { scheduledFor: "asc" },
+    select: { id: true, scheduledFor: true },
+  });
+
+  const today = formatId(now, { day: "numeric", month: "short" });
+  return orders.map((order) => {
+    const when = order.scheduledFor!;
+    const dateLabel = formatId(when, { day: "numeric", month: "short" });
+    return {
+      id: order.id,
+      timeLabel: formatId(when, { hour: "2-digit", minute: "2-digit", hour12: false }),
+      isToday: dateLabel === today,
+      dateLabel,
+    };
+  });
 }

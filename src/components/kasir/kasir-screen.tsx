@@ -14,6 +14,8 @@ import { Sheet } from "@/components/ui/sheet";
 import { SheetItem } from "@/components/ui/sheet-motion";
 import { LinkButton } from "@/components/ui/link-button";
 import { LateOrderBanner } from "@/components/ui/late-order-banner";
+import { PreorderReminderBanner } from "@/components/ui/preorder-reminder-banner";
+import type { PreOrderReminder } from "@/lib/orders/get-preorders";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { ChannelTableBar } from "./channel-table-bar";
 import { CategoryTabs } from "./category-tabs";
@@ -31,10 +33,12 @@ export function KasirScreen({
   comboShortcuts,
   nav,
   shiftOpen,
+  preorderReminders,
 }: {
   categories: MenuCategory[];
   comboShortcuts: ComboShortcut[];
   nav: HeaderNav;
+  preorderReminders: PreOrderReminder[];
   // false only for an OWNER looking at Kasir before opening the shift (a
   // CASHIER never gets here — see kasir/page.tsx). The screen stays fully
   // browsable; only saving is blocked, and the server blocks it too.
@@ -152,7 +156,10 @@ export function KasirScreen({
 
   return (
     <div className="flex h-dvh flex-col">
+      {/* Late orders first: those are food already waiting, the pre-order
+          bar is about food not started yet. */}
       <LateOrderBanner lateCount={nav.lateCount} />
+      <PreorderReminderBanner reminders={preorderReminders} />
       {!shiftOpen && (
         <div className="bg-danger flex flex-wrap items-center justify-center gap-3 px-3 py-2 text-white">
           <span className="text-base font-bold">Kasir belum dibuka — pesanan tidak bisa disimpan</span>

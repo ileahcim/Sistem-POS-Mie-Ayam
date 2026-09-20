@@ -4,6 +4,8 @@ import { getOpenShift } from "@/lib/shift/get-shift-state";
 import { getComboShortcuts } from "@/lib/combo/get-combo-shortcuts";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { getPreOrderReminders } from "@/lib/orders/get-preorders";
+import { getSettings } from "@/lib/settings/get-settings";
 import { KasirScreen } from "@/components/kasir/kasir-screen";
 
 export default async function KasirPage() {
@@ -16,17 +18,24 @@ export default async function KasirPage() {
   // only about which screen you get to look at.
   if (!openShift && user?.role !== "OWNER") redirect("/shift/buka");
 
-  const [categories, comboShortcuts, nav] = await Promise.all([
+  const [categories, comboShortcuts, nav, settings] = await Promise.all([
     getActiveMenu(),
     getComboShortcuts(),
     getHeaderNav(),
+    getSettings(),
   ]);
+  // Re-read on every request — the root layout forces dynamic rendering, so
+  // a pre-order entering the window shows up on the next screen refresh
+  // without any client-side clock (see CLAUDE.md "Rendering dinamis").
+  const preorderReminders = await getPreOrderReminders(settings.preorderReminderMinutes);
+
   return (
     <KasirScreen
       categories={categories}
       comboShortcuts={comboShortcuts}
       nav={nav}
       shiftOpen={!!openShift}
+      preorderReminders={preorderReminders}
     />
   );
 }

@@ -7,6 +7,7 @@ import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver, PrintResult } from "@/lib/printing/types";
 import {
   updateAutoPrintReceipt,
+  updatePreorderReminderMinutes,
   updatePrinterDriver,
   updatePrintLogo,
   updateSheetBlurEnabled,
@@ -19,6 +20,7 @@ import {
   PRINTER_CHANGED_EVENT,
 } from "@/lib/printing/printers/web-bluetooth-printer";
 import { printColumnTest, printTest } from "@/lib/printing/test-print";
+import { PREORDER_REMINDER_CHOICES } from "@/lib/settings/preorder-reminder";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ListRow } from "@/components/ui/list-row";
@@ -200,6 +202,73 @@ function ToggleCard({
   );
 }
 
+function PreorderReminderCard({ settings }: { settings: StoreSettings }) {
+  const router = useRouter();
+  const [minutes, setMinutes] = useState(settings.preorderReminderMinutes);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(next: number) {
+    if (next === minutes) return;
+    const previous = minutes;
+    setMinutes(next);
+    setSaving(true);
+    setSavedFlash(false);
+    setError(null);
+    try {
+      const result = await updatePreorderReminderMinutes(next);
+      if (!result.ok) {
+        setMinutes(previous); // roll back on failure
+        setError(result.error);
+        return;
+      }
+      setSavedFlash(true);
+      window.setTimeout(() => setSavedFlash(false), 1500);
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card padded className="flex flex-col gap-2">
+      <div>
+        <p className="text-ink text-base font-semibold">Pengingat pesanan terjadwal</p>
+        <p className="text-ink-muted text-sm">
+          Berapa lama sebelum jam kirim, layar Kasir menampilkan peringatan merah. Bisa ditutup, tapi muncul lagi
+          setiap halaman dimuat ulang atau kalau ada pesanan lain yang masuk jendela ini.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div
+          role="group"
+          aria-label="Pengingat pesanan terjadwal"
+          className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold"
+        >
+          {PREORDER_REMINDER_CHOICES.map((choice) => (
+            <button
+              key={choice.minutes}
+              type="button"
+              onClick={() => handleChange(choice.minutes)}
+              disabled={saving}
+              aria-pressed={minutes === choice.minutes}
+              className={cn(
+                "rounded-pill h-10 px-3",
+                minutes === choice.minutes ? "bg-surface text-ink shadow-card" : "text-ink-muted",
+              )}
+            >
+              {choice.label}
+            </button>
+          ))}
+        </div>
+        {savedFlash && <p className="text-primary-strong text-sm font-medium">Tersimpan ✓</p>}
+      </div>
+      {error && <p className="text-danger text-sm">{error}</p>}
+    </Card>
+  );
+}
+
 // Print setup — which driver prints to the Blueprint ECO80D and where the
 // pairing/test entry points live. Driver choice is saved to the singleton
 // Setting row (server-side truth the client printer factory reads every
@@ -370,6 +439,8 @@ export function SettingsScreen({
           </Card>
 
           <StoreInfoCard settings={settings} />
+
+          <PreorderReminderCard settings={settings} />
 
           <ToggleCard
             title="Cetak struk otomatis"

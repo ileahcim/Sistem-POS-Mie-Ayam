@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
+import { isPreorderReminderChoice } from "@/lib/settings/preorder-reminder";
 import type { PrinterDriver } from "@/lib/printing/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -37,6 +38,18 @@ export async function updatePrinterDriver(driver: PrinterDriver): Promise<Action
 export async function updatePrintLogo(printLogo: boolean): Promise<ActionResult> {
   await requireRole("OWNER");
   await prisma.setting.update({ where: { id: "singleton" }, data: { printLogo } });
+  return { ok: true };
+}
+
+// How early the red pre-order bar appears on the Kasir screen. The accepted
+// values are a whitelist shared with the settings card — see
+// lib/settings/preorder-reminder.ts for why it lives outside this file.
+export async function updatePreorderReminderMinutes(minutes: number): Promise<ActionResult> {
+  await requireRole("OWNER");
+  if (!isPreorderReminderChoice(minutes)) {
+    return { ok: false, error: "Pilihan waktu pengingat tidak dikenal." };
+  }
+  await prisma.setting.update({ where: { id: "singleton" }, data: { preorderReminderMinutes: minutes } });
   return { ok: true };
 }
 

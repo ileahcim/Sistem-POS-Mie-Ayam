@@ -94,6 +94,12 @@ model Setting {
   // "logonya pecah di printer" escape hatch without touching code.
   printLogo Boolean @default(true)
 
+  // How long before a pre-order's scheduledFor the red reminder bar appears
+  // on the Kasir screen. Minutes, not hours, so the owner can pick 30 menit
+  // without the setting needing fractions; the UI offers presets rather than
+  // a number field (see "Konteks pengguna" in CLAUDE.md).
+  preorderReminderMinutes Int @default(120)
+
   updatedAt DateTime @updatedAt
 }
 
