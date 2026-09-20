@@ -40,6 +40,5 @@ export function buildReceiptData(order: OrderDetail, settings: StoreSettings): R
     changeGiven: order.changeGiven,
     footerNote: settings.receiptFooter,
     printLogo: settings.printLogo,
-    tuning: settings.printTuning,
   };
 }

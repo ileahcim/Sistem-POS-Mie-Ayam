@@ -88,22 +88,11 @@ model Setting {
   // printer factory instead of the client guessing.
   printerDriver String @default("webbluetooth")
 
-  // On (default): the store logo (public/assets/logo-ctr-mono.png) is
+  // On (default): the store logo (public/assets/logo-ctr-thermal.png) is
   // rasterised into the struk/daftar packing header. Off: text-only header
   // for a leaner paper output. Owner-tunable from /admin/settings; the
   // "logonya pecah di printer" escape hatch without touching code.
   printLogo Boolean @default(true)
-
-  // Thermal head tuning, sent at the start of EVERY print job (see
-  // src/lib/printing/tuning.ts). All four are NULL by default = "do not send
-  // anything, keep the printer's own factory value". Owner-tunable from
-  // /admin/settings so bold text that smears can be fixed by trial without a
-  // code change. printDensity → DC2 # n (0-31); the three heat* → ESC 7 n1 n2
-  // n3 (max heating dots / heating time / heating interval).
-  printDensity      Int?
-  printHeatDots     Int?
-  printHeatTime     Int?
-  printHeatInterval Int?
 
   updatedAt DateTime @updatedAt
 }

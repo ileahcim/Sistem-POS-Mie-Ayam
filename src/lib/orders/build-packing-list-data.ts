@@ -16,7 +16,6 @@ export function buildPackingListData(order: OrderDetail, settings: StoreSettings
     printedAt: new Date(),
     tableLabel: order.tableLabel,
     printLogo: settings.printLogo,
-    tuning: settings.printTuning,
     items: order.items.map((item) => ({
       productName: item.productName,
       addons: groupAddonsForPrint(item.addons).map(formatAddonWithQty),

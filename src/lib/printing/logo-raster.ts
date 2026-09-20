@@ -4,8 +4,8 @@
 // raster that escpos.ts embeds via GS v 0, so the printed receipt carries the
 // same branding the screen preview shows. The PNG is already dot-exact: a
 // 1-bit image made by scripts/make-thermal-logo.py (bowl outline + "CTR" only,
-// thick strokes, 416 dots wide) — the hairline lettering of the full artwork
-// is printed as plain text instead (see receipt-layout.ts). Rasterizing runs
+// thick strokes, 224 dots ≈ 28 mm wide) — the hairline lettering of the full
+// artwork is dropped, the warung name below it is printer text. Rasterizing runs
 // in the browser (canvas) because the printer clients are the only place the
 // bytes are needed — the server never sees binary pixels, and MockPrinter just
 // shows the on-screen <img> anyway.

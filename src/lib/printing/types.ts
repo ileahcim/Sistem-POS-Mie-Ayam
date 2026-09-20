@@ -31,15 +31,6 @@ export type LogoRaster = {
   bytes: Uint8Array;
 };
 
-// Thermal head tuning sent at the start of every print job — see tuning.ts.
-// null = send nothing, the printer keeps its own factory value.
-export type PrintTuning = {
-  density: number | null; // DC2 # n, 0-31
-  heatDots: number | null; // ESC 7 n1
-  heatTime: number | null; // ESC 7 n2
-  heatInterval: number | null; // ESC 7 n3
-};
-
 export type ReceiptData = {
   storeName: string;
   address?: string | null; // may contain "\n" for a second address line
@@ -56,7 +47,6 @@ export type ReceiptData = {
   // struk" di Pengaturan). Undefined/true = logo ikut dicetak. Dinolongkan
   // oleh logo-raster.ts withLogo, bukan di escpos.
   printLogo?: boolean;
-  tuning?: PrintTuning;
   items: ReceiptItem[];
   subtotal: number;
   deliveryFee: number; // 0 when not applicable — still fine to compute a total from
@@ -87,7 +77,6 @@ export type PackingListData = {
   tableLabel?: string | null;
   logoRaster?: LogoRaster | null;
   printLogo?: boolean;
-  tuning?: PrintTuning;
   items: PackingListItem[];
 };
 

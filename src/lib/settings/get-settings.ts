@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { PrinterDriver, PrintTuning } from "@/lib/printing/types";
-import { NO_TUNING } from "@/lib/printing/tuning";
+import type { PrinterDriver } from "@/lib/printing/types";
 
 export type StoreSettings = {
   storeName: string;
@@ -13,7 +12,6 @@ export type StoreSettings = {
   sheetBlurEnabled: boolean;
   printerDriver: PrinterDriver;
   printLogo: boolean;
-  printTuning: PrintTuning;
 };
 
 const FALLBACK: StoreSettings = {
@@ -27,7 +25,6 @@ const FALLBACK: StoreSettings = {
   sheetBlurEnabled: true,
   printerDriver: "webbluetooth",
   printLogo: true,
-  printTuning: NO_TUNING,
 };
 
 // The singleton row is created by prisma/seed.ts, but fall back gracefully
@@ -48,12 +45,6 @@ export async function getSettings(): Promise<StoreSettings> {
     sheetBlurEnabled: setting.sheetBlurEnabled,
     printerDriver: setting.printerDriver as PrinterDriver,
     printLogo: setting.printLogo,
-    printTuning: {
-      density: setting.printDensity,
-      heatDots: setting.printHeatDots,
-      heatTime: setting.printHeatTime,
-      heatInterval: setting.printHeatInterval,
-    },
   };
 }
 

@@ -6,16 +6,16 @@
 // a real order. Uses the same escpos.ts bytes as real receipts — a passing
 // hardware test therefore proves the real auto-print will work too.
 
-import type { PackingListData, PrinterDriver, PrintResult, PrintTuning, ReceiptData } from "./types";
+import type { PackingListData, PrinterDriver, PrintResult, ReceiptData } from "./types";
 import type { StoreSettings } from "@/lib/settings/get-settings";
-import { buildColumnTestBytes, buildSharpnessTestBytes } from "./escpos";
+import { buildColumnTestBytes } from "./escpos";
 import { getPrinter } from "./get-printer";
 
 // The warung identity on a test print comes from the Setting table, exactly
 // like a real struk (see buildReceiptData / buildPackingListData) — a test
 // must never print a made-up shop name on real paper. Only the order lines
 // below are sample data.
-type TestPrintSettings = Pick<StoreSettings, "storeName" | "address" | "phone" | "receiptFooter" | "printLogo" | "printTuning">;
+type TestPrintSettings = Pick<StoreSettings, "storeName" | "address" | "phone" | "receiptFooter" | "printLogo">;
 
 // printedAt is a raw instant (new Date()), which is always timezone-safe:
 // escpos.ts and ReceiptView render it through formatId (explicit
@@ -57,7 +57,6 @@ export function buildTestReceipt(settings: TestPrintSettings): ReceiptData {
     paymentMethod: "CASH",
     footerNote: settings.receiptFooter,
     printLogo: settings.printLogo,
-    tuning: settings.printTuning,
   };
 }
 
@@ -72,7 +71,6 @@ export function buildTestPackingList(settings: TestPrintSettings): PackingListDa
     printedAt: new Date(),
     // No tableLabel: the packing list is Antar-only, and Antar has no table.
     printLogo: settings.printLogo,
-    tuning: settings.printTuning,
     items: [
       {
         productName: "Mi Ayam Spesial",
@@ -93,14 +91,8 @@ export async function printPackingListTest(driver: PrinterDriver, settings: Test
   return getPrinter(driver).printPackingList(buildTestPackingList(settings));
 }
 
-// Hardware diagnostics (see buildColumnTestBytes / buildSharpnessTestBytes):
-// measure the real printable width and the print sharpness instead of
-// guessing. Not receipts — no warung data, no order. They run under the saved
-// tuning so they show what a real struk gets.
-export async function printColumnTest(driver: PrinterDriver, tuning: PrintTuning): Promise<PrintResult> {
-  return getPrinter(driver).printBytes(buildColumnTestBytes(tuning));
-}
-
-export async function printSharpnessTest(driver: PrinterDriver, tuning: PrintTuning): Promise<PrintResult> {
-  return getPrinter(driver).printBytes(buildSharpnessTestBytes(tuning));
+// Hardware diagnostic (see buildColumnTestBytes): measure the real printable
+// width instead of guessing. Not a receipt — no warung data, no order.
+export async function printColumnTest(driver: PrinterDriver): Promise<PrintResult> {
+  return getPrinter(driver).printBytes(buildColumnTestBytes());
 }

@@ -18,20 +18,17 @@ import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 
 // The thermal logo (see scripts/make-thermal-logo.py) is only the bowl and
-// "CTR". The lettering that used to be baked into the artwork is printed as
-// ordinary text under it, because printer text is always sharp and a 1-bit
-// image of hairline lettering is not. Kept next to the logo path on purpose:
-// it is part of the logo, not warung identity (name/address/phone/footer,
-// which always come from Setting).
+// "CTR", 224 dots (≈28 mm) wide. No caption under it: the warung name from
+// Setting is printed right below in sharp printer text, so a second line of
+// branding was just noise.
 export const RECEIPT_LOGO_SRC = "/assets/logo-ctr-thermal.png";
-export const RECEIPT_LOGO_CAPTION = "CIPTA RASA GROUP";
 
 export type TextRole = "title" | "heading" | "small" | "body" | "note";
 export type PairRole = "item" | "plain" | "total" | "qty";
 
 export type LayoutLine =
-  // Logo image (if the device could rasterise it) + the caption as text.
-  | { kind: "logo"; caption: string }
+  // Logo image, or nothing at all when the device could not rasterise it.
+  | { kind: "logo" }
   | { kind: "text"; text: string; align: "left" | "center"; role: TextRole }
   | { kind: "blank" }
   // A full-width line of literal characters: "====…", "----…", or the
@@ -88,7 +85,7 @@ function headerLines(
   heading?: string,
 ): LayoutLine[] {
   const lines: LayoutLine[] = [];
-  if (data.printLogo !== false) lines.push({ kind: "logo", caption: RECEIPT_LOGO_CAPTION }, { kind: "blank" });
+  if (data.printLogo !== false) lines.push({ kind: "logo" }, { kind: "blank" });
   for (const name of data.storeName.split("\n").filter(Boolean)) lines.push(text(name, "center", "title"));
   for (const address of (data.address ?? "").split("\n").filter(Boolean)) lines.push(text(address, "center", "small"));
   if (data.phone) lines.push(text(data.phone, "center", "small"));

@@ -5,8 +5,9 @@ Why a separate thermal logo: the full artwork has hairline-thin curved lettering
 ("CIPTA RASA" over the bowl, "GROUP" under it) that does not survive a 203 DPI
 1-bit thermal head — it printed as blotches. The thermal version keeps only what
 is bold enough to print: the bowl outline + foot and the "CTR" letters, all made
-thicker, at ~416 dots wide. "CIPTA RASA GROUP" is printed as plain text under the
-logo instead (see receipt-layout.ts), because printer text is always sharp.
+thicker. The lettering is dropped entirely — the receipt says the warung name in
+printer text right underneath (from Setting), so repeating "CIPTA RASA GROUP" in
+the logo block was redundant.
 
 Colour classification (not grayscale): the artwork is red/yellow/black, and a plain
 grayscale threshold would turn red and yellow into indistinguishable mid-grays.
@@ -24,7 +25,12 @@ from scipy import ndimage as ndi
 
 SRC = "reference/logo HD.png"
 OUT = "public/assets/logo-ctr-thermal.png"
-TARGET_W = 416  # dots — multiple of 8 (52 bytes/row); ~52 mm of the 72 mm printable width
+# Dots wide, multiple of 8 (GS v 0 packs 8 dots per byte). 224 dots ≈ 28 mm at
+# 203 DPI: big enough to read, small enough to look like a logo instead of a
+# banner — 416 (≈52 mm) ate nearly the whole printable width. It also cuts the
+# raster from ~14 KB to ~4 KB, i.e. from 29 BLE frames to 9, which matters
+# because a dropped frame shows up as a horizontally shifted row in the bowl.
+TARGET_W = 224
 OUTLINE_GROW = 5  # px at source resolution (outline is ~12 px there): thicker lines
 LETTER_GROW = 3
 MARGIN = 14

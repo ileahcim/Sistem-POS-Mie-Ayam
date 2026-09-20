@@ -7,6 +7,12 @@
 // drawn with ESC/POS (bold/size commands, right-aligned prices, the raster
 // logo). Both WebBluetoothPrinter and RawBtPrinter ship exactly these bytes.
 //
+// Emphasis is BOLD ONLY (ESC E). Measured on the real ECO80D (Tes Ketajaman,
+// 20 Sep 2026): normal and bold text are crisp, but every double-height /
+// double-width variant smears — and the heating/density commands (ESC 7,
+// DC2 #) changed nothing at all, so this printer ignores them. Do not bring
+// ESC ! size bits back without re-testing on paper.
+//
 // The web Bluetooth and RawBT raw passes are byte streams, not RawBT text
 // mode, so all text is sanitised to single-byte ASCII first: Indonesian text
 // is almost entirely ASCII, and the remaining Latin-1 / typographic chars
@@ -15,9 +21,8 @@
 // (emoji, etc.) become "?". This is the safe-enough choice for a thermal
 // receipt; the copy on the database and screen is never touched.
 
-import type { LogoRaster, PackingListData, PrintTuning, ReceiptData } from "./types";
+import type { LogoRaster, PackingListData, ReceiptData } from "./types";
 import { RECEIPT_CHARS_PER_LINE } from "./paper";
-import { HEAT_DEFAULTS, NO_TUNING } from "./tuning";
 import {
   buildPackingListLayout,
   buildReceiptLayout,
@@ -86,44 +91,16 @@ const JUSTIFY_CENTER = Uint8Array.from([ESC, 0x61, 1]); // ESC a 1
 const BOLD_ON = Uint8Array.from([ESC, 0x45, 1]); // ESC E 1
 const BOLD_OFF = Uint8Array.from([ESC, 0x45, 0]); // ESC E 0
 
-// ESC ! character-style. Applies until the next ESC !:
-// 0x00 = Font A normal, 0x10 = Font A double-height, 0x28 = Font A
-// double-width + bold. Used for the store-name heading and the Total row
-// (revisi: nama warung double-height + tebal, Total double-width + tebal).
+// ESC ! 0 — Font A, no size bits. Sent once at the top of every diagnostic
+// page to make the starting state explicit; nothing here ever sets a size
+// bit, so it never has to be undone mid-receipt.
 const FONT_NORMAL = Uint8Array.from([ESC, 0x21, 0x00]);
-const FONT_TITLE = Uint8Array.from([ESC, 0x21, 0x10]);
-const FONT_WIDE_BOLD = Uint8Array.from([ESC, 0x21, 0x28]);
 
 // Feed the paper up n blank lines. The ECO80D's cutter is MANUAL
 // ("Potongan kertas: not supported" in RawBT), so we never send a GS V cut
 // command — just space the next/mounted receipt off the thermal head.
 function feed(n: number): Uint8Array {
   return Uint8Array.from([ESC, 0x64, n]);
-}
-
-// Thermal head tuning (see tuning.ts), sent right after ESC @ at the start of
-// every job. Empty fields send nothing, so an untouched Setting changes no
-// byte of the output. ESC 7 carries all three heating parameters at once; the
-// ones the owner left empty fall back to the documented factory values.
-export function tuningBytes(tuning: PrintTuning | null | undefined): Uint8Array[] {
-  if (!tuning) return [];
-  const parts: Uint8Array[] = [];
-  if (tuning.heatDots != null || tuning.heatTime != null || tuning.heatInterval != null) {
-    parts.push(escHeating(tuning));
-  }
-  if (tuning.density != null) parts.push(Uint8Array.from([0x12, 0x23, tuning.density & 0x1f])); // DC2 # n
-  return parts;
-}
-
-// ESC 7 n1 n2 n3 with factory values filling any blank parameter.
-function escHeating(tuning: PrintTuning): Uint8Array {
-  return Uint8Array.from([
-    ESC,
-    0x37,
-    tuning.heatDots ?? HEAT_DEFAULTS.heatDots,
-    tuning.heatTime ?? HEAT_DEFAULTS.heatTime,
-    tuning.heatInterval ?? HEAT_DEFAULTS.heatInterval,
-  ]);
 }
 
 // No TextEncoder here on purpose: every character is guaranteed ASCII, and
@@ -171,21 +148,18 @@ function metaLine(label: string, value: string): string {
   return `${label.padEnd(10)}: ${value}`;
 }
 
-// Thermal emphasis lives here and only here: paper has no font-weight, so the
-// store name is double-height + bold and the Total row double-width + bold.
-// (If the printer turns out to smear bold + double-size together, this is the
-// one place to change — the structure of the paper does not depend on it.)
+// Thermal emphasis lives here and only here, and it is bold and nothing else
+// — the store name and the daftar packing title are bold at normal size.
 function styledText(value: string, role: TextRole): Uint8Array[] {
-  if (role === "title") return [FONT_TITLE, BOLD_ON, line(value), BOLD_OFF, FONT_NORMAL];
-  if (role === "heading") return [BOLD_ON, line(value), BOLD_OFF];
+  if (role === "title" || role === "heading") return [BOLD_ON, line(value), BOLD_OFF];
   return [line(value)];
 }
 
-// The Total row: label double-width + bold (each glyph two columns wide, so
-// its width is counted twice), value bold, still glued to the right edge.
-function totalRow(label: string, value: string): Uint8Array[] {
-  const spaces = Math.max(1, RECEIPT_CHARS_PER_LINE - label.length * 2 - value.length);
-  return [FONT_WIDE_BOLD, text(label), FONT_NORMAL, text(" ".repeat(spaces)), BOLD_ON, text(value), text("\n"), BOLD_OFF];
+// A name/value row whose value is emphasised: the Total, and the qty on a
+// daftar packing. Bold only, so the columns still line up exactly like an
+// ordinary rightLine row.
+function boldValueRow(label: string, value: string): Uint8Array[] {
+  return [BOLD_ON, line(rightLine(label, value)), BOLD_OFF];
 }
 
 function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined): Uint8Array[] {
@@ -202,9 +176,9 @@ function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined):
   for (const item of lines) {
     switch (item.kind) {
       case "logo":
+        if (!logo) break;
         align(true);
-        if (logo) parts.push(buildRasterBytes(logo.widthDots, logo.heightDots, logo.bytes));
-        parts.push(line(item.caption));
+        parts.push(buildRasterBytes(logo.widthDots, logo.heightDots, logo.bytes));
         break;
       case "text":
         align(item.align === "center");
@@ -223,8 +197,11 @@ function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined):
         break;
       case "pair":
         align(false);
-        if (item.role === "total") parts.push(...totalRow(item.left, item.right));
-        else parts.push(line(rightLine(item.checkbox ? `[ ] ${item.left}` : item.left, item.right)));
+        if (item.role === "total" || item.role === "qty") {
+          parts.push(...boldValueRow(item.checkbox ? `[ ] ${item.left}` : item.left, item.right));
+        } else {
+          parts.push(line(rightLine(item.checkbox ? `[ ] ${item.left}` : item.left, item.right)));
+        }
         break;
       case "sub":
         align(false);
@@ -239,11 +216,11 @@ function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined):
 const END_FEED_LINES = 5;
 
 export function buildReceiptBytes(data: ReceiptData): Uint8Array {
-  return concat(INIT, ...tuningBytes(data.tuning), ...renderLayout(buildReceiptLayout(data), data.logoRaster), feed(END_FEED_LINES));
+  return concat(INIT, ...renderLayout(buildReceiptLayout(data), data.logoRaster), feed(END_FEED_LINES));
 }
 
 export function buildPackingListBytes(data: PackingListData): Uint8Array {
-  return concat(INIT, ...tuningBytes(data.tuning), ...renderLayout(buildPackingListLayout(data), data.logoRaster), feed(END_FEED_LINES));
+  return concat(INIT, ...renderLayout(buildPackingListLayout(data), data.logoRaster), feed(END_FEED_LINES));
 }
 
 // "1234567890" repeated — count the last digit on the first physical row to
@@ -270,25 +247,27 @@ function edgeMarker(width: number): string {
 // Font A = 48 columns (T0 = T1: the power-on font is Font A), a 48-column row
 // + LF leaves no extra blank row, the size commands are undone, and no byte is
 // lost across 512-byte BLE frames. Kept so the check can be repeated after any
-// change to the print pipeline or on a second printer. Per section:
+// change to the print pipeline or on a second printer. (It only covers ~2.5 KB
+// though — the logo raster is the big transfer, and a dropped frame there
+// shows up as a horizontally shifted row inside the bowl.) Per section:
 //  T0/T1  how many columns fit in the default font (no ESC ! sent before T0)
 //         and in Font A — count the last digit on the first physical row;
 //  T2     where a 47/48/49-column row wraps, and whether a full 48-column row
 //         followed by LF leaves an extra blank row;
-//  T3     whether the size commands the struk uses (double-height title,
-//         double-width Total) are really undone before the next row;
+//  T3     whether the emphasis the struk uses (bold title, bold Total) is
+//         really undone before the next row;
 //  T4     numbered full-width rows shaped like the item block (a short
 //         add-on-like row between full rows) — left number must equal the
 //         right number. Each row also prints its byte offset, and "*" marks a
 //         row that straddles a 512-byte BLE frame boundary.
 // (Font B via ESC ! 1 is not tested: this printer ignores that font bit.)
-export function buildColumnTestBytes(tuning?: PrintTuning): Uint8Array {
+export function buildColumnTestBytes(): Uint8Array {
   const cols = RECEIPT_CHARS_PER_LINE;
   const parts: Uint8Array[] = [];
   const push = (...next: Uint8Array[]) => parts.push(...next);
   const size = () => parts.reduce((total, part) => total + part.length, 0);
 
-  push(INIT, ...tuningBytes(tuning), JUSTIFY_LEFT);
+  push(INIT, JUSTIFY_LEFT);
   push(line("TES LEBAR KOLOM"));
 
   push(line("[T0] font bawaan (tanpa ESC !)"), line(digitRuler(60)), line(markRuler(60)));
@@ -305,9 +284,11 @@ export function buildColumnTestBytes(tuning?: PrintTuning): Uint8Array {
     line("akhir T2"),
   );
 
-  // Same command sequences as the real struk: header title, then the Total row.
-  push(line("[T3] setelah huruf besar (harus 48)"), JUSTIFY_CENTER, ...styledText("NAMA 2xTINGGI", "title"), JUSTIFY_LEFT);
-  push(line(edgeMarker(cols)), ...totalRow("Total", "Rp47.000"), line(edgeMarker(cols)));
+  // Same command sequences as the real struk: bold header title, then the
+  // bold Total row. Both edge markers must still be exactly 48 wide — that is
+  // what proves the emphasis was turned back off.
+  push(line("[T3] setelah huruf tebal (harus 48)"), JUSTIFY_CENTER, ...styledText("NAMA WARUNG", "title"), JUSTIFY_LEFT);
+  push(line(edgeMarker(cols)), ...boldValueRow("Total", "Rp47.000"), line(edgeMarker(cols)));
 
   push(line("[T4] nomor kiri harus = nomor kanan"));
   for (let n = 1; n <= 24; n++) {
@@ -320,101 +301,6 @@ export function buildColumnTestBytes(tuning?: PrintTuning): Uint8Array {
     if (n % 5 === 1) push(line(" (baris pendek, tanpa kanan)"));
   }
 
-  push(feed(END_FEED_LINES));
-  return concat(...parts);
-}
-
-const printMode = (n: number) => Uint8Array.from([ESC, 0x21, n]); // ESC ! n
-
-// "titik=7 waktu=80 jeda=2" — the ESC 7 numbers exactly as they will be sent
-// (blank parameters shown as their factory values).
-function describeHeating(tuning: PrintTuning): string {
-  const dots = tuning.heatDots ?? HEAT_DEFAULTS.heatDots;
-  const time = tuning.heatTime ?? HEAT_DEFAULTS.heatTime;
-  const interval = tuning.heatInterval ?? HEAT_DEFAULTS.heatInterval;
-  return `titik=${dots} waktu=${time} jeda=${interval}`;
-}
-
-// Label for a profile of the sweep: ESC 7 is always sent there, DC2 # only
-// when the profile sets a density.
-function describeProfile(tuning: PrintTuning): string {
-  return tuning.density != null ? `${describeHeating(tuning)} kepekatan=${tuning.density}` : describeHeating(tuning);
-}
-
-// What the saved settings send on every job: nothing at all when empty.
-function describeSaved(tuning: PrintTuning): string {
-  const parts: string[] = [];
-  if (tuning.heatDots != null || tuning.heatTime != null || tuning.heatInterval != null) parts.push(describeHeating(tuning));
-  if (tuning.density != null) parts.push(`kepekatan=${tuning.density}`);
-  return parts.length ? parts.join(" ") : "bawaan printer";
-}
-
-// "Total ..... Rp47.000" in an arbitrary ESC ! mode, for the style comparison.
-function sampleTotalRow(mode: number, boldLabel: boolean): Uint8Array[] {
-  const label = "Total";
-  const value = "Rp47.000";
-  const wide = (mode & 0x20) !== 0;
-  const spaces = Math.max(1, RECEIPT_CHARS_PER_LINE - label.length * (wide ? 2 : 1) - value.length);
-  return [printMode(mode), ...(boldLabel ? [BOLD_ON] : []), text(label), FONT_NORMAL, BOLD_OFF, text(" ".repeat(spaces)), text(value), text("\n")];
-}
-
-// The combinations the Tes Ketajaman sweeps. Every ESC 7 profile fully
-// specifies the three heating parameters (blank ones = factory values), so a
-// profile never inherits the previous one's heating; density profiles come
-// last because DC2 # stays in force until it is changed again.
-const SHARPNESS_PROFILES: PrintTuning[] = [
-  NO_TUNING, // ESC 7 with all factory values
-  { ...NO_TUNING, heatTime: 120 },
-  { ...NO_TUNING, heatTime: 160 },
-  { ...NO_TUNING, heatTime: 200 },
-  { ...NO_TUNING, heatDots: 3, heatTime: 120 },
-  { ...NO_TUNING, heatTime: 120, heatInterval: 20 },
-  { ...NO_TUNING, density: 8 },
-  { ...NO_TUNING, density: 14 },
-  { ...NO_TUNING, density: 22 },
-];
-
-// Hardware diagnostic page for print sharpness (Pengaturan → "Tes Ketajaman").
-// Bold / double-size text smears on the ECO80D while normal text is crisp, so
-// this prints, on ONE strip and through the real pipeline:
-//  [G]   the same sample in every text style (normal, bold, double-height,
-//        double-width, both, and the two combinations the struk uses), under
-//        the saved tuning — shows whether the smear comes from a particular
-//        style (e.g. bold + double-size together) rather than from heat;
-//  [P0-] the same three sample rows under each heating/density combination,
-//        each labelled with the exact numbers to type into Pengaturan.
-// Pick the sharpest row, enter its numbers, save. A printer that does not know
-// ESC 7 / DC2 # prints the parameter bytes as stray characters right under the
-// profile label — that itself is the answer ("not supported").
-export function buildSharpnessTestBytes(saved?: PrintTuning): Uint8Array {
-  const parts: Uint8Array[] = [];
-  const push = (...next: Uint8Array[]) => parts.push(...next);
-  const current = saved ?? NO_TUNING;
-
-  push(INIT, ...tuningBytes(saved), JUSTIFY_LEFT);
-  push(line("TES KETAJAMAN"), line(`Tersimpan: ${describeSaved(current)}`));
-
-  push(line("[G] gaya huruf"));
-  push(line("G1 normal"), line(rightLine("2x Mie Ayam", "Rp34.000")));
-  push(line("G2 tebal (ESC E)"), BOLD_ON, line(rightLine("2x Mie Ayam", "Rp34.000")), BOLD_OFF);
-  push(line("G3 tinggi 2x"), printMode(0x10), line("NAMA WARUNG"), FONT_NORMAL);
-  push(line("G4 lebar 2x"), ...sampleTotalRow(0x20, false));
-  push(line("G5 lebar+tinggi 2x"), ...sampleTotalRow(0x30, false));
-  push(line("G6 tinggi 2x + tebal (nama warung)"), ...styledText("NAMA WARUNG", "title"));
-  push(line("G7 lebar 2x + tebal (Total)"), ...totalRow("Total", "Rp47.000"));
-
-  SHARPNESS_PROFILES.forEach((profile, index) => {
-    push(line(""), line(`[P${index}] ${describeProfile(profile)}`));
-    push(escHeating(profile), ...(profile.density != null ? [Uint8Array.from([0x12, 0x23, profile.density & 0x1f])] : []));
-    push(line(rightLine("2x Mie Ayam", "Rp34.000")));
-    push(BOLD_ON, line(rightLine("Subtotal", "Rp47.000")), BOLD_OFF);
-    push(...totalRow("Total", "Rp47.000"));
-  });
-
-  // Put the saved values back; anything a profile changed that the saved
-  // tuning does not cover only clears when the printer is power-cycled.
-  push(escHeating(current), ...tuningBytes(saved));
-  push(line(""), line("Matikan-nyalakan printer setelah tes ini"));
   push(feed(END_FEED_LINES));
   return concat(...parts);
 }
