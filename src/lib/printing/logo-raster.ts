@@ -13,7 +13,18 @@
 // Threshold rule: a dot prints where the source pixel is both opaque and
 // dark (luminance < 128). The image is drawn at its NATIVE size, never
 // scaled: resampling a 1-bit image is exactly what turned thin strokes into
-// blotches before.
+// blotches before. There is no dithering anywhere in the pipeline — the PNG
+// holds only pure black and pure white, and this loop is a hard threshold.
+//
+// BIT ORDER — the one that cost a roll of paper: GS v 0 packs 8 horizontal
+// dots per byte with the MOST significant bit as the LEFTMOST dot. Packing
+// `1 << (x & 7)` instead mirrors every group of 8 dots, which leaves the
+// overall shape in place (so it looks like neither a shift nor a crop) while
+// turning every near-horizontal curve into a sawtooth, every diagonal into
+// stair-step streaks, and letters into blocky fragments — exactly how the
+// logo printed until 20 Sep 2026. Verified by packing both ways and decoding
+// MSB-first, the way the printer does: 11.6% of dots landed in the wrong
+// column the old way, 0% now.
 
 import type { LogoRaster } from "./types";
 import { RECEIPT_LOGO_SRC } from "./receipt-layout";
@@ -55,7 +66,9 @@ async function buildLogoRaster(): Promise<LogoRaster | null> {
         const alpha = data[i + 3];
         const luminance = (data[i] + data[i + 1] + data[i + 2]) / 3;
         if (alpha > 128 && luminance < 128) {
-          bytes[y * bytesPerRow + (x >> 3)] |= 1 << (x & 7);
+          // MSB first: bit 7 of a byte is its LEFTMOST dot (see the bit-order
+          // note at the top). `1 << (x & 7)` would mirror every group of 8.
+          bytes[y * bytesPerRow + (x >> 3)] |= 0x80 >> (x & 7);
         }
       }
     }

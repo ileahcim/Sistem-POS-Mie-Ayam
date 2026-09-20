@@ -71,8 +71,9 @@ const ESC = 0x1b;
 
 // ESC/POS raster image: GS v 0 m xL xH yL yH d… — x = bytes per row
 // (widthDots/8), y = height in dots, data scanned row-major with each byte
-// packing 8 horizontal dots, bit0 = leftmost. Sorted black dots print first
-// (reversed packing = the classic mistake that renders a mirror image).
+// packing 8 horizontal dots, MSB = leftmost dot and a 1 bit = a black dot.
+// logo-raster.ts does the packing; see the bit-order note there for what
+// getting that backwards looks like on paper.
 function buildRasterBytes(widthDots: number, heightDots: number, data: Uint8Array): Uint8Array {
   const bytesPerRow = widthDots / 8;
   const header = Uint8Array.from([
