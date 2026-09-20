@@ -13,7 +13,7 @@
 
 import type { PackingListData, ReceiptData } from "./types";
 import { formatRupiah, mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
-import { centeredRule, paperRule } from "./paper";
+import { centeredRule, paperRule, wrapHeading, wrapWords, RECEIPT_CHARS_PER_LINE } from "./paper";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 
@@ -22,6 +22,10 @@ import { formatQueueLabel } from "@/lib/orders/queue-label";
 // Setting is printed right below in sharp printer text, so a second line of
 // branding was just noise.
 export const RECEIPT_LOGO_SRC = "/assets/logo-ctr-thermal.png";
+// Must match the asset (scripts/make-thermal-logo.py prints it when it runs).
+// The printer reads the real size off the PNG; this is only so the preview can
+// show the logo at the same fraction of the paper width it will really take.
+export const RECEIPT_LOGO_WIDTH_DOTS = 224;
 
 export type TextRole = "title" | "heading" | "small" | "body" | "note";
 export type PairRole = "item" | "plain" | "total" | "qty";
@@ -85,10 +89,19 @@ function headerLines(
   heading?: string,
 ): LayoutLine[] {
   const lines: LayoutLine[] = [];
+  // Line breaks the owner typed in Setting are kept; each of those is then
+  // wrapped to the paper so a long name/address can never run off the edge
+  // (and the name is balanced across its lines — see wrapHeading).
   if (data.printLogo !== false) lines.push({ kind: "logo" }, { kind: "blank" });
-  for (const name of data.storeName.split("\n").filter(Boolean)) lines.push(text(name, "center", "title"));
-  for (const address of (data.address ?? "").split("\n").filter(Boolean)) lines.push(text(address, "center", "small"));
-  if (data.phone) lines.push(text(data.phone, "center", "small"));
+  for (const line of data.storeName.split("\n").filter(Boolean)) {
+    for (const name of wrapHeading(line)) lines.push(text(name, "center", "title"));
+  }
+  for (const line of (data.address ?? "").split("\n").filter(Boolean)) {
+    for (const address of wrapWords(line, RECEIPT_CHARS_PER_LINE)) lines.push(text(address, "center", "small"));
+  }
+  if (data.phone) {
+    for (const phone of wrapWords(data.phone, RECEIPT_CHARS_PER_LINE)) lines.push(text(phone, "center", "small"));
+  }
   lines.push({ kind: "blank" });
   if (heading) lines.push(text(heading, "center", "heading"));
   lines.push(rule("="));

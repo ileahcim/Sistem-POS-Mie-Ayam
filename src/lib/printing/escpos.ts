@@ -155,11 +155,19 @@ function styledText(value: string, role: TextRole): Uint8Array[] {
   return [line(value)];
 }
 
-// A name/value row whose value is emphasised: the Total, and the qty on a
-// daftar packing. Bold only, so the columns still line up exactly like an
-// ordinary rightLine row.
-function boldValueRow(label: string, value: string): Uint8Array[] {
+// The Total row: whole line bold, label and value both, still glued to the
+// right edge by the same rightLine padding as any other row.
+function totalRow(label: string, value: string): Uint8Array[] {
   return [BOLD_ON, line(rightLine(label, value)), BOLD_OFF];
+}
+
+// A daftar packing row: only the qty on the right is bold, so it pops out of
+// the checklist without shouting the product name too. The value is always
+// the tail of the rendered row, so bolding the last value.length characters
+// works whether or not rightLine had to break the row in two.
+function boldTailRow(label: string, value: string): Uint8Array[] {
+  const rendered = rightLine(label, value);
+  return [text(rendered.slice(0, rendered.length - value.length)), BOLD_ON, text(value), BOLD_OFF, text("\n")];
 }
 
 function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined): Uint8Array[] {
@@ -197,11 +205,9 @@ function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined):
         break;
       case "pair":
         align(false);
-        if (item.role === "total" || item.role === "qty") {
-          parts.push(...boldValueRow(item.checkbox ? `[ ] ${item.left}` : item.left, item.right));
-        } else {
-          parts.push(line(rightLine(item.checkbox ? `[ ] ${item.left}` : item.left, item.right)));
-        }
+        if (item.role === "total") parts.push(...totalRow(item.left, item.right));
+        else if (item.role === "qty") parts.push(...boldTailRow(`[ ] ${item.left}`, item.right));
+        else parts.push(line(rightLine(item.checkbox ? `[ ] ${item.left}` : item.left, item.right)));
         break;
       case "sub":
         align(false);
@@ -288,7 +294,7 @@ export function buildColumnTestBytes(): Uint8Array {
   // bold Total row. Both edge markers must still be exactly 48 wide — that is
   // what proves the emphasis was turned back off.
   push(line("[T3] setelah huruf tebal (harus 48)"), JUSTIFY_CENTER, ...styledText("NAMA WARUNG", "title"), JUSTIFY_LEFT);
-  push(line(edgeMarker(cols)), ...boldValueRow("Total", "Rp47.000"), line(edgeMarker(cols)));
+  push(line(edgeMarker(cols)), ...totalRow("Total", "Rp47.000"), line(edgeMarker(cols)));
 
   push(line("[T4] nomor kiri harus = nomor kanan"));
   for (let n = 1; n <= 24; n++) {

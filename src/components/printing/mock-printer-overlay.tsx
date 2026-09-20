@@ -18,7 +18,10 @@ export function MockPrinterOverlay() {
     <AnimatePresence>
       {job && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-6"
+          // overflow-auto, not just -y: the paper inside is a fixed 48-column
+          // grid and must never be squeezed into re-wrapping, so a screen too
+          // narrow for it scrolls sideways instead.
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/50 p-3 sm:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -26,7 +29,7 @@ export function MockPrinterOverlay() {
           onClick={() => setJob(null)}
         >
           <motion.div
-            className="rounded-card shadow-sheet bg-surface mt-6"
+            className="rounded-card shadow-sheet bg-surface mt-6 shrink-0"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
