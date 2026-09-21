@@ -33,6 +33,15 @@
   --color-info: #7c3aed;
   --color-info-soft: #f3e8ff;
 
+  /* Product photos are shot on white, and a white photo on a white card has
+     no visible edge. The frame is a translucent gray so it reads as a faint
+     line on any surface. If a dark palette is ever added: redefine
+     --color-photo-frame lighter (e.g. rgba(255, 255, 255, 0.18)), but leave
+     --color-photo-canvas WHITE — the photo files themselves are white, so a
+     dark canvas would show white bars around them. */
+  --color-photo-frame: rgba(60, 64, 72, 0.16); /* 1px border around the photo box */
+  --color-photo-canvas: #ffffff; /* photo box background (letterbox bars) */
+
   --radius-pill: 999px; /* buttons, badges, chips */
   --radius-card: 16px; /* cards, panels */
   --radius-sheet: 20px; /* bottom sheet top corners */
@@ -66,6 +75,8 @@
   --color-warning-soft: var(--color-warning-soft);
   --color-info: var(--color-info);
   --color-info-soft: var(--color-info-soft);
+  --color-photo-frame: var(--color-photo-frame);
+  --color-photo-canvas: var(--color-photo-canvas);
 
   --radius-pill: var(--radius-pill);
   --radius-card: var(--radius-card);

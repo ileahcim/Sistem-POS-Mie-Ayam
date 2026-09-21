@@ -26,7 +26,8 @@ export function ProductPhotosScreen({
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
           <p className="text-ink-muted text-sm">
             Foto tampil di kartu produk layar Kasir. Produk tanpa foto memakai kotak warna dengan inisial namanya.
-            Foto otomatis dipotong 4:3 dan dikecilkan sebelum diunggah.
+            Foto tampil utuh, tidak dipotong — sisa ruang diisi putih, jadi foto berlatar putih paling cocok. Ukurannya
+            dikecilkan otomatis sebelum diunggah.
           </p>
           {categories
             .filter((c) => c.products.length > 0)

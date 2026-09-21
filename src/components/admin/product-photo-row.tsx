@@ -5,35 +5,9 @@ import { useRouter } from "next/navigation";
 import { removeProductImage, uploadProductImage } from "@/app/admin/foto-produk/actions";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/ui/product-image";
+import { resizeToCard } from "@/lib/images/resize-to-card";
 
 export type PhotoProduct = { id: string; name: string; imageUrl: string | null };
-
-const OUT_WIDTH = 800;
-const OUT_HEIGHT = 600; // 4:3, same as the Kasir product card
-
-// Center-crops to 4:3 and shrinks to 800×600 in the browser, so a 5 MB
-// phone photo becomes a ~60-120 KB file before it's ever sent.
-async function resizeToCard(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.max(OUT_WIDTH / bitmap.width, OUT_HEIGHT / bitmap.height);
-  const w = bitmap.width * scale;
-  const h = bitmap.height * scale;
-  const canvas = document.createElement("canvas");
-  canvas.width = OUT_WIDTH;
-  canvas.height = OUT_HEIGHT;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas");
-  ctx.drawImage(bitmap, (OUT_WIDTH - w) / 2, (OUT_HEIGHT - h) / 2, w, h);
-  bitmap.close();
-  const toBlob = (type: string) =>
-    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, 0.82));
-  // Browsers without WebP encoding silently hand back PNG — use JPEG then.
-  const webp = await toBlob("image/webp");
-  if (webp && webp.type === "image/webp") return webp;
-  const jpeg = await toBlob("image/jpeg");
-  if (!jpeg) throw new Error("encode");
-  return jpeg;
-}
 
 export function ProductPhotoRow({ product }: { product: PhotoProduct }) {
   const router = useRouter();

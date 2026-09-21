@@ -33,6 +33,12 @@ export function productPlaceholderColors(name: string): { background: string; co
 // The product picture box: the uploaded photo when there is one, otherwise
 // the name-derived placeholder with the product's initials. The box itself
 // has a fixed aspect ratio, so the grid never jumps while a photo loads.
+//
+// A photo is shown WHOLE (object-contain) on a white canvas inside a thin
+// frame: photos are shot on white, so the bars left over beside a tall bottle
+// vanish into the canvas, and the frame keeps the box visible on a white card.
+// The frame is on this element, so it takes the corner radius the caller
+// passes in `className`. The placeholder is unframed — its own tint marks it.
 export function ProductImage({
   name,
   imageUrl,
@@ -46,11 +52,11 @@ export function ProductImage({
 }) {
   if (imageUrl) {
     return (
-      <div className={cn("bg-muted overflow-hidden", className)}>
+      <div className={cn("bg-photo-canvas border-photo-frame overflow-hidden border", className)}>
         {/* Plain <img>: photos are already resized to ~800px on upload and
             served from Supabase Storage, so no Next image optimizer needed. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        <img src={imageUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />
       </div>
     );
   }
