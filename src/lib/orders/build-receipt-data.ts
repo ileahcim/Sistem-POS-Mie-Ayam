@@ -38,6 +38,17 @@ export function buildReceiptData(order: OrderDetail, settings: StoreSettings): R
     paymentMethod: order.paymentMethod,
     cashTendered: order.cashTendered,
     changeGiven: order.changeGiven,
+    // Only present when the order held DP; an ordinary order leaves it out
+    // entirely so its struk is exactly what it always was.
+    ...(order.deposits.length > 0
+      ? {
+          deposits: order.deposits.map((d) => ({
+            receivedAt: new Date(d.receivedAt),
+            method: d.method,
+            amount: d.amount,
+          })),
+        }
+      : {}),
     footerNote: settings.receiptFooter,
     printLogo: settings.printLogo,
   };

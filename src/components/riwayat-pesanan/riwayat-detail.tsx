@@ -14,7 +14,8 @@ import { AppHeader } from "@/components/ui/app-header";
 import { LinkButton } from "@/components/ui/link-button";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
-import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
+import { groupAddonsForPrint, formatAddonWithQty, formatRupiah } from "@/lib/printing/format";
+import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
 import { VoidOrderButton } from "@/components/order-aktif/void-order-sheet";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
@@ -116,6 +117,14 @@ export function RiwayatDetail({
               {order.cancelledAt ? ` · ${formatDateTime(order.cancelledAt)}` : ""}
             </p>
             {order.cancelReason && <p className="text-ink-muted mt-0.5 text-sm">Alasan: {order.cancelReason}</p>}
+            {/* A cancelled pre-order that took DP: what became of the money. */}
+            {order.depositOutcomes.map((o, i) => (
+              <p key={i} className="text-ink mt-0.5 text-sm font-semibold">
+                {o.kind === "REFUNDED"
+                  ? `DP dikembalikan ${formatRupiah(o.amount)} (${DEPOSIT_METHOD_LABEL[o.method]})`
+                  : `DP hangus ${formatRupiah(o.amount)} (${DEPOSIT_METHOD_LABEL[o.method]}) — dicatat sebagai pendapatan`}
+              </p>
+            ))}
           </Card>
         )}
 
@@ -154,6 +163,22 @@ export function RiwayatDetail({
               <span className="text-base font-bold text-ink">Total</span>
               <PriceText amount={order.total} weight="total" />
             </div>
+            {order.deposits.map((d) => (
+              <div key={d.id} className="flex justify-between text-sm text-ink-muted">
+                <span>
+                  DP {formatId(new Date(d.receivedAt), { day: "numeric", month: "short" })}, {DEPOSIT_METHOD_LABEL[d.method]}
+                </span>
+                <PriceText amount={d.amount} weight="secondary" />
+              </div>
+            ))}
+            {order.deposits.length > 0 && order.status === "PAID" && (
+              <div className="mt-1 flex justify-between border-t border-border pt-2">
+                <span className="text-base font-bold text-ink">
+                  {order.refundDue > 0 ? "Dikembalikan ke pelanggan" : "Sisa dibayar"}
+                </span>
+                <PriceText amount={order.refundDue > 0 ? order.refundDue : order.amountDue} weight="total" />
+              </div>
+            )}
           </div>
         </Card>
       </div>

@@ -48,8 +48,8 @@ function bucketKey(date: Date, granularity: OmzetGranularity): { key: string; la
 // Pure so it's usable both in the client chart and (if ever needed) in a
 // test — buckets by the shift's openedAt "business day" in Jakarta local
 // time (see src/lib/timezone.ts — never the runtime's default timezone,
-// which is UTC on Vercel), sums cashSales + nonCashSales (the same frozen
-// numbers get-shift-history.ts uses), and returns only the most recent N
+// which is UTC on Vercel), sums cashSales + nonCashSales + forfeitedDeposits
+// ("DP hangus" — the same frozen numbers get-shift-history.ts uses), and returns only the most recent N
 // buckets in chronological order.
 export function bucketOmzet(points: OmzetShiftPoint[], granularity: OmzetGranularity): OmzetBucket[] {
   const byKey = new Map<string, OmzetBucket>();
@@ -58,7 +58,7 @@ export function bucketOmzet(points: OmzetShiftPoint[], granularity: OmzetGranula
     const date = new Date(point.openedAt);
     const { key, label } = bucketKey(date, granularity);
     const existing = byKey.get(key);
-    const amount = point.cashSales + point.nonCashSales;
+    const amount = point.cashSales + point.nonCashSales + point.forfeitedDeposits;
     if (existing) {
       existing.total += amount;
     } else {

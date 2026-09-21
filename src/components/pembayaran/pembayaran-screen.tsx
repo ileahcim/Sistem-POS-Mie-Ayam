@@ -19,6 +19,8 @@ import { LinkButton } from "@/components/ui/link-button";
 import { AddItemsPanel } from "@/components/order-aktif/add-items-panel";
 import { SplitAndPayButton } from "@/components/order-aktif/split-and-pay-sheet";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
+import { formatId } from "@/lib/timezone";
+import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
 import { payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
 
 // Cash and QRIS only — no Transfer button. Payment is always "tap method,
@@ -59,6 +61,21 @@ export function PembayaranScreen({
   // point. Only PAID/VOID actually block the payment UI.
   const alreadyPaid = order.status !== "OPEN" && order.status !== "RECEIVABLE";
 
+  // A pre-order that took DP: only the remainder is collected here. When the DP
+  // already covers everything (or the order shrank below it) there is nothing to
+  // collect, so no method has to be picked — and a leftover DP is shown as
+  // "Kembalikan Rp X", never as a silent zero.
+  const hasDeposit = order.deposits.length > 0;
+  const nothingToCollect = hasDeposit && order.amountDue === 0;
+  const canPay = nothingToCollect || !!method;
+  const payLabel = !hasDeposit
+    ? `Bayar - ${formatRupiah(order.total)}`
+    : nothingToCollect
+      ? order.refundDue > 0
+        ? `Selesai - Kembalikan ${formatRupiah(order.refundDue)}`
+        : "Selesai - Lunas oleh DP"
+      : `Bayar Sisa - ${formatRupiah(order.amountDue)}`;
+
   // Outcome of a print attempt as plain text: null when the command went out,
   // otherwise the reason. Never throws — a printer problem must never turn
   // into an unhandled error on a payment that is already saved.
@@ -75,11 +92,13 @@ export function PembayaranScreen({
   }
 
   async function handlePay() {
-    if (!method) return;
+    if (!canPay) return;
     setPaying(true);
     setError(null);
     try {
-      const result = await payOrder(order.id, method, null);
+      // With nothing to collect the server labels the order after the DP that
+      // covered it; the value sent here is then ignored.
+      const result = await payOrder(order.id, method ?? "CASH", null);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -209,6 +228,32 @@ export function PembayaranScreen({
                   <span className="text-base font-bold text-ink">Total</span>
                   <PriceText amount={order.total} weight="total" />
                 </div>
+                {hasDeposit && (
+                  <>
+                    {order.deposits.map((d) => (
+                      <div key={d.id} className="flex justify-between text-sm text-ink-muted">
+                        <span>
+                          DP {formatId(new Date(d.receivedAt), { day: "numeric", month: "short" })},{" "}
+                          {DEPOSIT_METHOD_LABEL[d.method]}
+                        </span>
+                        <PriceText amount={d.amount} weight="secondary" />
+                      </div>
+                    ))}
+                    <div className="mt-1 flex justify-between border-t border-border pt-2">
+                      {order.refundDue > 0 ? (
+                        <>
+                          <span className="text-base font-bold text-danger">Kembalikan ke pelanggan</span>
+                          <PriceText amount={order.refundDue} weight="total" />
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-base font-bold text-ink">Sisa dibayar</span>
+                          <PriceText amount={order.amountDue} weight="total" />
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </Card>
 
@@ -218,12 +263,19 @@ export function PembayaranScreen({
               </div>
             )}
 
-            {order.status === "OPEN" && (
+            {order.status === "OPEN" && !hasDeposit && (
               <div className="mt-3 flex justify-center">
                 <SplitAndPayButton order={order} />
               </div>
             )}
 
+            {nothingToCollect ? (
+              <p className="text-ink-muted mt-4 text-center text-sm">
+                {order.refundDue > 0
+                  ? `DP lebih besar dari total pesanan — kembalikan ${formatRupiah(order.refundDue)} ke pelanggan, lalu tekan Selesai.`
+                  : "DP sudah menutup seluruh pesanan — tidak ada yang perlu dibayar lagi."}
+              </p>
+            ) : (
             <div className="mt-4 flex gap-2">
               {METHODS.map((m) => (
                 <button
@@ -239,6 +291,7 @@ export function PembayaranScreen({
                 </button>
               ))}
             </div>
+            )}
 
             {error && <p className="text-danger mt-3 text-sm">{error}</p>}
           </>
@@ -247,8 +300,8 @@ export function PembayaranScreen({
 
       {!alreadyPaid && !pendingReceipt && (
         <div className="border-border bg-surface border-t p-4">
-          <Button variant="primary" size="large" fullWidth disabled={!method || paying} onClick={handlePay}>
-            {paying ? "Memproses..." : `Bayar - ${formatRupiah(order.total)}`}
+          <Button variant="primary" size="large" fullWidth disabled={!canPay || paying} onClick={handlePay}>
+            {paying ? "Memproses..." : payLabel}
           </Button>
         </div>
       )}

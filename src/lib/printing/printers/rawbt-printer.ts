@@ -18,8 +18,8 @@
 // removes it. That only affects the RawBT path — the web Bluetooth path
 // has no watermark — which is exactly why web bluetooth is the default.
 
-import type { PackingListData, Printer, PrintResult, ReceiptData } from "../types";
-import { buildPackingListBytes, buildReceiptBytes } from "../escpos";
+import type { DepositReceiptData, PackingListData, Printer, PrintResult, ReceiptData } from "../types";
+import { buildDepositReceiptBytes, buildPackingListBytes, buildReceiptBytes } from "../escpos";
 import { withLogo } from "../logo-raster";
 
 function isAndroid(): boolean {
@@ -56,6 +56,10 @@ function transmitToRawBt(bytes: Uint8Array): PrintResult {
 export const rawBtPrinter: Printer = {
   async printReceipt(data: ReceiptData): Promise<PrintResult> {
     return transmitToRawBt(buildReceiptBytes(await withLogo(data)));
+  },
+
+  async printDepositReceipt(data: DepositReceiptData): Promise<PrintResult> {
+    return transmitToRawBt(buildDepositReceiptBytes(await withLogo(data)));
   },
 
   async printPackingList(data: PackingListData): Promise<PrintResult> {

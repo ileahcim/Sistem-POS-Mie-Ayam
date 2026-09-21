@@ -27,11 +27,22 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Acti
   const trimmed = reason.trim();
   if (!trimmed) return { ok: false, error: "Isi alasan pembatalan." };
 
+  // "No DP" is part of the WHERE for the same reason status is: a pre-order that
+  // took DP holds real money, so cancelling it has to say what happens to that
+  // money — that is cancelOrderWithDeposit (OWNER), never this plain path.
   const result = await prisma.order.updateMany({
-    where: { id: orderId, status: "OPEN" },
+    where: { id: orderId, status: "OPEN", deposits: { none: {} } },
     data: { status: "CANCELLED", cancelReason: trimmed, cancelledById: user.id, cancelledAt: new Date() },
   });
   if (result.count === 0) {
+    const holdsDeposit = await prisma.preorderDeposit.count({ where: { orderId } });
+    if (holdsDeposit > 0) {
+      return {
+        ok: false,
+        error:
+          "Order ini punya DP — pembatalannya hanya oleh pemilik, lewat detail order (pilih Kembalikan DP atau DP hangus).",
+      };
+    }
     return { ok: false, error: "Order ini sudah dibayar/tidak aktif — tidak bisa dibatalkan." };
   }
   return { ok: true };
@@ -172,6 +183,11 @@ export async function splitAndPay(orderId: string, selections: SplitSelection[])
     if (!order) return { ok: false, error: "Order tidak ditemukan." };
     if (order.status !== "OPEN") {
       return { ok: false, error: "Order ini sudah tidak aktif — tidak bisa dipisah." };
+    }
+    // The DP belongs to the whole order; splitting would leave it against
+    // whichever half happens to be paid first.
+    if ((await tx.preorderDeposit.count({ where: { orderId } })) > 0) {
+      return { ok: false, error: "Order ini punya DP — tidak bisa dipisah. Selesaikan lewat pembayaran biasa." };
     }
 
     const itemById = new Map(order.items.map((i) => [i.id, i]));

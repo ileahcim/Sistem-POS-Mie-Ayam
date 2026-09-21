@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { NoScheduleIcon } from "@/components/ui/empty-state-icons";
 import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
+import { formatRupiah } from "@/lib/printing/format";
 
 const CHANNEL_LABEL: Record<PreOrderSummary["channel"], string> = {
   DINE_IN: "Dine In",
@@ -69,6 +70,14 @@ export function PesananTerjadwalList({
                     {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
                   </div>
                   <div className="text-ink-muted truncate text-sm">{order.itemSummary}</div>
+                  {order.depositTotal > 0 && (
+                    <div className="text-primary-strong text-sm font-semibold">
+                      DP {formatRupiah(order.depositTotal)} ·{" "}
+                      {order.refundDue > 0
+                        ? `Kembalikan ${formatRupiah(order.refundDue)}`
+                        : `Sisa ${formatRupiah(order.amountDue)}`}
+                    </div>
+                  )}
                 </div>
               </ListRow>
             ))

@@ -104,12 +104,18 @@ export function OrderAktifList({
                       {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
                     </span>
                   </ListRow>
-                  <CancelOrderButton
-                    size="compact"
-                    orderId={order.id}
-                    orderLabel={formatQueueLabel(order.queueNumber, order.queueSuffix)}
-                    onCancelled={() => router.refresh()}
-                  />
+                  {order.hasDeposit ? (
+                    // Same footprint as the Batal button. An order that holds DP is
+                    // cancelled from its detail screen (owner picks the DP's fate).
+                    <span className="mr-3 w-16 shrink-0" aria-hidden />
+                  ) : (
+                    <CancelOrderButton
+                      size="compact"
+                      orderId={order.id}
+                      orderLabel={formatQueueLabel(order.queueNumber, order.queueSuffix)}
+                      onCancelled={() => router.refresh()}
+                    />
+                  )}
                 </div>
               ))}
             </Card>

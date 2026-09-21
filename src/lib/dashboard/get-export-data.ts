@@ -58,6 +58,10 @@ export type ExportShiftRow = {
   expectedCash: number;
   countedCash: number;
   difference: number;
+  depositsAppliedCash: number;
+  depositsReceivedCash: number;
+  depositRefundsCash: number;
+  forfeitedDeposits: number;
 };
 
 // All closed shifts — the frozen numbers, same rule as the dashboard.
@@ -80,5 +84,9 @@ export async function getAllClosedShifts(): Promise<ExportShiftRow[]> {
     expectedCash: s.expectedCash ?? 0,
     countedCash: s.countedCash ?? 0,
     difference: s.difference ?? 0,
+    depositsAppliedCash: s.depositsAppliedCash ?? 0,
+    depositsReceivedCash: s.depositsReceivedCash ?? 0,
+    depositRefundsCash: s.depositRefundsCash ?? 0,
+    forfeitedDeposits: s.forfeitedDeposits ?? 0,
   }));
 }

@@ -22,6 +22,7 @@ export function ReasonSheet({
   busyLabel,
   notice,
   footnote,
+  confirmDisabled = false,
   onSubmit,
   onClose,
   onDone,
@@ -34,6 +35,9 @@ export function ReasonSheet({
   busyLabel: string;
   notice?: ReactNode;
   footnote?: string;
+  // Extra condition on top of "a reason was given" — e.g. the DP-cancel sheet
+  // won't confirm until the owner has chosen what happens to the DP.
+  confirmDisabled?: boolean;
   onSubmit: (reason: string) => Promise<ReasonActionResult>;
   onClose: () => void;
   onDone: () => void;
@@ -71,7 +75,7 @@ export function ReasonSheet({
           title={title}
           onClose={close}
           footer={
-            <Button variant="danger" size="large" fullWidth disabled={saving || !reason.trim()} onClick={handleConfirm}>
+            <Button variant="danger" size="large" fullWidth disabled={saving || confirmDisabled || !reason.trim()} onClick={handleConfirm}>
               {saving ? busyLabel : confirmLabel}
             </Button>
           }

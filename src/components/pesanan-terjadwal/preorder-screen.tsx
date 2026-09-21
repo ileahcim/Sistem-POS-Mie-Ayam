@@ -8,6 +8,8 @@ import { useCartDraft } from "@/lib/cart/use-cart-draft";
 import { expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
+import type { PrinterDriver } from "@/lib/printing/types";
+import { computeOrderTotals } from "@/lib/orders/pricing";
 import { AppHeader } from "@/components/ui/app-header";
 import { LinkButton } from "@/components/ui/link-button";
 import { ChannelTableBar } from "@/components/kasir/channel-table-bar";
@@ -18,6 +20,8 @@ import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-shee
 import { CartPanel } from "@/components/kasir/cart-panel";
 import { CartBar } from "@/components/kasir/cart-bar";
 import { savePreOrder } from "@/app/pesanan-terjadwal/actions";
+import { DepositPicker, initialDepositDraft, type DepositDraft } from "./deposit-picker";
+import { useDepositReceiptPrompt } from "./use-deposit-receipt-prompt";
 
 const PREORDER_STORAGE_KEY = "pos-mi-ayam:preorder-draft";
 
@@ -34,10 +38,17 @@ export function PreOrderScreen({
   categories,
   comboShortcuts,
   nav,
+  cashDepositAvailable,
+  autoPrintReceipt,
+  printerDriver,
 }: {
   categories: MenuCategory[];
   comboShortcuts: ComboShortcut[];
   nav: HeaderNav;
+  // A cash DP needs an open shift (it goes into the drawer); QRIS never does.
+  cashDepositAvailable: boolean;
+  autoPrintReceipt: boolean;
+  printerDriver: PrinterDriver;
 }) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, clear } =
@@ -50,6 +61,18 @@ export function PreOrderScreen({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
+  const [deposit, setDeposit] = useState<DepositDraft>(() => initialDepositDraft(cashDepositAvailable));
+
+  // After the order is saved with a DP, the "BUKTI UANG MUKA" is what the
+  // customer walks away with — this decides about the paper, then leaves.
+  const { handleRecorded, prompt: depositPrompt } = useDepositReceiptPrompt({
+    autoPrint: autoPrintReceipt,
+    printerDriver,
+    onFinished: () => {
+      router.push("/pesanan-terjadwal");
+      router.refresh();
+    },
+  });
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? categories[0];
 
@@ -142,6 +165,7 @@ export function PreOrderScreen({
           notes: i.notes,
           qty: i.qty,
         })),
+        deposit: deposit.amount > 0 ? { amount: deposit.amount, method: deposit.method } : null,
       });
       if (!result.ok) {
         setSaveError(result.error);
@@ -149,6 +173,10 @@ export function PreOrderScreen({
       }
       clear();
       setCartSheetOpen(false);
+      if (result.depositReceipt) {
+        await handleRecorded(result.depositReceipt);
+        return;
+      }
       router.push("/pesanan-terjadwal");
       router.refresh();
     } finally {
@@ -156,8 +184,25 @@ export function PreOrderScreen({
     }
   }
 
+  const orderTotal = computeOrderTotals(draft.items, draft.channel).total;
+  const depositExtra = (
+    <div className="border-border mt-2 border-t pt-2">
+      <p className="text-ink mb-1.5 text-sm font-bold">
+        Uang Muka (DP) <span className="text-ink-faint font-normal">· Opsional</span>
+      </p>
+      <DepositPicker
+        total={orderTotal}
+        value={deposit}
+        onChange={setDeposit}
+        cashAvailable={cashDepositAvailable}
+        allowNone
+      />
+    </div>
+  );
+
   return (
     <div className="flex h-dvh flex-col">
+      {depositPrompt}
       <AppHeader
         nav={nav}
         title="Pre-order Baru"
@@ -225,6 +270,7 @@ export function PreOrderScreen({
             onRemove={removeItem}
             onSave={handleSave}
             saveLabel="Simpan Pre-order"
+            footerExtra={depositExtra}
           />
         </div>
       </div>
@@ -247,6 +293,7 @@ export function PreOrderScreen({
             onRemove={removeItem}
             onSave={handleSave}
             saveLabel="Simpan Pre-order"
+            footerExtra={depositExtra}
             onClose={() => setCartSheetOpen(false)}
           />
         )}

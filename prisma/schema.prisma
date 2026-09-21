@@ -42,6 +42,7 @@ model User {
   ordersVoided    Order[]     @relation("OrderVoidedBy")
   ordersCancelled Order[]     @relation("OrderCancelledBy")
   mieLedgerEntriesCreated MieLedgerEntry[]
+  depositEntriesCreated   PreorderDeposit[]
 }
 
 // ---------------------------------------------------------------------------
@@ -229,12 +230,41 @@ model Shift {
   cashSales     Int?
   nonCashSales  Int?
   expenseTotal  Int?
-  expectedCash  Int? // openingCash + cashSales - expenseTotal
+  expectedCash  Int? // openingCash + cashSales - depositsAppliedCash + depositsReceivedCash - depositRefundsCash - expenseTotal
   countedCash   Int? // what the cashier physically counted, entered blind
   difference    Int? // countedCash - expectedCash, shown only after countedCash is submitted
 
+  // Pre-order DP (uang muka), frozen at close like everything above. NULL on
+  // every shift that closed before DP existed — those reports are never
+  // recomputed, and NULL reads as 0 everywhere they are shown.
+  //
+  // cashSales/nonCashSales stay the FULL sale value recognised on the delivery
+  // day (that is what omzet, margin and per-channel all read); these columns
+  // only explain how the DRAWER differs from that number:
+  //   depositsAppliedCash     DP (received on an earlier day) that was applied
+  //                           to orders paid in CASH this shift. Those rupiah
+  //                           are inside cashSales but never hit today's drawer.
+  //   depositsReceivedCash    cash DP taken this shift. Physically in the
+  //                           drawer, but not a sale (yet).
+  //   depositsReceivedNonCash QRIS DP taken this shift. Informational — never
+  //                           touches the drawer.
+  //   depositRefundsCash      cash DP handed back this shift (cancelled
+  //                           pre-order, or the customer overpaid). Leaves the
+  //                           drawer.
+  //   depositRefundsNonCash   the same for QRIS. Informational.
+  //   forfeitedDeposits       "DP hangus": DP kept from a cancelled pre-order,
+  //                           recognised as revenue on the day of cancellation.
+  //                           Not a food sale, so it lives apart from cashSales.
+  depositsAppliedCash     Int?
+  depositsReceivedCash    Int?
+  depositsReceivedNonCash Int?
+  depositRefundsCash      Int?
+  depositRefundsNonCash   Int?
+  forfeitedDeposits       Int?
+
   orders   Order[]
   expenses Expense[]
+  deposits PreorderDeposit[]
 }
 
 model Expense {
@@ -350,12 +380,57 @@ model Order {
   cancelledBy   User?     @relation("OrderCancelledBy", fields: [cancelledById], references: [id])
   cancelledAt   DateTime?
 
-  items OrderItem[]
+  items    OrderItem[]
+  deposits PreorderDeposit[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([shiftId, queueNumber, queueSuffix])
+}
+
+// What happened to a slice of a pre-order's DP (uang muka).
+enum DepositKind {
+  RECEIVED // the customer handed over DP
+  APPLIED // DP offset against the final sale when the order is paid
+  REFUNDED // DP handed back: pre-order cancelled, or the customer overpaid
+  FORFEITED // pre-order cancelled and the DP kept — "DP hangus"
+}
+
+// DP ledger. Like MieLedgerEntry: the balance a pre-order still holds is
+// never a stored column, it is RECEIVED minus everything that settled it, and
+// nothing here is ever edited or deleted — a correction is a new row.
+// `amount` is always positive; `kind` says which way it went.
+//
+// Why a table and not a column on Order: a customer can pay DP more than once,
+// and every entry has its own day, method and shift — the shift is what lets
+// a cash DP be part of THAT day's drawer reconciliation, as a receipt and not
+// as a sale (see Shift.depositsReceivedCash).
+model PreorderDeposit {
+  id String @id @default(cuid())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  kind   DepositKind
+  method PaymentMethod // CASH or QRIS only — enforced in app code, TRANSFER is legacy
+  amount Int // Rupiah, > 0
+
+  // The shift that was open when this happened. Always set for anything that
+  // moves cash (a cash DP or refund needs an open shift). Null only for a
+  // QRIS RECEIVED/REFUNDED entry made while no shift was open.
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id])
+
+  // Cancellation reason for REFUNDED/FORFEITED entries made by cancelling.
+  note String?
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+  @@index([shiftId])
 }
 
 // One row per distinct cart line. Product name/price/cost are snapshotted at

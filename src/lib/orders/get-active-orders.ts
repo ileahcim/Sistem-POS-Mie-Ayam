@@ -16,6 +16,9 @@ export type ActiveOrder = {
   totalQty: number;
   portionsToCook: number; // qty summed over Makanan/Minuman Racik lines only
   items: ActiveOrderItem[];
+  // True once a DP was taken. Such an order can't be cancelled with the plain
+  // "Batal" button (the DP needs a decision) — the row hides it.
+  hasDeposit: boolean;
 };
 
 // "Order Aktif" = food not yet served, regardless of payment status (paid
@@ -30,7 +33,7 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
       OR: [{ scheduledFor: null }, { scheduledFor: { lte: new Date() } }],
     },
     orderBy: { createdAt: "asc" },
-    include: { items: true },
+    include: { items: true, deposits: { select: { id: true }, take: 1 } },
   });
 
   return orders.map((order) => ({
@@ -44,6 +47,7 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
     totalQty: order.items.reduce((sum, i) => sum + i.qty, 0),
     portionsToCook: order.items.reduce((sum, i) => sum + (i.isKitchenItem ? i.qty : 0), 0),
     items: order.items.map((i) => ({ productName: i.productName, qty: i.qty })),
+    hasDeposit: order.deposits.length > 0,
   }));
 }
 
@@ -54,6 +58,7 @@ export type UnpaidServedOrder = {
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   servedAt: string;
+  hasDeposit: boolean;
 };
 
 // Food already served but not yet paid (typical dine-in: eat now, pay
@@ -64,6 +69,7 @@ export async function getUnpaidServedOrders(): Promise<UnpaidServedOrder[]> {
   const orders = await prisma.order.findMany({
     where: { servedAt: { not: null }, status: "OPEN" },
     orderBy: { servedAt: "asc" },
+    include: { deposits: { select: { id: true }, take: 1 } },
   });
 
   return orders.map((order) => ({
@@ -73,5 +79,6 @@ export async function getUnpaidServedOrders(): Promise<UnpaidServedOrder[]> {
     channel: order.channel,
     tableLabel: order.tableLabel,
     servedAt: order.servedAt!.toISOString(),
+    hasDeposit: order.deposits.length > 0,
   }));
 }

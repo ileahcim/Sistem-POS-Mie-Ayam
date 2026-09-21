@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { DELIVERY_FEE_PER_FOOD_ITEM } from "./pricing";
+import { depositPosition, type DepositMethod } from "@/lib/deposits/settle";
 
 export type OrderDetailItem = {
   id: string;
@@ -14,6 +15,22 @@ export type OrderDetailItem = {
   // it only ever drives the on-screen reading order, see line-order.ts, so
   // following a later re-ordering of the categories is the right behaviour.
   categorySortOrder: number;
+};
+
+// One DP the customer paid on a pre-order (the RECEIVED entries of the ledger).
+export type OrderDetailDeposit = {
+  id: string;
+  method: DepositMethod;
+  amount: number;
+  receivedAt: string; // ISO
+  receivedByName: string;
+};
+
+// How a cancelled pre-order's DP ended: handed back, or kept ("DP hangus").
+export type OrderDetailDepositOutcome = {
+  kind: "REFUNDED" | "FORFEITED";
+  method: DepositMethod;
+  amount: number;
 };
 
 export type OrderDetail = {
@@ -47,6 +64,18 @@ export type OrderDetail = {
   subtotal: number;
   deliveryFee: number;
   total: number;
+  // Pre-order DP. `deposits` is empty for every ordinary order — and then
+  // depositTotal is 0, amountDue === total and refundDue is 0, so nothing
+  // downstream needs a special case.
+  deposits: OrderDetailDeposit[];
+  depositTotal: number;
+  // What still has to be collected at the till (total minus DP, never below 0).
+  amountDue: number;
+  // DP beyond the total — the order shrank after the DP was taken. Shown as
+  // "Kembalikan Rp X", never silently treated as 0.
+  refundDue: number;
+  // Only for a CANCELLED order that held DP.
+  depositOutcomes: OrderDetailDepositOutcome[];
 };
 
 export async function getOrderDetail(orderId: string): Promise<OrderDetail | null> {
@@ -64,6 +93,10 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       cancelledBy: { select: { name: true } },
       voidedBy: { select: { name: true } },
       shift: { select: { status: true } },
+      deposits: {
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        include: { createdBy: { select: { name: true } } },
+      },
     },
   });
   if (!order) return null;
@@ -85,6 +118,18 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     order.channel === "ANTAR"
       ? items.reduce((sum, i) => sum + (i.isDeliveryChargeable ? i.qty : 0), 0) * DELIVERY_FEE_PER_FOOD_ITEM
       : 0;
+
+  const total = subtotal + deliveryFee;
+  const deposits: OrderDetailDeposit[] = order.deposits
+    .filter((d) => d.kind === "RECEIVED")
+    .map((d) => ({
+      id: d.id,
+      method: d.method as DepositMethod,
+      amount: d.amount,
+      receivedAt: d.createdAt.toISOString(),
+      receivedByName: d.createdBy.name,
+    }));
+  const position = depositPosition(total, deposits.map((d) => d.amount));
 
   return {
     id: order.id,
@@ -114,6 +159,16 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     items,
     subtotal,
     deliveryFee,
-    total: subtotal + deliveryFee,
+    total,
+    deposits,
+    depositTotal: position.held,
+    amountDue: position.remainder,
+    refundDue: position.excess,
+    depositOutcomes:
+      order.status === "CANCELLED"
+        ? order.deposits
+            .filter((d) => d.kind === "REFUNDED" || d.kind === "FORFEITED")
+            .map((d) => ({ kind: d.kind as "REFUNDED" | "FORFEITED", method: d.method as DepositMethod, amount: d.amount }))
+        : [],
   };
 }

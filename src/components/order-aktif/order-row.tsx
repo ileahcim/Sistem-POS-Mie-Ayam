@@ -62,7 +62,7 @@ export function OrderRow({
         {order.status === "PAID" && <Badge variant="success">Lunas</Badge>}
         <span className={cn("w-16 shrink-0 text-right text-sm", timerClass)}>{minutes} mnt</span>
       </ListRow>
-      {order.status === "OPEN" ? (
+      {order.status === "OPEN" && !order.hasDeposit ? (
         <CancelOrderButton
           size="compact"
           orderId={order.id}

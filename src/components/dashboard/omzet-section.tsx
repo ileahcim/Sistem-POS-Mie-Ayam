@@ -16,8 +16,9 @@ const OPTIONS: { value: OmzetGranularity; label: string }[] = [
 
 // Section 2. Buckets client-side from a wide raw history (see
 // get-omzet-history.ts) so switching range is instant, no round trip —
-// same frozen Shift.cashSales/nonCashSales numbers as section 1, summed
-// per bucket, never recomputed from Order.
+// same frozen Shift.cashSales/nonCashSales numbers as section 1 (plus
+// "DP hangus", kept from cancelled pre-orders), summed per bucket, never
+// recomputed from Order.
 export function OmzetSection({ history }: { history: OmzetShiftPoint[] }) {
   const [granularity, setGranularity] = useState<OmzetGranularity>("harian");
   const buckets = useMemo(() => bucketOmzet(history, granularity), [history, granularity]);

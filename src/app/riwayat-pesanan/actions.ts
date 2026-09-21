@@ -21,11 +21,20 @@ export async function voidPaidOrder(orderId: string, reason: string): Promise<Ac
   const trimmed = reason.trim();
   if (!trimmed) return { ok: false, error: "Isi alasan void." };
 
+  // Not yet supported for an order that used DP: the DP was settled into a
+  // shift that may already be closed, and un-settling it would need its own
+  // refund/forfeit step to keep the drawer honest. Refused rather than guessed.
   const result = await prisma.order.updateMany({
-    where: { id: orderId, status: "PAID" },
+    where: { id: orderId, status: "PAID", deposits: { none: {} } },
     data: { status: "VOID", voidReason: trimmed, voidedById: user.id, voidedAt: new Date() },
   });
   if (result.count === 0) {
+    if ((await prisma.preorderDeposit.count({ where: { orderId } })) > 0) {
+      return {
+        ok: false,
+        error: "Void belum didukung untuk order yang memakai DP, supaya kas shift tetap akurat. Hubungi pengembang.",
+      };
+    }
     return { ok: false, error: "Hanya order yang sudah dibayar yang bisa di-void." };
   }
   return { ok: true };

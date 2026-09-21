@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { CartItem, ChannelType, TableLabel } from "@/lib/cart/types";
 import { computeOrderTotals } from "@/lib/orders/pricing";
@@ -29,6 +30,7 @@ export function CartPanel({
   onRemove,
   onSave,
   saveLabel = "Simpan Pesanan",
+  footerExtra,
   variant = "sidebar",
   onClose,
 }: {
@@ -44,6 +46,9 @@ export function CartPanel({
   onRemove: (localId: string) => void;
   onSave: () => void;
   saveLabel?: string;
+  // Optional block rendered right under Total, above the save button (the
+  // pre-order screen puts its DP picker here).
+  footerExtra?: ReactNode;
   variant?: "sidebar" | "sheet";
   onClose?: () => void;
 }) {
@@ -102,6 +107,8 @@ export function CartPanel({
         <span className="text-base font-bold text-ink">Total</span>
         <PriceText amount={totals.total} weight="total" />
       </div>
+
+      {items.length > 0 && footerExtra}
 
       {saveError && <p className="text-danger mt-1.5 text-sm">{saveError}</p>}
       {!saveError && !channel && items.length > 0 && (

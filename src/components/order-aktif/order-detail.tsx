@@ -21,6 +21,8 @@ import { AddItemsPanel } from "./add-items-panel";
 import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { CancelOrderButton } from "./cancel-order-sheet";
 import { VoidOrderButton } from "./void-order-sheet";
+import { DepositCard } from "@/components/pesanan-terjadwal/deposit-card";
+import { CancelDepositOrderButton } from "@/components/pesanan-terjadwal/cancel-deposit-order-sheet";
 import { markServed, removeOrderItem } from "@/app/order-aktif/actions";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
@@ -125,6 +127,8 @@ export function OrderDetail({
   printerDriver,
   nav,
   isOwner,
+  cashDepositAvailable,
+  autoPrintReceipt,
 }: {
   order: OrderDetailData;
   menu: MenuCategory[];
@@ -132,6 +136,9 @@ export function OrderDetail({
   printerDriver: PrinterDriver;
   nav: HeaderNav;
   isOwner: boolean;
+  // A cash DP needs an open shift (it goes into the drawer); QRIS never does.
+  cashDepositAvailable: boolean;
+  autoPrintReceipt: boolean;
 }) {
   const router = useRouter();
   const [markingServed, setMarkingServed] = useState(false);
@@ -223,6 +230,15 @@ export function OrderDetail({
           </div>
         </Card>
 
+        {(order.scheduledFor || order.deposits.length > 0) && (
+          <DepositCard
+            order={order}
+            cashAvailable={cashDepositAvailable}
+            autoPrint={autoPrintReceipt}
+            printerDriver={printerDriver}
+          />
+        )}
+
         {canPrintPackingList && (
           <div className="mt-3">
             <Button variant="secondary" size="large" fullWidth onClick={handlePrintDaftar} disabled={printing}>
@@ -232,7 +248,7 @@ export function OrderDetail({
           </div>
         )}
 
-        {order.status === "OPEN" && (
+        {order.status === "OPEN" && order.deposits.length === 0 && (
           <div className="mt-3 flex justify-center">
             <SplitAndPayButton order={order} />
           </div>
@@ -257,13 +273,31 @@ export function OrderDetail({
           </div>
         )}
 
-        {order.status === "OPEN" && (
+        {order.status === "OPEN" && order.deposits.length === 0 && (
           <div className="mt-6">
             <CancelOrderButton
               orderId={order.id}
               orderLabel={order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : null}
               onCancelled={() => router.push("/order-aktif")}
             />
+          </div>
+        )}
+
+        {/* DP is real money: cancelling has to decide its fate, and only the
+            owner may (the plain cancel refuses an order that holds DP). */}
+        {order.status === "OPEN" && order.deposits.length > 0 && (
+          <div className="mt-6">
+            {isOwner ? (
+              <CancelDepositOrderButton
+                orderId={order.id}
+                deposits={order.deposits}
+                onCancelled={() => router.push("/order-aktif")}
+              />
+            ) : (
+              <p className="text-ink-muted text-center text-sm">
+                Pesanan ini sudah ada DP-nya — membatalkannya hanya bisa oleh pemilik.
+              </p>
+            )}
           </div>
         )}
 

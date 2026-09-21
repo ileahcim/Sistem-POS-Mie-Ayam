@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { formatId } from "@/lib/timezone";
+import { orderTotalFromLines } from "./order-total";
+import { depositPosition } from "@/lib/deposits/settle";
 
 export type PreOrderSummary = {
   id: string;
@@ -9,6 +11,10 @@ export type PreOrderSummary = {
   customerName: string | null;
   status: "OPEN" | "PAID";
   itemSummary: string;
+  // DP (uang muka). depositTotal is 0 for a pre-order without one.
+  depositTotal: number;
+  amountDue: number; // what is still to be collected (total minus DP, never below 0)
+  refundDue: number; // DP beyond the total — the order shrank; shown as "Kembalikan"
 };
 
 // "Pesanan Terjadwal" tab — pre-orders not yet due. The moment scheduledFor
@@ -22,20 +28,29 @@ export async function getUpcomingPreOrders(): Promise<PreOrderSummary[]> {
       status: { in: ["OPEN", "PAID"] },
     },
     orderBy: { scheduledFor: "asc" },
-    include: { items: true },
+    include: { items: true, deposits: { where: { kind: "RECEIVED" }, select: { amount: true } } },
   });
 
-  return orders.map((order) => ({
-    id: order.id,
-    scheduledFor: order.scheduledFor!.toISOString(),
-    channel: order.channel,
-    tableLabel: order.tableLabel,
-    customerName: order.customerName,
-    status: order.status as "OPEN" | "PAID",
-    itemSummary: order.items
-      .map((i) => (i.qty > 1 ? `${i.productName} x${i.qty}` : i.productName))
-      .join(", "),
-  }));
+  return orders.map((order) => {
+    const position = depositPosition(
+      orderTotalFromLines(order.items, order.channel),
+      order.deposits.map((d) => d.amount),
+    );
+    return {
+      id: order.id,
+      scheduledFor: order.scheduledFor!.toISOString(),
+      channel: order.channel,
+      tableLabel: order.tableLabel,
+      customerName: order.customerName,
+      status: order.status as "OPEN" | "PAID",
+      itemSummary: order.items
+        .map((i) => (i.qty > 1 ? `${i.productName} x${i.qty}` : i.productName))
+        .join(", "),
+      depositTotal: position.held,
+      amountDue: position.remainder,
+      refundDue: position.excess,
+    };
+  });
 }
 
 export type PreOrderReminder = {

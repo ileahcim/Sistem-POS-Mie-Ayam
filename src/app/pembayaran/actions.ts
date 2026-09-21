@@ -2,8 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/get-current-user";
-import { getOrderDetail } from "@/lib/orders/get-order-detail";
+import { getOrderDetail, type OrderDetail } from "@/lib/orders/get-order-detail";
 import { buildReceiptData } from "@/lib/orders/build-receipt-data";
+import { orderTotalFromLines } from "@/lib/orders/order-total";
+import { allocateDeposits, methodWhenFullyPrepaid, type DepositMethod } from "@/lib/deposits/settle";
 import { getSettings } from "@/lib/settings/get-settings";
 import type { ReceiptData } from "@/lib/printing/types";
 
@@ -12,6 +14,13 @@ export type PaymentMethod = "CASH" | "QRIS" | "TRANSFER";
 export type PayOrderResult =
   | { ok: true; receipt: ReceiptData }
   | { ok: false; error: string };
+
+// Thrown inside a transaction to roll it back with a message the cashier can read.
+class PaymentRefused extends Error {}
+
+const PAYABLE = ["OPEN", "RECEIVABLE"] as const;
+const RACED =
+  "Order ini baru saja berubah (sudah dibayar, atau baru dicatat DP di perangkat lain). Muat ulang layar lalu coba lagi.";
 
 // Total is always recomputed server-side from the order's own snapshotted
 // items (getOrderDetail) — never trust a total the client displayed, since
@@ -23,7 +32,7 @@ export async function payOrder(
   method: PaymentMethod,
   cashTendered: number | null,
 ): Promise<PayOrderResult> {
-  await requireUser();
+  const user = await requireUser();
 
   const order = await getOrderDetail(orderId);
   if (!order) return { ok: false, error: "Order tidak ditemukan." };
@@ -32,6 +41,11 @@ export async function payOrder(
   if (order.status !== "OPEN" && order.status !== "RECEIVABLE") {
     return { ok: false, error: "Order ini sudah tidak bisa dibayar (sudah lunas/void)." };
   }
+
+  // A pre-order that took DP settles in its own transaction: only the remainder
+  // is collected, and the DP is applied (or the excess handed back) in the same
+  // commit. Everything below is the ordinary path, untouched by DP.
+  if (order.deposits.length > 0) return payWithDeposits(order, user.id, method, cashTendered);
 
   if (cashTendered != null && cashTendered < order.total) {
     return { ok: false, error: "Uang tendered kurang dari total." };
@@ -57,28 +71,37 @@ export async function payOrder(
       return { ok: false, error: "Belum ada shift terbuka. Buka shift dulu sebelum membayar pre-order ini." };
     }
 
-    await prisma.$transaction(async (tx) => {
-      const shift = await tx.shift.update({
-        where: { id: openShift.id },
-        data: { lastQueueNumber: { increment: 1 } },
+    try {
+      await prisma.$transaction(async (tx) => {
+        const shift = await tx.shift.update({
+          where: { id: openShift.id },
+          data: { lastQueueNumber: { increment: 1 } },
+        });
+        // Guarded by status and by "still no DP": a second tap on Bayar, or a DP
+        // recorded on another device a moment ago, makes this match nothing and
+        // rolls the queue-number increment back with it.
+        const claimed = await tx.order.updateMany({
+          where: { id: order.id, status: { in: [...PAYABLE] }, deposits: { none: {} } },
+          data: {
+            shiftId: shift.id,
+            queueNumber: shift.lastQueueNumber,
+            status: "PAID",
+            paymentMethod: method,
+            paidAt,
+            servedAt,
+            cashTendered,
+            changeGiven,
+          },
+        });
+        if (claimed.count !== 1) throw new PaymentRefused(RACED);
       });
-      await tx.order.update({
-        where: { id: order.id },
-        data: {
-          shiftId: shift.id,
-          queueNumber: shift.lastQueueNumber,
-          status: "PAID",
-          paymentMethod: method,
-          paidAt,
-          servedAt,
-          cashTendered,
-          changeGiven,
-        },
-      });
-    });
+    } catch (e) {
+      if (e instanceof PaymentRefused) return { ok: false, error: e.message };
+      throw e;
+    }
   } else {
-    await prisma.order.update({
-      where: { id: order.id },
+    const claimed = await prisma.order.updateMany({
+      where: { id: order.id, status: { in: [...PAYABLE] }, deposits: { none: {} } },
       data: {
         status: "PAID",
         paymentMethod: method,
@@ -88,10 +111,98 @@ export async function payOrder(
         changeGiven,
       },
     });
+    if (claimed.count !== 1) return { ok: false, error: RACED };
   }
 
   const [paidOrder, settings] = await Promise.all([getOrderDetail(order.id), getSettings()]);
   const receipt = buildReceiptData(paidOrder!, settings);
 
   return { ok: true, receipt };
+}
+
+// Paying a pre-order that holds DP. Only the REMAINDER is collected now; the DP
+// is applied against the sale, and if the order shrank below the DP the excess
+// is handed back — each as ledger rows stamped with THIS shift, which is what
+// lets closeShift keep the drawer honest (see lib/deposits/shift-math.ts).
+//
+// The whole thing is one transaction that starts by locking the order row, and
+// everything (items, total, ledger) is re-read after the lock — so a double tap,
+// or an item removed or a DP recorded on another device a moment ago, can neither
+// settle the DP twice nor settle it against a stale total.
+async function payWithDeposits(
+  order: OrderDetail,
+  userId: string,
+  method: PaymentMethod,
+  cashTendered: number | null,
+): Promise<PayOrderResult> {
+  const paidAt = new Date();
+  const servedAt = order.servedAt ? undefined : order.channel !== "DINE_IN" ? paidAt : undefined;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const locked = await tx.order.updateMany({
+        where: { id: order.id, status: { in: [...PAYABLE] } },
+        data: { updatedAt: new Date() },
+      });
+      if (locked.count !== 1) {
+        throw new PaymentRefused("Order ini sudah tidak bisa dibayar (sudah lunas/void).");
+      }
+
+      const fresh = await tx.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: { items: true, deposits: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+      });
+      const total = orderTotalFromLines(fresh.items, fresh.channel);
+      const received = fresh.deposits
+        .filter((d) => d.kind === "RECEIVED")
+        .map((d) => ({ id: d.id, method: d.method as DepositMethod, amount: d.amount }));
+      const allocation = allocateDeposits(total, received);
+
+      if (cashTendered != null && cashTendered < allocation.remainder) {
+        throw new PaymentRefused("Uang tendered kurang dari sisa yang harus dibayar.");
+      }
+      const changeGiven = cashTendered != null ? cashTendered - allocation.remainder : null;
+      // Nothing left to collect: the DP paid for it all, so there is no method
+      // to choose at the till — label the order after the DP that covered it.
+      const paymentMethod = allocation.remainder === 0 ? methodWhenFullyPrepaid(allocation.applied) : method;
+
+      // Same rule as any pre-order: it is attached to the shift open NOW, the
+      // delivery day's, not the day it was phoned in.
+      let shiftId = fresh.shiftId;
+      let queueNumber = fresh.queueNumber;
+      if (shiftId == null) {
+        const openShift = await tx.shift.findFirst({ where: { status: "OPEN" } });
+        if (!openShift) {
+          throw new PaymentRefused("Belum ada shift terbuka. Buka shift dulu sebelum membayar pre-order ini.");
+        }
+        const shift = await tx.shift.update({
+          where: { id: openShift.id },
+          data: { lastQueueNumber: { increment: 1 } },
+        });
+        shiftId = shift.id;
+        queueNumber = shift.lastQueueNumber;
+      }
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: { shiftId, queueNumber, status: "PAID", paymentMethod, paidAt, servedAt, cashTendered, changeGiven },
+      });
+
+      const settlement = [
+        ...allocation.applied.map((slice) => ({ kind: "APPLIED" as const, method: slice.method, amount: slice.amount })),
+        ...allocation.refunded.map((slice) => ({ kind: "REFUNDED" as const, method: slice.method, amount: slice.amount })),
+      ];
+      if (settlement.length > 0) {
+        await tx.preorderDeposit.createMany({
+          data: settlement.map((entry) => ({ ...entry, orderId: order.id, shiftId, createdById: userId })),
+        });
+      }
+    });
+  } catch (e) {
+    if (e instanceof PaymentRefused) return { ok: false, error: e.message };
+    throw e;
+  }
+
+  const [paidOrder, settings] = await Promise.all([getOrderDetail(order.id), getSettings()]);
+  return { ok: true, receipt: buildReceiptData(paidOrder!, settings) };
 }

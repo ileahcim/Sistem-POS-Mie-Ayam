@@ -17,6 +17,12 @@ export type ShiftHistoryRow = {
   expectedCash: number;
   countedCash: number;
   difference: number;
+  // Pre-order DP, frozen too. 0 for every shift that closed before DP existed
+  // (the columns are NULL there and are never recomputed).
+  depositsAppliedCash: number;
+  depositsReceivedCash: number;
+  depositRefundsCash: number;
+  forfeitedDeposits: number;
 };
 
 export async function getShiftHistory(limit = 30): Promise<ShiftHistoryRow[]> {
@@ -39,5 +45,9 @@ export async function getShiftHistory(limit = 30): Promise<ShiftHistoryRow[]> {
     expectedCash: s.expectedCash ?? 0,
     countedCash: s.countedCash ?? 0,
     difference: s.difference ?? 0,
+    depositsAppliedCash: s.depositsAppliedCash ?? 0,
+    depositsReceivedCash: s.depositsReceivedCash ?? 0,
+    depositRefundsCash: s.depositRefundsCash ?? 0,
+    forfeitedDeposits: s.forfeitedDeposits ?? 0,
   }));
 }

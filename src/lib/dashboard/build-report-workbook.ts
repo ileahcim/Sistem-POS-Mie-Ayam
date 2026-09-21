@@ -8,6 +8,7 @@ type DailyRecap = {
   penjualanCash: number;
   penjualanNonCash: number;
   pengeluaran: number;
+  dpHangus: number;
   omzetTotal: number;
 };
 
@@ -24,7 +25,8 @@ function buildDailyRecap(shifts: ExportShiftRow[]): DailyRecap[] {
       existing.penjualanCash += s.cashSales;
       existing.penjualanNonCash += s.nonCashSales;
       existing.pengeluaran += s.expenseTotal;
-      existing.omzetTotal += s.cashSales + s.nonCashSales;
+      existing.dpHangus += s.forfeitedDeposits;
+      existing.omzetTotal += s.cashSales + s.nonCashSales + s.forfeitedDeposits;
     } else {
       byDay.set(s.tanggalBuka, {
         tanggal: s.tanggalBuka,
@@ -33,7 +35,8 @@ function buildDailyRecap(shifts: ExportShiftRow[]): DailyRecap[] {
         penjualanCash: s.cashSales,
         penjualanNonCash: s.nonCashSales,
         pengeluaran: s.expenseTotal,
-        omzetTotal: s.cashSales + s.nonCashSales,
+        dpHangus: s.forfeitedDeposits,
+        omzetTotal: s.cashSales + s.nonCashSales + s.forfeitedDeposits,
       });
     }
   }
@@ -78,6 +81,7 @@ export async function buildReportWorkbook(): Promise<ExcelJS.Workbook> {
     { header: "Penjualan Cash", key: "penjualanCash", width: 14, style: { numFmt: MONEY_FORMAT } },
     { header: "Penjualan Non-Cash", key: "penjualanNonCash", width: 16, style: { numFmt: MONEY_FORMAT } },
     { header: "Pengeluaran", key: "pengeluaran", width: 14, style: { numFmt: MONEY_FORMAT } },
+    { header: "DP Hangus", key: "dpHangus", width: 12, style: { numFmt: MONEY_FORMAT } },
     { header: "Omzet Total", key: "omzetTotal", width: 14, style: { numFmt: MONEY_FORMAT } },
   ];
   recapSheet.addRows(dailyRecap);
@@ -93,6 +97,10 @@ export async function buildReportWorkbook(): Promise<ExcelJS.Workbook> {
     { header: "Modal Awal Laci", key: "openingCash", width: 16, style: { numFmt: MONEY_FORMAT } },
     { header: "Penjualan Cash", key: "cashSales", width: 16, style: { numFmt: MONEY_FORMAT } },
     { header: "Penjualan Non-Cash", key: "nonCashSales", width: 19, style: { numFmt: MONEY_FORMAT } },
+    { header: "DP Dipakai", key: "depositsAppliedCash", width: 12, style: { numFmt: MONEY_FORMAT } },
+    { header: "Terima DP (Tunai)", key: "depositsReceivedCash", width: 17, style: { numFmt: MONEY_FORMAT } },
+    { header: "DP Kembali (Tunai)", key: "depositRefundsCash", width: 18, style: { numFmt: MONEY_FORMAT } },
+    { header: "DP Hangus", key: "forfeitedDeposits", width: 12, style: { numFmt: MONEY_FORMAT } },
     { header: "Total Pengeluaran", key: "expenseTotal", width: 18, style: { numFmt: MONEY_FORMAT } },
     { header: "Uang Seharusnya", key: "expectedCash", width: 17, style: { numFmt: MONEY_FORMAT } },
     { header: "Uang Fisik Dihitung", key: "countedCash", width: 20, style: { numFmt: MONEY_FORMAT } },

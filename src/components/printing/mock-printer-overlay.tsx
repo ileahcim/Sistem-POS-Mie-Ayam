@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { subscribeMockPrinter, type MockPrintJob } from "@/lib/printing/printers/mock-printer";
 import { ReceiptView } from "./receipt-view";
+import { DepositReceiptView } from "./deposit-receipt-view";
 import { PackingListView } from "./packing-list-view";
 
 // Always mounted (see root layout) regardless of which driver is active in
@@ -38,7 +39,11 @@ export function MockPrinterOverlay() {
           >
             <div className="border-border flex items-center justify-between border-b px-4 py-2">
               <span className="text-ink-muted text-sm font-medium">
-                {job.kind === "receipt" ? "Preview Struk (MockPrinter)" : "Preview Daftar Packing (MockPrinter)"}
+                {job.kind === "receipt"
+                  ? "Preview Struk (MockPrinter)"
+                  : job.kind === "deposit-receipt"
+                    ? "Preview Bukti Uang Muka (MockPrinter)"
+                    : "Preview Daftar Packing (MockPrinter)"}
               </span>
               <button
                 type="button"
@@ -49,7 +54,13 @@ export function MockPrinterOverlay() {
               </button>
             </div>
             <div className="py-4">
-              {job.kind === "receipt" ? <ReceiptView data={job.data} /> : <PackingListView data={job.data} />}
+              {job.kind === "receipt" ? (
+                <ReceiptView data={job.data} />
+              ) : job.kind === "deposit-receipt" ? (
+                <DepositReceiptView data={job.data} />
+              ) : (
+                <PackingListView data={job.data} />
+              )}
             </div>
           </motion.div>
         </motion.div>

@@ -21,14 +21,21 @@ export type ReceiptItem = {
 };
 
 // 1-bit raster of the store logo, ready for ESC/POS GS v 0 (bytes are
-// row-major, each row = widthDots/8 bytes, 8 horizontal dots per byte, bit0
-// leftmost). Built in the browser from public/assets/logo-ctr-thermal.png by
+// row-major, each row = widthDots/8 bytes, 8 horizontal dots per byte, MSB
+// = leftmost dot — see the bit-order note in logo-raster.ts). Built in the browser from public/assets/logo-ctr-thermal.png by
 // logo-raster.ts and attached by the client printers right before the bytes
 // are dispatched — it never ships from the server (see escpos.ts).
 export type LogoRaster = {
   widthDots: number; // must be a multiple of 8
   heightDots: number;
   bytes: Uint8Array;
+};
+
+// One DP (uang muka) the customer paid before the pre-order was collected.
+export type ReceiptDeposit = {
+  receivedAt: Date;
+  method: ReceiptPaymentMethod;
+  amount: number;
 };
 
 export type ReceiptData = {
@@ -54,6 +61,37 @@ export type ReceiptData = {
   paymentMethod: ReceiptPaymentMethod;
   cashTendered?: number | null;
   changeGiven?: number | null;
+  // DP received before this order was paid. Absent/empty for every ordinary
+  // order — then the struk is exactly what it always was. When present, the
+  // struk shows each DP under Total and the remainder actually paid now, and
+  // `paymentMethod` is the method of that remainder.
+  deposits?: ReceiptDeposit[];
+  footerNote?: string;
+};
+
+// "BUKTI UANG MUKA" — handed to the customer when a DP is taken, printed
+// before the order is paid (so it has no queue number and no payment method).
+// `deposits` is every DP received up to and including the one this proof is
+// for, oldest first: a customer who pays DP twice gets a proof per payment,
+// each showing what has been paid so far.
+export type DepositReceiptData = {
+  storeName: string;
+  address?: string | null;
+  phone?: string | null;
+  orderNumber: number;
+  customerName: string;
+  kasirName: string;
+  printedAt: Date; // when THIS DP was received
+  scheduledFor: Date; // pre-order delivery date/time
+  channel: ReceiptChannel;
+  tableLabel?: string | null;
+  logoRaster?: LogoRaster | null;
+  printLogo?: boolean;
+  items: ReceiptItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  deposits: ReceiptDeposit[];
   footerNote?: string;
 };
 
@@ -89,6 +127,7 @@ export type PrinterDriver = "mock" | "webbluetooth" | "rawbt";
 
 export interface Printer {
   printReceipt(data: ReceiptData): Promise<PrintResult>;
+  printDepositReceipt(data: DepositReceiptData): Promise<PrintResult>;
   printPackingList(data: PackingListData): Promise<PrintResult>;
   // Raw ESC/POS bytes, for hardware diagnostics only (Tes Lebar Kolom) — real
   // receipts always go through printReceipt/printPackingList.

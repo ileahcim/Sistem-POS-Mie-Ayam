@@ -17,6 +17,18 @@ import { AppHeader } from "@/components/ui/app-header";
 
 type Step = "warning" | "unpaid" | "expenses" | "count" | "result";
 
+// Did any pre-order DP move today? Decides whether the DP rows are shown at all.
+function hasDepositMovement(result: Extract<CloseShiftResult, { ok: true }>): boolean {
+  return (
+    result.depositsAppliedCash > 0 ||
+    result.depositsReceivedCash > 0 ||
+    result.depositsReceivedNonCash > 0 ||
+    result.depositRefundsCash > 0 ||
+    result.depositRefundsNonCash > 0 ||
+    result.forfeitedDeposits > 0
+  );
+}
+
 const CHANNEL_LABEL: Record<UnpaidOrderForClose["channel"], string> = {
   DINE_IN: "Dine In",
   BUNGKUS: "Bungkus",
@@ -279,6 +291,51 @@ export function TutupShiftFlow({
               <span>Penjualan Non-Cash</span>
               <PriceText amount={result.nonCashSales} weight="secondary" />
             </div>
+            {/* Pre-order DP. Only on a day that had any, so an ordinary day reads
+                exactly as it always did. These rows are what make "Uang
+                Seharusnya" traceable:
+                  Modal + Penjualan Cash - DP dipakai + Penerimaan DP tunai
+                  - DP dikembalikan tunai - Pengeluaran. */}
+            {hasDepositMovement(result) && (
+              <div className="bg-canvas rounded-card my-1 flex flex-col gap-0.5 px-3 py-2">
+                <p className="text-ink text-xs font-bold">Uang muka (DP) hari ini</p>
+                <div className="flex justify-between text-sm text-ink-muted">
+                  <span>DP dipakai (sudah diterima sebelumnya)</span>
+                  <span>−{formatRupiah(result.depositsAppliedCash)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-ink-muted">
+                  <span>Penerimaan DP hari ini (tunai)</span>
+                  <span>+{formatRupiah(result.depositsReceivedCash)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-ink-muted">
+                  <span>DP dikembalikan (tunai)</span>
+                  <span>−{formatRupiah(result.depositRefundsCash)}</span>
+                </div>
+                {(result.depositsReceivedNonCash > 0 || result.depositRefundsNonCash > 0 || result.forfeitedDeposits > 0) && (
+                  <div className="border-border mt-1 flex flex-col gap-0.5 border-t pt-1">
+                    <p className="text-ink-faint text-xs">Tidak memengaruhi uang di laci:</p>
+                    {result.depositsReceivedNonCash > 0 && (
+                      <div className="text-ink-faint flex justify-between text-xs">
+                        <span>Penerimaan DP QRIS</span>
+                        <span>{formatRupiah(result.depositsReceivedNonCash)}</span>
+                      </div>
+                    )}
+                    {result.depositRefundsNonCash > 0 && (
+                      <div className="text-ink-faint flex justify-between text-xs">
+                        <span>DP dikembalikan (QRIS)</span>
+                        <span>{formatRupiah(result.depositRefundsNonCash)}</span>
+                      </div>
+                    )}
+                    {result.forfeitedDeposits > 0 && (
+                      <div className="text-ink-faint flex justify-between text-xs">
+                        <span>DP hangus (pendapatan, bukan penjualan makanan)</span>
+                        <span>{formatRupiah(result.forfeitedDeposits)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex justify-between py-1 text-sm text-ink-muted">
               <span>Total Pengeluaran</span>
               <PriceText amount={result.expenseTotal} weight="secondary" />

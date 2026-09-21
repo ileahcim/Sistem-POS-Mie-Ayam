@@ -11,11 +11,12 @@
 //
 // Pure data + formatting: no React, no ESC/POS, safe to import anywhere.
 
-import type { PackingListData, ReceiptData } from "./types";
+import type { DepositReceiptData, PackingListData, ReceiptData } from "./types";
 import { formatRupiah, mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
 import { centeredRule, paperRule, wrapHeading, wrapWords, RECEIPT_CHARS_PER_LINE } from "./paper";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
+import { depositPosition } from "@/lib/deposits/settle";
 
 // The thermal logo (see scripts/make-thermal-logo.py) is only the bowl and
 // "CTR", 224 dots (≈28 mm) wide. No caption under it: the warung name from
@@ -63,6 +64,11 @@ function formatTanggal(date: Date): string {
 
 function formatJam(date: Date): string {
   return formatId(date, { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+// "12 Sep" — the DP lines say when the money came in without the year.
+function formatTanggalPendek(date: Date): string {
+  return formatId(date, { day: "numeric", month: "short" });
 }
 
 const text = (value: string, align: "left" | "center", role: TextRole): LayoutLine => ({
@@ -138,11 +144,99 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
   lines.push(rule("="), text(`${totalItemCount(items)} item`, "left", "body"), pair("plain", "Subtotal", formatRupiah(data.subtotal)));
   if (data.deliveryFee > 0) lines.push(rule("-"), pair("plain", "Ongkir", formatRupiah(data.deliveryFee)));
   lines.push(rule("-"), pair("total", "Total", formatRupiah(data.total)), rule("-"));
-  lines.push(pair("plain", `Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.cashTendered ?? data.total)));
-  // Only ever set on an old order — payOrder no longer computes change.
-  if (data.changeGiven != null && data.changeGiven > 0) {
-    lines.push(pair("plain", "Kembali", formatRupiah(data.changeGiven)));
+  const deposits = data.deposits ?? [];
+  if (deposits.length === 0) {
+    // An ordinary order: byte for byte what it printed before DP existed.
+    lines.push(pair("plain", `Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.cashTendered ?? data.total)));
+    // Only ever set on an old order — payOrder no longer computes change.
+    if (data.changeGiven != null && data.changeGiven > 0) {
+      lines.push(pair("plain", "Kembali", formatRupiah(data.changeGiven)));
+    }
+  } else {
+    lines.push(...depositLines(deposits, data.total, data.paymentMethod));
   }
+  lines.push(rule("="), { kind: "rule", text: centeredRule(data.footerNote ?? "Terima kasih!") });
+  return lines;
+}
+
+// The DP block of a struk lunas: each DP with the day and method it was paid,
+// then what was actually collected now — or, when the order shrank below the DP,
+// what has to go back to the customer. Never a silent Rp0.
+function depositLines(
+  deposits: NonNullable<ReceiptData["deposits"]>,
+  total: number,
+  paymentMethod: ReceiptData["paymentMethod"],
+): LayoutLine[] {
+  const position = depositPosition(total, deposits.map((d) => d.amount));
+  const lines: LayoutLine[] = deposits.map((d) =>
+    pair("plain", `DP ${formatTanggalPendek(d.receivedAt)}, ${PAYMENT_LABEL[d.method]}`, formatRupiah(d.amount)),
+  );
+  lines.push(rule("-"));
+  if (position.excess > 0) {
+    lines.push(pair("plain", "Kembalikan", formatRupiah(position.excess)));
+  } else if (position.remainder > 0) {
+    lines.push(pair("plain", `Sisa dibayar (${PAYMENT_LABEL[paymentMethod]})`, formatRupiah(position.remainder)));
+  } else {
+    // Fully covered by DP: nothing was collected, so no method to name.
+    lines.push(pair("plain", "Sisa dibayar", formatRupiah(0)));
+  }
+  return lines;
+}
+
+// A value too long for the meta column (a customer name is free text) is
+// continued on the lines below, aligned under the value. Those lines are
+// "rule" lines because that kind is the literal-characters line both renderers
+// already keep verbatim, spaces included.
+function metaWrapped(label: string, value: string): LayoutLine[] {
+  const META_LABEL_COLUMNS = 10 + 2; // "label     : " — see metaLine / MetaRow
+  const [first = "", ...rest] = wrapWords(value, RECEIPT_CHARS_PER_LINE - META_LABEL_COLUMNS);
+  return [meta(label, first), ...rest.map((chunk): LayoutLine => ({ kind: "rule", text: " ".repeat(META_LABEL_COLUMNS) + chunk }))];
+}
+
+// "BUKTI UANG MUKA" — given to the customer when a DP is taken. Not a struk:
+// nothing is paid in full yet, so there is no payment line and no queue number
+// (a pre-order has none until it is paid); the customer keeps it as proof
+// until they collect the order. What they still owe is the last, bold line.
+export function buildDepositReceiptLayout(data: DepositReceiptData): LayoutLine[] {
+  const items = mergeReceiptItems(data.items);
+  const tipe =
+    data.channel === "DINE_IN" && data.tableLabel
+      ? `${CHANNEL_LABEL[data.channel]} - ${data.tableLabel}`
+      : CHANNEL_LABEL[data.channel];
+  const position = depositPosition(data.total, data.deposits.map((d) => d.amount));
+
+  const lines: LayoutLine[] = [
+    ...headerLines(data, "BUKTI UANG MUKA"),
+    meta("No. Order", String(data.orderNumber)),
+    ...metaWrapped("Pemesan", data.customerName),
+    meta("Tanggal", formatTanggal(data.printedAt)),
+    meta("Jam", formatJam(data.printedAt)),
+    meta("Kasir", data.kasirName),
+    meta("Tipe", tipe),
+    meta("Kirim", `${formatTanggal(data.scheduledFor)}, ${formatJam(data.scheduledFor)}`),
+    rule("="),
+  ];
+
+  for (const item of items) {
+    lines.push(pair("item", `${item.qty}x ${item.productName}`, formatRupiah(item.lineTotal)));
+    if (item.addons.length > 0) {
+      lines.push({ kind: "sub", role: "addon", text: groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", ") });
+    }
+    if (item.notes) lines.push({ kind: "sub", role: "note", text: `"${item.notes}"` });
+  }
+
+  lines.push(rule("="), text(`${totalItemCount(items)} item`, "left", "body"), pair("plain", "Subtotal", formatRupiah(data.subtotal)));
+  if (data.deliveryFee > 0) lines.push(rule("-"), pair("plain", "Ongkir", formatRupiah(data.deliveryFee)));
+  lines.push(rule("-"), pair("total", "Total", formatRupiah(data.total)), rule("-"));
+
+  for (const d of data.deposits) {
+    lines.push(pair("plain", `DP ${formatTanggalPendek(d.receivedAt)}, ${PAYMENT_LABEL[d.method]}`, formatRupiah(d.amount)));
+  }
+  if (data.deposits.length > 1) lines.push(rule("-"), pair("plain", "Total DP", formatRupiah(position.held)));
+  lines.push(rule("-"));
+  if (position.excess > 0) lines.push(pair("total", "Dikembalikan saat diambil", formatRupiah(position.excess)));
+  else lines.push(pair("total", "Sisa dibayar saat diambil", formatRupiah(position.remainder)));
+
   lines.push(rule("="), { kind: "rule", text: centeredRule(data.footerNote ?? "Terima kasih!") });
   return lines;
 }

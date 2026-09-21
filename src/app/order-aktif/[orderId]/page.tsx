@@ -5,6 +5,7 @@ import { getSettings } from "@/lib/settings/get-settings";
 import { buildPackingListData } from "@/lib/orders/build-packing-list-data";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { getOpenShift } from "@/lib/shift/get-shift-state";
 import { OrderDetail } from "@/components/order-aktif/order-detail";
 
 export default async function OrderDetailPage({
@@ -18,11 +19,12 @@ export default async function OrderDetailPage({
   // A cancelled order has nothing left to act on — show its record instead.
   if (order.status === "CANCELLED") redirect(`/riwayat-pesanan/${order.id}`);
 
-  const [menu, settings, nav, user] = await Promise.all([
+  const [menu, settings, nav, user, openShift] = await Promise.all([
     getActiveMenu(),
     getSettings(),
     getHeaderNav(),
     getCurrentUser(),
+    getOpenShift(),
   ]);
   const packingList = order.channel === "ANTAR" ? buildPackingListData(order, settings) : null;
 
@@ -34,6 +36,8 @@ export default async function OrderDetailPage({
       printerDriver={settings.printerDriver}
       nav={nav}
       isOwner={user?.role === "OWNER"}
+      cashDepositAvailable={!!openShift}
+      autoPrintReceipt={settings.autoPrintReceipt}
     />
   );
 }
