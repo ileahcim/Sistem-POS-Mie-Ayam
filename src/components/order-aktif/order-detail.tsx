@@ -16,7 +16,8 @@ import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
-import { sortOrderLines } from "@/lib/orders/line-order";
+import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
+import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list";
 import { AddItemsPanel } from "./add-items-panel";
 import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { CancelOrderButton } from "./cancel-order-sheet";
@@ -211,22 +212,31 @@ export function OrderDetail({
 
       <div className="flex-1 overflow-y-auto p-3">
         <Card>
-          <div className="divide-border flex flex-col divide-y">
-            {/* Same reading order as the cart; the struk keeps creation order. */}
-            {sortOrderLines(order.items).map((item) => (
-              <OrderItemRow
-                key={item.id}
-                orderId={order.id}
-                item={item}
-                editable={canEditItems}
-                canRemove={totalQty > 1}
-                onChanged={() => router.refresh()}
-              />
-            ))}
+          <div className="flex flex-col">
+            {/* Same reading order as the cart and the struk, grouped per
+                product on a big order (line-order.ts). */}
+            <OrderLineList
+              lines={sortOrderLines(order.items, portionPriceOf)}
+              keyOf={(item) => item.id}
+              divided
+              inset="px-3"
+              renderLine={(item) => (
+                <OrderItemRow
+                  orderId={order.id}
+                  item={item}
+                  editable={canEditItems}
+                  canRemove={totalQty > 1}
+                  onChanged={() => router.refresh()}
+                />
+              )}
+            />
           </div>
-          <div className="border-border bg-canvas flex items-center justify-between rounded-b-card border-t px-3 py-2">
-            <span className="text-base font-bold text-ink">Subtotal</span>
-            <PriceText amount={order.subtotal} weight="total" />
+          <div className="border-border bg-canvas rounded-b-card border-t px-3 py-2">
+            <PortionTotalRow lines={order.items} className="mb-1" />
+            <div className="flex items-center justify-between">
+              <span className="text-base font-bold text-ink">Subtotal</span>
+              <PriceText amount={order.subtotal} weight="total" />
+            </div>
           </div>
         </Card>
 

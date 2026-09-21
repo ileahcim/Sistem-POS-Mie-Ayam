@@ -31,6 +31,8 @@ export function buildReceiptData(order: OrderDetail, settings: StoreSettings): R
       qty: item.qty,
       unitPrice: item.unitPrice,
       lineTotal: item.lineTotal,
+      categorySortOrder: item.categorySortOrder,
+      productSortOrder: item.productSortOrder,
     })),
     subtotal: order.subtotal,
     deliveryFee: order.deliveryFee,

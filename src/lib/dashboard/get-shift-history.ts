@@ -21,7 +21,9 @@ export type ShiftHistoryRow = {
   // (the columns are NULL there and are never recomputed).
   depositsAppliedCash: number;
   depositsReceivedCash: number;
+  depositsReceivedNonCash: number;
   depositRefundsCash: number;
+  depositRefundsNonCash: number;
   forfeitedDeposits: number;
 };
 
@@ -47,7 +49,9 @@ export async function getShiftHistory(limit = 30): Promise<ShiftHistoryRow[]> {
     difference: s.difference ?? 0,
     depositsAppliedCash: s.depositsAppliedCash ?? 0,
     depositsReceivedCash: s.depositsReceivedCash ?? 0,
+    depositsReceivedNonCash: s.depositsReceivedNonCash ?? 0,
     depositRefundsCash: s.depositRefundsCash ?? 0,
+    depositRefundsNonCash: s.depositRefundsNonCash ?? 0,
     forfeitedDeposits: s.forfeitedDeposits ?? 0,
   }));
 }

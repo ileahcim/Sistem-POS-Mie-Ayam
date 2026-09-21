@@ -82,6 +82,7 @@ export function KasirScreen({
         qty: 1,
         isDeliveryChargeable: product.isDeliveryChargeable,
         categorySortOrder: product.categorySortOrder,
+        productSortOrder: product.productSortOrder,
       }),
     );
   }
@@ -109,6 +110,7 @@ export function KasirScreen({
       qty: result.qty,
       isDeliveryChargeable: product.isDeliveryChargeable,
       categorySortOrder: product.categorySortOrder,
+        productSortOrder: product.productSortOrder,
     };
 
     // Adding a second identical customisation merges with the first, and so
@@ -188,6 +190,8 @@ export function KasirScreen({
             tableLabel={draft.tableLabel}
             onChannel={setChannel}
             onTableLabel={setTableLabel}
+            customerName={draft.customerName}
+            onCustomerNameChange={setCustomerName}
           />
         </div>
         <div className="order-3">
@@ -219,8 +223,6 @@ export function KasirScreen({
             items={draft.items}
             channel={draft.channel}
             tableLabel={draft.tableLabel}
-            customerName={draft.customerName}
-            onCustomerNameChange={setCustomerName}
             saving={saving}
             saveError={saveError}
             lastAddedLocalId={lastAddedLocalId}
@@ -240,8 +242,6 @@ export function KasirScreen({
             items={draft.items}
             channel={draft.channel}
             tableLabel={draft.tableLabel}
-            customerName={draft.customerName}
-            onCustomerNameChange={setCustomerName}
             saving={saving}
             saveError={saveError}
             lastAddedLocalId={lastAddedLocalId}

@@ -23,6 +23,7 @@ export type MenuProduct = {
   // Category.sortOrder, carried down to the product so a cart line can
   // snapshot it and sort itself — see lib/orders/line-order.ts.
   categorySortOrder: number;
+  productSortOrder: number; // Product.sortOrder — the grid order, also the cart order
   addonGroups: MenuAddonGroup[];
 };
 
@@ -79,6 +80,7 @@ export async function getActiveMenu(): Promise<MenuCategory[]> {
       imageUrl: product.imageUrl,
       isDeliveryChargeable: category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME,
       categorySortOrder: category.sortOrder,
+      productSortOrder: product.sortOrder,
       addonGroups: product.addonGroups.map((pag) => ({
         id: pag.addonGroup.id,
         name: pag.addonGroup.name,

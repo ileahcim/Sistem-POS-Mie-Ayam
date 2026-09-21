@@ -4,6 +4,7 @@ import { depositPosition, type DepositMethod } from "@/lib/deposits/settle";
 
 export type OrderDetailItem = {
   id: string;
+  productId: string;
   productName: string;
   unitPrice: number;
   addons: { name: string; price: number }[];
@@ -11,10 +12,11 @@ export type OrderDetailItem = {
   qty: number;
   lineTotal: number;
   isDeliveryChargeable: boolean;
-  // Read live off the product's category (OrderItem doesn't snapshot it) —
-  // it only ever drives the on-screen reading order, see line-order.ts, so
-  // following a later re-ordering of the categories is the right behaviour.
+  // Read live off the product and its category (OrderItem doesn't snapshot
+  // them) — they only ever drive the reading order, see line-order.ts, so
+  // following a later re-ordering of the menu is the right behaviour.
   categorySortOrder: number;
+  productSortOrder: number;
 };
 
 // One DP the customer paid on a pre-order (the RECEIVED entries of the ledger).
@@ -82,11 +84,13 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      // Still creation order: this list also feeds buildReceiptData, and the
-      // printed struk deliberately keeps the order the items were added in.
-      // Screens sort their own copy (sortOrderLines) instead.
+      // Creation order here; the reading order (sortOrderLines) is applied by
+      // each screen and by receipt-layout.ts for the paper.
       items: {
-        include: { addons: true, product: { select: { category: { select: { sortOrder: true } } } } },
+        include: {
+          addons: true,
+          product: { select: { sortOrder: true, category: { select: { sortOrder: true } } } },
+        },
         orderBy: { createdAt: "asc" },
       },
       createdBy: { select: { name: true } },
@@ -103,6 +107,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
 
   const items: OrderDetailItem[] = order.items.map((item) => ({
     id: item.id,
+    productId: item.productId,
     productName: item.productName,
     unitPrice: item.unitPrice,
     addons: item.addons.map((a) => ({ name: a.name, price: a.price })),
@@ -111,6 +116,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     lineTotal: item.lineTotal,
     isDeliveryChargeable: item.isDeliveryChargeable,
     categorySortOrder: item.product.category.sortOrder,
+    productSortOrder: item.product.sortOrder,
   }));
 
   const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);

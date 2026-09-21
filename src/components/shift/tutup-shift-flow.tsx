@@ -2,32 +2,19 @@
 
 import { useState } from "react";
 import type { UnpaidOrderForClose, ShiftExpense } from "@/lib/shift/get-shift-state";
-import { formatRupiah } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
 import { RupiahInput } from "@/components/ui/rupiah-input";
-import { cn } from "@/components/ui/cn";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { markOrderReceivable, addExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
 import { CancelOrderButton } from "@/components/order-aktif/cancel-order-sheet";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { AppHeader } from "@/components/ui/app-header";
+import { ShiftSummary } from "./shift-summary";
 
 type Step = "warning" | "unpaid" | "expenses" | "count" | "result";
-
-// Did any pre-order DP move today? Decides whether the DP rows are shown at all.
-function hasDepositMovement(result: Extract<CloseShiftResult, { ok: true }>): boolean {
-  return (
-    result.depositsAppliedCash > 0 ||
-    result.depositsReceivedCash > 0 ||
-    result.depositsReceivedNonCash > 0 ||
-    result.depositRefundsCash > 0 ||
-    result.depositRefundsNonCash > 0 ||
-    result.forfeitedDeposits > 0
-  );
-}
 
 const CHANNEL_LABEL: Record<UnpaidOrderForClose["channel"], string> = {
   DINE_IN: "Dine In",
@@ -278,88 +265,8 @@ export function TutupShiftFlow({
 
       {step === "result" && result && (
         <div className="flex flex-col gap-3">
-          <Card padded className="flex flex-col gap-1">
-            <div className="flex justify-between py-1 text-sm text-ink-muted">
-              <span>Modal Awal Laci</span>
-              <PriceText amount={result.openingCash} weight="secondary" />
-            </div>
-            <div className="flex justify-between py-1 text-sm text-ink-muted">
-              <span>Penjualan Cash</span>
-              <PriceText amount={result.cashSales} weight="secondary" />
-            </div>
-            <div className="flex justify-between py-1 text-sm text-ink-muted">
-              <span>Penjualan Non-Cash</span>
-              <PriceText amount={result.nonCashSales} weight="secondary" />
-            </div>
-            {/* Pre-order DP. Only on a day that had any, so an ordinary day reads
-                exactly as it always did. These rows are what make "Uang
-                Seharusnya" traceable:
-                  Modal + Penjualan Cash - DP dipakai + Penerimaan DP tunai
-                  - DP dikembalikan tunai - Pengeluaran. */}
-            {hasDepositMovement(result) && (
-              <div className="bg-canvas rounded-card my-1 flex flex-col gap-0.5 px-3 py-2">
-                <p className="text-ink text-xs font-bold">Uang muka (DP) hari ini</p>
-                <div className="flex justify-between text-sm text-ink-muted">
-                  <span>DP dipakai (sudah diterima sebelumnya)</span>
-                  <span>−{formatRupiah(result.depositsAppliedCash)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-ink-muted">
-                  <span>Penerimaan DP hari ini (tunai)</span>
-                  <span>+{formatRupiah(result.depositsReceivedCash)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-ink-muted">
-                  <span>DP dikembalikan (tunai)</span>
-                  <span>−{formatRupiah(result.depositRefundsCash)}</span>
-                </div>
-                {(result.depositsReceivedNonCash > 0 || result.depositRefundsNonCash > 0 || result.forfeitedDeposits > 0) && (
-                  <div className="border-border mt-1 flex flex-col gap-0.5 border-t pt-1">
-                    <p className="text-ink-faint text-xs">Tidak memengaruhi uang di laci:</p>
-                    {result.depositsReceivedNonCash > 0 && (
-                      <div className="text-ink-faint flex justify-between text-xs">
-                        <span>Penerimaan DP QRIS</span>
-                        <span>{formatRupiah(result.depositsReceivedNonCash)}</span>
-                      </div>
-                    )}
-                    {result.depositRefundsNonCash > 0 && (
-                      <div className="text-ink-faint flex justify-between text-xs">
-                        <span>DP dikembalikan (QRIS)</span>
-                        <span>{formatRupiah(result.depositRefundsNonCash)}</span>
-                      </div>
-                    )}
-                    {result.forfeitedDeposits > 0 && (
-                      <div className="text-ink-faint flex justify-between text-xs">
-                        <span>DP hangus (pendapatan, bukan penjualan makanan)</span>
-                        <span>{formatRupiah(result.forfeitedDeposits)}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="flex justify-between py-1 text-sm text-ink-muted">
-              <span>Total Pengeluaran</span>
-              <PriceText amount={result.expenseTotal} weight="secondary" />
-            </div>
-            <div className="border-border mt-2 flex justify-between border-t pt-2 text-sm font-semibold text-ink">
-              <span>Uang Seharusnya</span>
-              <PriceText amount={result.expectedCash} weight="primary" />
-            </div>
-            <div className="flex justify-between py-1 text-sm text-ink-muted">
-              <span>Uang Fisik Dihitung</span>
-              <PriceText amount={result.countedCash} weight="secondary" />
-            </div>
-            <div
-              className={cn(
-                "border-border mt-2 flex justify-between border-t pt-2 text-base font-bold",
-                result.difference === 0 ? "text-ink" : result.difference > 0 ? "text-primary-strong" : "text-danger",
-              )}
-            >
-              <span>Selisih</span>
-              <span>
-                {result.difference > 0 ? "+" : ""}
-                {formatRupiah(result.difference)}
-              </span>
-            </div>
+          <Card padded>
+            <ShiftSummary figures={result} salesTitle="Penjualan Hari Ini" />
           </Card>
           <LinkButton href="/kasir" variant="primary" size="large" fullWidth>
             Selesai

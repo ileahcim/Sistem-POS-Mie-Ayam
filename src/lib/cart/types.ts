@@ -25,9 +25,11 @@ export type CartItem = {
   notes: string;
   qty: number;
   isDeliveryChargeable: boolean; // snapshot of "is this product's category Makanan"
-  // Category.sortOrder, snapshotted so the cart can be sorted into reading
-  // order without looking the product back up — see lib/orders/line-order.ts.
+  // Category.sortOrder and Product.sortOrder, snapshotted so the cart can be
+  // sorted into reading order without looking the product back up — see
+  // lib/orders/line-order.ts.
   categorySortOrder: number;
+  productSortOrder: number;
 };
 
 export type CartDraft = {

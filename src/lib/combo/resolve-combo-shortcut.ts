@@ -40,5 +40,6 @@ export function resolveComboShortcut(
     qty: 1,
     isDeliveryChargeable: product.isDeliveryChargeable,
     categorySortOrder: product.categorySortOrder,
+        productSortOrder: product.productSortOrder,
   };
 }

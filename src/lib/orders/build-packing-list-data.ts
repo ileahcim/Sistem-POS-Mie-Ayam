@@ -21,6 +21,9 @@ export function buildPackingListData(order: OrderDetail, settings: StoreSettings
       addons: groupAddonsForPrint(item.addons).map(formatAddonWithQty),
       notes: item.notes,
       qty: item.qty,
+      categorySortOrder: item.categorySortOrder,
+      productSortOrder: item.productSortOrder,
+      portionPrice: item.lineTotal / item.qty,
     })),
   };
 }

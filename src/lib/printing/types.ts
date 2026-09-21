@@ -18,6 +18,10 @@ export type ReceiptItem = {
   qty: number;
   unitPrice: number; // base product price snapshot, before addons
   lineTotal: number; // (unitPrice + sum(addons.price)) * qty
+  // Reading-order keys (lib/orders/line-order.ts) — the paper lists items in
+  // the same order as the screens. Absent (test print) = keep given order.
+  categorySortOrder?: number;
+  productSortOrder?: number;
 };
 
 // 1-bit raster of the store logo, ready for ESC/POS GS v 0 (bytes are
@@ -102,6 +106,11 @@ export type PackingListItem = {
   addons: string[]; // names only, no prices
   notes?: string | null;
   qty: number;
+  // Reading-order keys, same as ReceiptItem. The price is only a sort key
+  // here (cheapest variant first) — it is never printed on a packing list.
+  categorySortOrder?: number;
+  productSortOrder?: number;
+  portionPrice?: number;
 };
 
 export type PackingListData = {

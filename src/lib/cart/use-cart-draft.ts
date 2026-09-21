@@ -18,10 +18,15 @@ function loadDraft(storageKey: string): CartDraft {
     return {
       ...parsed,
       customerName: parsed.customerName ?? "",
-      // A draft written by an older build has no categorySortOrder. Default
-      // it rather than letting `undefined` through: NaN in the comparator
-      // would scramble the whole cart, and a draft outlives a deploy.
-      items: parsed.items.map((item) => ({ ...item, categorySortOrder: item.categorySortOrder ?? 0 })),
+      // A draft written by an older build has no categorySortOrder /
+      // productSortOrder. Default them rather than letting `undefined`
+      // through: NaN in the comparator would scramble the whole cart, and a
+      // draft outlives a deploy.
+      items: parsed.items.map((item) => ({
+        ...item,
+        categorySortOrder: item.categorySortOrder ?? 0,
+        productSortOrder: item.productSortOrder ?? 0,
+      })),
     };
   } catch {
     return emptyCartDraft();

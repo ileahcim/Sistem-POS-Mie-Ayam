@@ -35,6 +35,8 @@ export function buildDepositReceiptData(
       qty: item.qty,
       unitPrice: item.unitPrice,
       lineTotal: item.lineTotal,
+      categorySortOrder: item.categorySortOrder,
+      productSortOrder: item.productSortOrder,
     })),
     subtotal: order.subtotal,
     deliveryFee: order.deliveryFee,

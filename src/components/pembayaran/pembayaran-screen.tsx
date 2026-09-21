@@ -8,7 +8,8 @@ import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver, ReceiptData } from "@/lib/printing/types";
 import { getPrinter } from "@/lib/printing/get-printer";
 import { formatRupiah, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
-import { sortOrderLines } from "@/lib/orders/line-order";
+import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
+import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -193,10 +194,15 @@ export function PembayaranScreen({
         ) : (
           <>
             <Card>
-              <div className="divide-border flex flex-col divide-y">
-                {/* Same reading order as the cart and the order detail. */}
-                {sortOrderLines(order.items).map((item) => (
-                  <div key={item.id} className="flex flex-col gap-1 p-4">
+              <div className="flex flex-col">
+                {/* Same reading order and grouping as the cart and the order detail. */}
+                <OrderLineList
+                  lines={sortOrderLines(order.items, portionPriceOf)}
+                  keyOf={(item) => item.id}
+                  divided
+                  inset="px-4"
+                  renderLine={(item) => (
+                  <div className="flex flex-col gap-1 p-4">
                     <div className="flex justify-between gap-3">
                       <span className="text-base font-semibold text-ink">
                         {item.qty}x {item.productName}
@@ -211,9 +217,11 @@ export function PembayaranScreen({
                       </span>
                     )}
                   </div>
-                ))}
+                  )}
+                />
               </div>
               <div className="border-border flex flex-col gap-1 border-t px-4 py-3">
+                <PortionTotalRow lines={order.items} />
                 <div className="flex justify-between text-sm text-ink-muted">
                   <span>Subtotal</span>
                   <PriceText amount={order.subtotal} weight="secondary" />

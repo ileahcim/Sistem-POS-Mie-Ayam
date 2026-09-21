@@ -17,6 +17,7 @@ import { centeredRule, paperRule, wrapHeading, wrapWords, RECEIPT_CHARS_PER_LINE
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { depositPosition } from "@/lib/deposits/settle";
+import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
 
 // The thermal logo (see scripts/make-thermal-logo.py) is only the bowl and
 // "CTR", 224 dots (≈28 mm) wide. No caption under it: the warung name from
@@ -114,8 +115,17 @@ function headerLines(
   return lines;
 }
 
+// Identical lines merged, then the same reading order as every screen
+// (category, product, cheapest variant first — see line-order.ts). The paper
+// used to keep creation order; the owner asked for it to follow the screens
+// (21 Sep 2026). Only the ORDER is shared: the per-product counts and dashed
+// dividers of the screens are never printed.
+function receiptItemsInReadingOrder(items: ReceiptData["items"]): ReceiptData["items"] {
+  return sortOrderLines(mergeReceiptItems(items), portionPriceOf);
+}
+
 export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
-  const items = mergeReceiptItems(data.items);
+  const items = receiptItemsInReadingOrder(data.items);
   const tipe =
     data.channel === "DINE_IN" && data.tableLabel
       ? `${CHANNEL_LABEL[data.channel]} - ${data.tableLabel}`
@@ -198,7 +208,7 @@ function metaWrapped(label: string, value: string): LayoutLine[] {
 // (a pre-order has none until it is paid); the customer keeps it as proof
 // until they collect the order. What they still owe is the last, bold line.
 export function buildDepositReceiptLayout(data: DepositReceiptData): LayoutLine[] {
-  const items = mergeReceiptItems(data.items);
+  const items = receiptItemsInReadingOrder(data.items);
   const tipe =
     data.channel === "DINE_IN" && data.tableLabel
       ? `${CHANNEL_LABEL[data.channel]} - ${data.tableLabel}`
@@ -253,7 +263,7 @@ export function buildPackingListLayout(data: PackingListData): LayoutLine[] {
     rule("="),
   ];
 
-  for (const item of data.items) {
+  for (const item of sortOrderLines(data.items, (i) => i.portionPrice ?? 0)) {
     lines.push(pair("qty", item.productName, `x${item.qty}`, true));
     if (item.addons.length > 0) lines.push({ kind: "sub", role: "addon", text: item.addons.join(", ") });
     if (item.notes) lines.push({ kind: "sub", role: "note", text: `"${item.notes}"` });
