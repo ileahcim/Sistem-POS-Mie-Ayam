@@ -41,6 +41,18 @@ function formatDateTime(iso: string): string {
   return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
 }
 
+function formatJamOnly(iso: string): string {
+  return formatId(new Date(iso), { timeStyle: "short" });
+}
+
+// "Dipesan HH.MM" always; second time depends on how the order concluded —
+// there's no single "Dibayar" for an order that was never paid.
+function secondTimeLabel(order: OrderHistoryRow): string | null {
+  if (order.paidAt) return `Dibayar ${formatJamOnly(order.paidAt)}`;
+  if (order.cancelledAt) return `Dibatalkan ${formatJamOnly(order.cancelledAt)}`;
+  return null;
+}
+
 // CASHIER's date inputs and quick-range chips never render at all (not just
 // disabled) — the server (get-order-history.ts's clampHistoryFilterForRole)
 // already forces the query to today regardless of URL params, so this is
@@ -158,7 +170,8 @@ export function RiwayatPesananScreen({
                     </span>
                   </div>
                   <span className="text-ink-faint truncate text-xs">
-                    No. Order {order.orderNumber} · {formatDateTime(order.createdAt)}
+                    No. Order {order.orderNumber} · Dipesan {formatDateTime(order.createdAt)}
+                    {secondTimeLabel(order) ? ` · ${secondTimeLabel(order)}` : ""}
                     {order.customerName ? ` · ${order.customerName}` : ""}
                   </span>
                 </div>
