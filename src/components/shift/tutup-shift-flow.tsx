@@ -8,7 +8,7 @@ import { LinkButton } from "@/components/ui/link-button";
 import { PriceText } from "@/components/ui/price-text";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
-import { markOrderReceivable, addExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
+import { markOrderReceivable, addExpense, deleteExpense, closeShift, type CloseShiftResult } from "@/app/shift/actions";
 import { CancelOrderButton } from "@/components/order-aktif/cancel-order-sheet";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { AppHeader } from "@/components/ui/app-header";
@@ -122,6 +122,7 @@ export function TutupShiftFlow({
   const [expenseAmount, setExpenseAmount] = useState<number | "">("");
   const [expenseError, setExpenseError] = useState<string | null>(null);
   const [addingExpense, setAddingExpense] = useState(false);
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
 
   const [countedCash, setCountedCash] = useState<number | "">("");
   const [closing, setClosing] = useState(false);
@@ -138,9 +139,19 @@ export function TutupShiftFlow({
     const result = await addExpense(expenseDesc, Number(expenseAmount));
     setAddingExpense(false);
     if (!result.ok) return setExpenseError(result.error);
-    setExpenses((list) => [...list, { id: crypto.randomUUID(), description: expenseDesc.trim(), amount: Number(expenseAmount) }]);
+    // Real DB id from the server, so Hapus below can act on it right away.
+    setExpenses((list) => [...list, { id: result.id, description: expenseDesc.trim(), amount: Number(expenseAmount) }]);
     setExpenseDesc("");
     setExpenseAmount("");
+  }
+
+  async function handleDeleteExpense(id: string) {
+    setDeletingExpenseId(id);
+    setExpenseError(null);
+    const result = await deleteExpense(id);
+    setDeletingExpenseId(null);
+    if (!result.ok) return setExpenseError(result.error);
+    setExpenses((list) => list.filter((e) => e.id !== id));
   }
 
   async function handleClose() {
@@ -206,9 +217,16 @@ export function TutupShiftFlow({
             {expenses.length === 0 && <p className="text-ink-faint p-4 text-sm">Belum ada pengeluaran.</p>}
             <div className="divide-border flex flex-col divide-y">
               {expenses.map((e) => (
-                <div key={e.id} className="flex justify-between p-4 text-sm">
-                  <span className="text-ink">{e.description}</span>
+                <div key={e.id} className="flex items-center justify-between gap-3 p-4 text-sm">
+                  <span className="text-ink flex-1">{e.description}</span>
                   <PriceText amount={e.amount} weight="secondary" />
+                  <Button
+                    variant="secondary"
+                    disabled={deletingExpenseId === e.id}
+                    onClick={() => handleDeleteExpense(e.id)}
+                  >
+                    {deletingExpenseId === e.id ? "..." : "Hapus"}
+                  </Button>
                 </div>
               ))}
             </div>

@@ -22,7 +22,9 @@ export async function openShift(openingCash: number): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function addExpense(description: string, amount: number): Promise<ActionResult> {
+export type AddExpenseResult = { ok: true; id: string } | { ok: false; error: string };
+
+export async function addExpense(description: string, amount: number): Promise<AddExpenseResult> {
   const user = await requireUser();
 
   if (!description.trim()) return { ok: false, error: "Isi keterangan pengeluaran." };
@@ -31,9 +33,25 @@ export async function addExpense(description: string, amount: number): Promise<A
   const shift = await prisma.shift.findFirst({ where: { status: "OPEN" } });
   if (!shift) return { ok: false, error: "Tidak ada shift terbuka." };
 
-  await prisma.expense.create({
+  const expense = await prisma.expense.create({
     data: { shiftId: shift.id, description: description.trim(), amount, createdById: user.id },
   });
+  return { ok: true, id: expense.id };
+}
+
+// Undoing a mis-typed Pengeluaran (wrong amount, duplicate entry). Only
+// while its shift is still OPEN — a closed shift's expenseTotal is frozen
+// (CLAUDE.md "Shift & kas": numbers from a closed shift never recompute),
+// so deleting a row underneath it would make the frozen total a lie.
+export async function deleteExpense(expenseId: string): Promise<ActionResult> {
+  await requireUser();
+
+  const result = await prisma.expense.deleteMany({
+    where: { id: expenseId, shift: { status: "OPEN" } },
+  });
+  if (result.count === 0) {
+    return { ok: false, error: "Pengeluaran tidak ditemukan, atau shift-nya sudah ditutup." };
+  }
   return { ok: true };
 }
 

@@ -8,7 +8,7 @@ import { PriceText } from "@/components/ui/price-text";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoExpenseIcon } from "@/components/ui/empty-state-icons";
-import { addExpense } from "@/app/shift/actions";
+import { addExpense, deleteExpense } from "@/app/shift/actions";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { AppHeader } from "@/components/ui/app-header";
 
@@ -18,6 +18,7 @@ export function PengeluaranForm({ initialExpenses, nav }: { initialExpenses: Shi
   const [amount, setAmount] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleAdd() {
     setSaving(true);
@@ -25,9 +26,20 @@ export function PengeluaranForm({ initialExpenses, nav }: { initialExpenses: Shi
     const result = await addExpense(description, Number(amount));
     setSaving(false);
     if (!result.ok) return setError(result.error);
-    setExpenses((list) => [...list, { id: crypto.randomUUID(), description: description.trim(), amount: Number(amount) }]);
+    // Real DB id from the server — not a client-generated one, so Hapus
+    // below can act on it immediately without a page reload first.
+    setExpenses((list) => [...list, { id: result.id, description: description.trim(), amount: Number(amount) }]);
     setDescription("");
     setAmount("");
+  }
+
+  async function handleDelete(id: string) {
+    setDeletingId(id);
+    setError(null);
+    const result = await deleteExpense(id);
+    setDeletingId(null);
+    if (!result.ok) return setError(result.error);
+    setExpenses((list) => list.filter((e) => e.id !== id));
   }
 
   return (
@@ -50,9 +62,12 @@ export function PengeluaranForm({ initialExpenses, nav }: { initialExpenses: Shi
         )}
         <div className="divide-border flex flex-col divide-y">
           {expenses.map((e) => (
-            <div key={e.id} className="flex justify-between p-4 text-sm">
-              <span className="text-ink">{e.description}</span>
+            <div key={e.id} className="flex items-center justify-between gap-3 p-4 text-sm">
+              <span className="text-ink flex-1">{e.description}</span>
               <PriceText amount={e.amount} weight="secondary" />
+              <Button variant="secondary" disabled={deletingId === e.id} onClick={() => handleDelete(e.id)}>
+                {deletingId === e.id ? "..." : "Hapus"}
+              </Button>
             </div>
           ))}
         </div>
