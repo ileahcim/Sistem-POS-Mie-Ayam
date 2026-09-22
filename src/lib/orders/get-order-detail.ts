@@ -7,7 +7,7 @@ export type OrderDetailItem = {
   productId: string;
   productName: string;
   unitPrice: number;
-  addons: { name: string; price: number }[];
+  addons: { addonOptionId: string; name: string; price: number }[];
   notes: string | null;
   qty: number;
   lineTotal: number;
@@ -115,7 +115,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     productId: item.productId,
     productName: item.productName,
     unitPrice: item.unitPrice,
-    addons: item.addons.map((a) => ({ name: a.name, price: a.price })),
+    addons: item.addons.map((a) => ({ addonOptionId: a.addonOptionId, name: a.name, price: a.price })),
     notes: item.notes,
     qty: item.qty,
     lineTotal: item.lineTotal,

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
 import type { OrderDetail as OrderDetailData } from "@/lib/orders/get-order-detail";
-import type { MenuCategory } from "@/lib/menu/get-active-menu";
+import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import type { PackingListData, PrinterDriver } from "@/lib/printing/types";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { getPrinter } from "@/lib/printing/get-printer";
@@ -17,16 +18,19 @@ import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
+import { expandAddonOptionIds, groupOrderItemAddons } from "@/lib/cart/types";
 import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list";
 import { AddItemsPanel } from "./add-items-panel";
+import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-sheet";
 import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { CancelOrderButton } from "./cancel-order-sheet";
 import { VoidOrderButton } from "./void-order-sheet";
 import { DepositCard } from "@/components/pesanan-terjadwal/deposit-card";
 import { CancelDepositOrderButton } from "@/components/pesanan-terjadwal/cancel-deposit-order-sheet";
-import { markServed, removeOrderItem } from "@/app/order-aktif/actions";
+import { markServed, removeOrderItem, editOrderItem } from "@/app/order-aktif/actions";
 import { buildKitchenTicketData } from "@/lib/orders/build-kitchen-ticket-data";
 import { printKitchenTicketSafely } from "@/lib/printing/print-kitchen-ticket";
+import { useKitchenTicketPrompt } from "@/components/printing/use-kitchen-ticket-prompt";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -40,21 +44,24 @@ function formatScheduledFor(iso: string): string {
 
 // One line of a saved order. While the order is still unpaid it can be
 // corrected in place (a mis-tapped drink used to be impossible to undo):
-// "− 1 porsi" for a multi-qty line, "Hapus" for the whole line. Deleting
-// asks once inline (no extra sheet) since it's the destructive one; the
-// server recomputes the order total either way.
+// "Edit" reopens the addon sheet pre-filled (wrong topping — used to mean
+// Hapus + tambah ulang), "− 1 porsi" for a multi-qty line, "Hapus" for the
+// whole line. Deleting asks once inline (no extra sheet) since it's the
+// destructive one; the server recomputes the order total either way.
 function OrderItemRow({
   orderId,
   item,
   editable,
   canRemove,
   onChanged,
+  onEdit,
 }: {
   orderId: string;
   item: OrderDetailData["items"][number];
   editable: boolean;
   canRemove: boolean;
   onChanged: () => void;
+  onEdit: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -92,19 +99,12 @@ function OrderItemRow({
         </span>
       )}
 
-      {editable && canRemove && (
+      {editable && !confirming && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          {confirming ? (
-            <>
-              <span className="text-ink text-sm font-medium">Hapus baris ini?</span>
-              <Button variant="danger" disabled={busy} onClick={() => run("all")}>
-                {busy ? "Menghapus..." : "Ya, hapus"}
-              </Button>
-              <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
-                Batal
-              </Button>
-            </>
-          ) : (
+          <Button variant="secondary" disabled={busy} onClick={onEdit}>
+            Edit
+          </Button>
+          {canRemove && (
             <>
               {item.qty > 1 && (
                 <Button variant="secondary" disabled={busy} onClick={() => run("one")}>
@@ -116,6 +116,17 @@ function OrderItemRow({
               </Button>
             </>
           )}
+        </div>
+      )}
+      {editable && confirming && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-medium">Hapus baris ini?</span>
+          <Button variant="danger" disabled={busy} onClick={() => run("all")}>
+            {busy ? "Menghapus..." : "Ya, hapus"}
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
+            Batal
+          </Button>
         </div>
       )}
       {error && <p className="text-danger mt-1 text-sm">{error}</p>}
@@ -156,6 +167,38 @@ export function OrderDetail({
   const [printError, setPrintError] = useState<string | null>(null);
   const [printingKitchenTicket, setPrintingKitchenTicket] = useState(false);
   const [kitchenTicketError, setKitchenTicketError] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<OrderDetailData["items"][number] | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const { offer: offerKitchenTicket, prompt: kitchenTicketPrompt } = useKitchenTicketPrompt({ printerDriver });
+
+  const allProducts = menu.flatMap((c) => c.products);
+  const editingProduct: MenuProduct | undefined = editingItem
+    ? allProducts.find((p) => p.id === editingItem.productId)
+    : undefined;
+
+  async function handleConfirmEdit(result: AddonSheetResult) {
+    if (!editingItem || !editingProduct) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const editResult = await editOrderItem(order.id, editingItem.id, {
+        productId: editingProduct.id,
+        addonOptionIds: expandAddonOptionIds(result.addons),
+        notes: result.notes,
+        qty: result.qty,
+      });
+      if (!editResult.ok) {
+        setEditError(editResult.error);
+        return;
+      }
+      setEditingItem(null);
+      router.refresh();
+      if (kitchenTicketEnabled && editResult.kitchenTicket) offerKitchenTicket(editResult.kitchenTicket);
+    } finally {
+      setEditSaving(false);
+    }
+  }
 
   const canAddItems = order.status === "OPEN";
   const canEditItems = order.status === "OPEN";
@@ -258,6 +301,10 @@ export function OrderDetail({
                   editable={canEditItems}
                   canRemove={totalQty > 1}
                   onChanged={() => router.refresh()}
+                  onEdit={() => {
+                    setEditError(null);
+                    setEditingItem(item);
+                  }}
                 />
               )}
             />
@@ -391,6 +438,43 @@ export function OrderDetail({
           </LinkButton>
         )}
       </div>
+
+      {kitchenTicketPrompt}
+
+      {editingItem && !editingProduct && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="rounded-card bg-surface shadow-sheet flex w-full max-w-sm flex-col items-center gap-4 p-6 text-center">
+            <p className="text-ink text-base font-semibold">
+              Produk ini sudah tidak ada di menu, tidak bisa diedit. Hapus baris ini lalu tambahkan produk penggantinya.
+            </p>
+            <Button variant="secondary" fullWidth onClick={() => setEditingItem(null)}>
+              Tutup
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {editingItem && editingProduct && (
+          <AddonSheet
+            product={editingProduct}
+            initial={{
+              addons: groupOrderItemAddons(editingItem.addons),
+              notes: editingItem.notes ?? "",
+              qty: editingItem.qty,
+            }}
+            onConfirm={handleConfirmEdit}
+            onClose={() => !editSaving && setEditingItem(null)}
+          />
+        )}
+      </AnimatePresence>
+      {editError && editingItem && (
+        <div className="fixed inset-x-0 bottom-0 z-[70] p-3">
+          <div className="rounded-card bg-danger-soft mx-auto max-w-sm p-3 text-center">
+            <p className="text-danger text-sm font-semibold">{editError}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

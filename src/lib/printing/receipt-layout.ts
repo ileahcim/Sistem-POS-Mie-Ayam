@@ -280,6 +280,7 @@ export function buildPackingListLayout(data: PackingListData): LayoutLine[] {
 const KITCHEN_TICKET_TITLE: Record<KitchenTicketData["kind"], string> = {
   FULL: "DAPUR",
   ADDITIONAL: "TAMBAHAN",
+  MODIFIED: "UBAH",
 };
 
 // The kitchen slip — see CLAUDE.md "Kertas dapur". No store header/logo (it

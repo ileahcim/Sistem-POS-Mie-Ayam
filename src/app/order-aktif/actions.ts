@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/get-current-user";
 import { buildOrderItemsCreateData, type OrderItemInput } from "@/lib/orders/build-order-items";
 import { buildKitchenTicketData } from "@/lib/orders/build-kitchen-ticket-data";
+import { buildComboKey } from "@/lib/orders/pricing";
+import { DELIVERY_CHARGEABLE_CATEGORY_NAME } from "@/lib/menu/get-active-menu";
 import type { KitchenTicketData } from "@/lib/printing/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -170,6 +172,125 @@ export async function removeOrderItem(
       data: { qty: nextQty, lineTotal: unitTotal * nextQty },
     });
     return { ok: true };
+  });
+}
+
+export type EditItemInput = { productId: string; addonOptionIds: string[]; notes: string; qty: number };
+export type EditItemResult =
+  // kitchenTicket ("UBAH") covers only the new version of the edited line —
+  // null when it doesn't need the kitchen (isKitchenItem false) or the
+  // order has nothing else to print for.
+  | { ok: true; kitchenTicket: KitchenTicketData | null }
+  | { ok: false; error: string };
+
+// Changing an item already on a saved order — wrong topping, forgot a
+// modifier — used to mean Hapus + tambah ulang (CLAUDE.md-worthy brief, 22
+// Sep 2026). Only while OPEN, same as removeOrderItem/addItemsToOrder.
+// Prices are re-read fresh from product/addon rows inside the transaction —
+// never trusts what the sheet displayed, same rule as buildOrderItemsCreateData.
+// If the edit now matches another line already on the order, it folds into
+// that line instead of leaving a duplicate — the same merge rule
+// addItemsToOrder uses for a fresh add, and upsertCartLine uses client-side
+// before the order is even saved.
+export async function editOrderItem(orderId: string, orderItemId: string, input: EditItemInput): Promise<EditItemResult> {
+  await requireUser();
+  const qty = Math.max(1, Math.floor(input.qty));
+  const notes = input.notes.trim() || null;
+
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+    if (!order) return { ok: false, error: "Order tidak ditemukan." };
+    if (order.status !== "OPEN") {
+      return { ok: false, error: "Order ini sudah dibayar/tidak aktif — tidak bisa diubah." };
+    }
+    const target = order.items.find((i) => i.id === orderItemId);
+    if (!target) return { ok: false, error: "Item tidak ditemukan di order ini." };
+
+    const product = await tx.product.findUnique({ where: { id: input.productId }, include: { category: true } });
+    if (!product || !product.isActive) {
+      return { ok: false, error: "Produk sudah tidak tersedia. Muat ulang halaman." };
+    }
+
+    const distinctAddonIds = [...new Set(input.addonOptionIds)];
+    const addonOptions = await tx.addonOption.findMany({ where: { id: { in: distinctAddonIds }, isActive: true } });
+    if (addonOptions.length !== distinctAddonIds.length) {
+      return { ok: false, error: "Salah satu topping sudah tidak tersedia. Muat ulang halaman." };
+    }
+    const addonById = new Map(addonOptions.map((a) => [a.id, a]));
+
+    const isDeliveryChargeable = product.category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME;
+    const isKitchenItem = product.category.isKitchenItem;
+    const unitTotal = product.price + input.addonOptionIds.reduce((sum, id) => sum + addonById.get(id)!.price, 0);
+    const comboKey = buildComboKey(product.id, input.addonOptionIds);
+    const lineTotal = unitTotal * qty;
+
+    // Same twin-match rule as addItemsToOrder: product+addons+notes match AND
+    // the per-portion price lines up (a price change since the order opened
+    // gets its own correctly-priced row instead of silently inheriting the
+    // twin's older price).
+    const twin = order.items.find(
+      (i) =>
+        i.id !== target.id &&
+        i.comboKey === comboKey &&
+        (i.notes ?? "") === (notes ?? "") &&
+        i.qty > 0 &&
+        i.lineTotal / i.qty === unitTotal,
+    );
+
+    const addonCreateData = input.addonOptionIds.map((id) => {
+      const a = addonById.get(id)!;
+      return { addonOptionId: a.id, name: a.name, price: a.price, costPrice: a.costPrice };
+    });
+
+    if (twin) {
+      await tx.orderItemAddon.deleteMany({ where: { orderItemId: target.id } });
+      await tx.orderItem.delete({ where: { id: target.id } });
+      await tx.orderItem.update({
+        where: { id: twin.id },
+        data: { qty: twin.qty + qty, lineTotal: twin.lineTotal + lineTotal },
+      });
+    } else {
+      // OrderItemAddon has no cascade — replace its rows explicitly rather
+      // than trying to diff old vs new selection.
+      await tx.orderItemAddon.deleteMany({ where: { orderItemId: target.id } });
+      await tx.orderItem.update({
+        where: { id: target.id },
+        data: {
+          productId: product.id,
+          productName: product.name,
+          unitPrice: product.price,
+          costPrice: product.costPrice,
+          qty,
+          notes,
+          isDeliveryChargeable,
+          isKitchenItem,
+          comboKey,
+          lineTotal,
+          addons: { create: addonCreateData },
+        },
+      });
+    }
+
+    const kitchenTicket = buildKitchenTicketData(
+      { queueNumber: order.queueNumber, queueSuffix: order.queueSuffix, channel: order.channel, tableLabel: order.tableLabel, customerName: order.customerName },
+      [
+        {
+          productId: product.id,
+          productName: product.name,
+          qty,
+          notes,
+          unitPrice: product.price,
+          addons: addonCreateData.map((a) => ({ name: a.name, price: a.price })),
+          isDeliveryChargeable,
+          isKitchenItem,
+          categorySortOrder: product.category.sortOrder,
+          productSortOrder: product.sortOrder,
+        },
+      ],
+      "MODIFIED",
+    );
+
+    return { ok: true, kitchenTicket };
   });
 }
 

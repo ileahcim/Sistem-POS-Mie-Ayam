@@ -65,6 +65,20 @@ export function expandAddonOptionIds(addons: Pick<CartAddon, "addonOptionId" | "
   return addons.flatMap((a) => Array(a.qty).fill(a.addonOptionId) as string[]);
 }
 
+// The inverse of expandAddonOptionIds — groups the one-row-per-unit shape
+// OrderItemAddon comes back as (via getOrderDetail) into {addonOptionId,
+// qty} pairs AddonSheet's `initial` prop expects. Used to pre-fill the sheet
+// when editing an item already on a saved order (order-detail.tsx).
+export function groupOrderItemAddons(addons: { addonOptionId: string; name: string; price: number }[]): CartAddon[] {
+  const byOption = new Map<string, CartAddon>();
+  for (const a of addons) {
+    const existing = byOption.get(a.addonOptionId);
+    if (existing) existing.qty += 1;
+    else byOption.set(a.addonOptionId, { addonOptionId: a.addonOptionId, name: a.name, price: a.price, qty: 1 });
+  }
+  return [...byOption.values()];
+}
+
 export function cartItemLineTotal(item: Pick<CartItem, "unitPrice" | "addons" | "qty">): number {
   return cartItemUnitTotal(item) * item.qty;
 }

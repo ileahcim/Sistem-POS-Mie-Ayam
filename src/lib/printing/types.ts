@@ -129,8 +129,10 @@ export type PackingListData = {
 
 // "DAPUR" when the whole order is new, "TAMBAHAN" when only items just added
 // to an already-saved order are on it (never the whole order again — the
-// kitchen would cook it twice). See CLAUDE.md "Kertas dapur".
-export type KitchenTicketKind = "FULL" | "ADDITIONAL";
+// kitchen would cook it twice), "UBAH" when one existing line was edited in
+// place (wrong topping etc.) — shows only the new version of that one line.
+// See CLAUDE.md "Kertas dapur".
+export type KitchenTicketKind = "FULL" | "ADDITIONAL" | "MODIFIED";
 
 export type KitchenTicketItem = {
   productId: string; // groups per product, same rule as the cart (line-order.ts)
