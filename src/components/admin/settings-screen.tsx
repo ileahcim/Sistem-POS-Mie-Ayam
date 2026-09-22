@@ -423,6 +423,13 @@ export function SettingsScreen({
               of taking up room in the main Menu. */}
           <Card>
             <p className="text-ink px-4 pt-3 pb-1 text-base font-semibold">Data menu</p>
+            <ListRow asLink="/admin/menu">
+              <span className="flex flex-1 flex-col">
+                <span className="text-ink text-base font-semibold">Manajemen Menu</span>
+                <span className="text-ink-muted text-sm">Tambah, ubah, atau nonaktifkan produk & add-on.</span>
+              </span>
+              <span className="text-ink-faint text-xl">›</span>
+            </ListRow>
             <ListRow asLink="/admin/hpp">
               <span className="flex flex-1 flex-col">
                 <span className="text-ink text-base font-semibold">Isi HPP</span>
