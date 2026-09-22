@@ -33,18 +33,22 @@ export function MainMenu({ isOwner }: { isOwner: boolean }) {
   const entries = MENU_ENTRIES.filter((e) => isOwner || !e.ownerOnly);
   return (
     <HeaderMenuButton>
-      {entries.map((entry, i) => (
-        <SheetItem key={entry.href} index={i} interactive className="border-b border-border">
-          <ListRow asLink={entry.href} noDivider className={entry.warning ? "bg-warning-soft" : undefined}>
-            <span className={entry.warning ? "text-warning text-base font-bold" : "text-base font-semibold text-ink"}>
-              {entry.label}
-            </span>
-          </ListRow>
-        </SheetItem>
-      ))}
-      <SheetItem index={entries.length} className="pt-3">
-        <SignOutButton />
-      </SheetItem>
+      {(close) => (
+        <>
+          {entries.map((entry, i) => (
+            <SheetItem key={entry.href} index={i} interactive className="border-b border-border">
+              <ListRow asLink={entry.href} onClick={close} noDivider className={entry.warning ? "bg-warning-soft" : undefined}>
+                <span className={entry.warning ? "text-warning text-base font-bold" : "text-base font-semibold text-ink"}>
+                  {entry.label}
+                </span>
+              </ListRow>
+            </SheetItem>
+          ))}
+          <SheetItem index={entries.length} className="pt-3">
+            <SignOutButton />
+          </SheetItem>
+        </>
+      )}
     </HeaderMenuButton>
   );
 }

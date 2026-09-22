@@ -9,8 +9,14 @@ import { Sheet } from "./sheet";
 // dropped so the header row still fits. Closes itself on any tap inside (a nav link
 // navigates away anyway; for an in-place action like sign-out, closing
 // immediately still reads correctly since the page redirects right after).
-export function HeaderMenuButton({ children }: { children: ReactNode }) {
+// The wrapper's onClick below is a catch-all for children that don't wire
+// `close` themselves (e.g. the sign-out button); nav rows (MainMenu) call
+// the `close` passed to them directly off the SAME onClick that triggers
+// the Link's navigation, instead of relying on this bubbling up through
+// nested motion.div gesture wrappers.
+export function HeaderMenuButton({ children }: { children: ReactNode | ((close: () => void) => ReactNode) }) {
   const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
 
   return (
     <>
@@ -27,9 +33,9 @@ export function HeaderMenuButton({ children }: { children: ReactNode }) {
       </button>
       <AnimatePresence>
         {open && (
-          <Sheet title="Menu" onClose={() => setOpen(false)}>
-            <div className="flex flex-col" onClick={() => setOpen(false)}>
-              {children}
+          <Sheet title="Menu" onClose={close}>
+            <div className="flex flex-col" onClick={close}>
+              {typeof children === "function" ? children(close) : children}
             </div>
           </Sheet>
         )}

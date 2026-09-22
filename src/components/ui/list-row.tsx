@@ -16,7 +16,13 @@ const MotionLink = motion.create(Link);
 // scrolling — everywhere else (Piutang, Pesanan Terjadwal, and every
 // sit-down report screen) keeps the default so nothing there is affected.
 // Pass either `onClick` (an in-page action) or `asLink` (real navigation,
-// so the browser's link semantics/prefetch still work) — not both.
+// so the browser's link semantics/prefetch still work) — not both, UNLESS
+// `asLink` is combined with `onClick` specifically to run a side effect
+// (e.g. closing a menu sheet) on the exact same click that triggers the
+// Link's own navigation — see MainMenu, which wires this instead of relying
+// on an ancestor's onClick to catch the click via bubbling (fragile: two
+// nested motion.div gesture wrappers sit in between, so it depends on
+// nothing upstream ever intercepting/stopping the event).
 export function ListRow({
   children,
   onClick,
@@ -49,7 +55,13 @@ export function ListRow({
 
   if (asLink) {
     return (
-      <MotionLink href={asLink} whileTap={{ scale: 0.99 }} transition={{ duration: 0.12 }} className={shared}>
+      <MotionLink
+        href={asLink}
+        onClick={onClick}
+        whileTap={{ scale: 0.99 }}
+        transition={{ duration: 0.12 }}
+        className={shared}
+      >
         {children}
       </MotionLink>
     );
