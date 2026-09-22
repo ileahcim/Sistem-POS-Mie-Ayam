@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { HeaderMenuButton } from "./header-menu-button";
 import { ListRow } from "./list-row";
 import { SheetItem } from "./sheet-motion";
@@ -30,25 +33,23 @@ const MENU_ENTRIES: MenuEntry[] = [
 ];
 
 export function MainMenu({ isOwner }: { isOwner: boolean }) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
   const entries = MENU_ENTRIES.filter((e) => isOwner || !e.ownerOnly);
   return (
-    <HeaderMenuButton>
-      {(close) => (
-        <>
-          {entries.map((entry, i) => (
-            <SheetItem key={entry.href} index={i} interactive className="border-b border-border">
-              <ListRow asLink={entry.href} onClick={close} noDivider className={entry.warning ? "bg-warning-soft" : undefined}>
-                <span className={entry.warning ? "text-warning text-base font-bold" : "text-base font-semibold text-ink"}>
-                  {entry.label}
-                </span>
-              </ListRow>
-            </SheetItem>
-          ))}
-          <SheetItem index={entries.length} className="pt-3">
-            <SignOutButton />
-          </SheetItem>
-        </>
-      )}
+    <HeaderMenuButton open={open} onOpen={() => setOpen(true)} onClose={close}>
+      {entries.map((entry, i) => (
+        <SheetItem key={entry.href} index={i} interactive className="border-b border-border">
+          <ListRow asLink={entry.href} onClick={close} noDivider className={entry.warning ? "bg-warning-soft" : undefined}>
+            <span className={entry.warning ? "text-warning text-base font-bold" : "text-base font-semibold text-ink"}>
+              {entry.label}
+            </span>
+          </ListRow>
+        </SheetItem>
+      ))}
+      <SheetItem index={entries.length} className="pt-3">
+        <SignOutButton />
+      </SheetItem>
     </HeaderMenuButton>
   );
 }
