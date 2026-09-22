@@ -2,7 +2,10 @@
 // plain string unions (same convention as the rest of this codebase, e.g.
 // Order's channel/status types — never importing the generated Prisma enum
 // directly into a DTO type).
-export type MieProductType = "MIE_KERITING" | "MIE_LURUS" | "PANGSIT" | "CUSTOM";
+// FROZEN = Mie Frozen, a warung POS product (not raw mi mentah) whose debt
+// is still tracked here but excluded from the Ringkasan's mi-mentah
+// omzet/kg totals — owner's call, 22 Sep 2026, see bucket-mie.ts.
+export type MieProductType = "MIE_KERITING" | "MIE_LURUS" | "PANGSIT" | "FROZEN" | "CUSTOM";
 export type MieLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT";
 
 // Kinds that carry a plain amount (no kg/price) and are added from the
@@ -19,9 +22,25 @@ export const MIE_PRODUCT_LABEL: Record<Exclude<MieProductType, "CUSTOM">, string
   MIE_KERITING: "Mi Keriting",
   MIE_LURUS: "Mi Lurus",
   PANGSIT: "Pangsit",
+  FROZEN: "Frozen",
 };
 
+// Used by the order form's jenis buttons AND /note/produk's default-price
+// rows — FROZEN belongs in both ("sejajar" with the others, priced the same
+// way, owner's call). It's the NARROWER MIE_MENTAH_PRODUCT_TYPES below
+// (bucket-mie.ts) that leaves FROZEN out, specifically for the Ringkasan's
+// mi-mentah omzet/kg totals and per-jenis breakdown.
 export const MIE_FIXED_PRODUCT_TYPES: Exclude<MieProductType, "CUSTOM">[] = [
+  "MIE_KERITING",
+  "MIE_LURUS",
+  "PANGSIT",
+  "FROZEN",
+];
+
+// The actual raw-noodle types — what the Ringkasan's headline omzet/kg and
+// "Per jenis mi" table count. FROZEN is deliberately excluded (see
+// MieProductType's doc comment above).
+export const MIE_MENTAH_PRODUCT_TYPES: Exclude<MieProductType, "CUSTOM" | "FROZEN">[] = [
   "MIE_KERITING",
   "MIE_LURUS",
   "PANGSIT",

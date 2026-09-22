@@ -3,6 +3,8 @@ import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import type { MieReportPoint } from "./get-mie-report";
 import type { MieProductType } from "./types";
 
+type MentahType = Exclude<MieProductType, "FROZEN">;
+
 export type MieGranularity = "harian" | "mingguan" | "bulanan";
 
 export type MieTypeTotals = { kg: number; amount: number };
@@ -11,10 +13,15 @@ export type MieBucket = {
   key: string;
   label: string; // short, for the chart axis
   longLabel: string; // for the table / selected-period heading
-  omzet: number; // sum of ORDER amounts
+  omzet: number; // sum of ORDER amounts — EXCLUDING Frozen, see frozenAmount
   payments: number; // sum of PAYMENT amounts
-  kg: number;
-  byType: Record<MieProductType, MieTypeTotals>;
+  kg: number; // EXCLUDING Frozen
+  byType: Record<MentahType, MieTypeTotals>;
+  // Mie Frozen is a warung POS product, not mi mentah (owner's call, 22 Sep
+  // 2026) — tracked here SEPARATELY, never folded into omzet/kg/byType
+  // above, so it can never inflate the mi-mentah stats those feed.
+  frozenKg: number;
+  frozenAmount: number;
 };
 
 // Default window per granularity — what the screen opens on, and what the
@@ -86,7 +93,7 @@ function labels(start: Date, g: MieGranularity): { label: string; longLabel: str
   };
 }
 
-function emptyByType(): Record<MieProductType, MieTypeTotals> {
+function emptyByType(): Record<MentahType, MieTypeTotals> {
   return {
     MIE_KERITING: { kg: 0, amount: 0 },
     MIE_LURUS: { kg: 0, amount: 0 },
@@ -120,7 +127,16 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
   const byKey = new Map<string, MieBucket>();
   for (let start = first; fmt(start) <= fmt(last); start = step(start, g, 1)) {
     const key = fmt(start);
-    const bucket: MieBucket = { key, ...labels(start, g), omzet: 0, payments: 0, kg: 0, byType: emptyByType() };
+    const bucket: MieBucket = {
+      key,
+      ...labels(start, g),
+      omzet: 0,
+      payments: 0,
+      kg: 0,
+      byType: emptyByType(),
+      frozenKg: 0,
+      frozenAmount: 0,
+    };
     buckets.push(bucket);
     byKey.set(key, bucket);
     if (buckets.length > MAX_BUCKETS + 1) break;
@@ -135,6 +151,11 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
     if (!bucket) continue; // outside the visible window
     if (p.kind === "PAYMENT") {
       bucket.payments += p.amount;
+      continue;
+    }
+    if (p.productType === "FROZEN") {
+      bucket.frozenKg += p.kg;
+      bucket.frozenAmount += p.amount;
       continue;
     }
     bucket.omzet += p.amount;

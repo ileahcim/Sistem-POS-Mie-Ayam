@@ -7,7 +7,7 @@ import { bucketMie, defaultRangeFor, isDefaultRange, type MieGranularity } from 
 import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import { DateRangePresets } from "@/components/ui/date-range-presets";
 import { formatId } from "@/lib/timezone";
-import { MIE_FIXED_PRODUCT_TYPES, MIE_PRODUCT_LABEL, type MieProductType } from "@/lib/mie/types";
+import { MIE_MENTAH_PRODUCT_TYPES, MIE_PRODUCT_LABEL, type MieProductType } from "@/lib/mie/types";
 import { formatRupiah } from "@/lib/printing/format";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
@@ -21,8 +21,10 @@ const OPTIONS: { value: MieGranularity; label: string; unit: string }[] = [
   { value: "bulanan", label: "Bulanan", unit: "Bulan" },
 ];
 
-const TYPE_ROWS: { type: MieProductType; label: string }[] = [
-  ...MIE_FIXED_PRODUCT_TYPES.map((t) => ({ type: t, label: MIE_PRODUCT_LABEL[t] })),
+// FROZEN deliberately excluded — this table (and the Total row under it)
+// is mi-mentah only, see bucket-mie.ts's MieBucket doc comment.
+const TYPE_ROWS: { type: Exclude<MieProductType, "FROZEN">; label: string }[] = [
+  ...MIE_MENTAH_PRODUCT_TYPES.map((t) => ({ type: t, label: MIE_PRODUCT_LABEL[t] })),
   { type: "CUSTOM", label: "Custom" },
 ];
 
@@ -30,7 +32,7 @@ function formatKg(kg: number): string {
   return `${(Math.round(kg * 100) / 100).toLocaleString("id-ID")} kg`;
 }
 
-function emptyTypeTotals(): Record<MieProductType, { kg: number; amount: number }> {
+function emptyTypeTotals(): Record<Exclude<MieProductType, "FROZEN">, { kg: number; amount: number }> {
   return {
     MIE_KERITING: { kg: 0, amount: 0 },
     MIE_LURUS: { kg: 0, amount: 0 },
@@ -91,11 +93,13 @@ export function MieReportScreen({
   // range — summed from the same buckets, so the two can never disagree.
   const view = useMemo(() => {
     if (selected) return { ...selected, label: selected.longLabel };
-    const totals = { omzet: 0, payments: 0, kg: 0, byType: emptyTypeTotals() };
+    const totals = { omzet: 0, payments: 0, kg: 0, frozenKg: 0, frozenAmount: 0, byType: emptyTypeTotals() };
     for (const b of buckets) {
       totals.omzet += b.omzet;
       totals.payments += b.payments;
       totals.kg += b.kg;
+      totals.frozenKg += b.frozenKg;
+      totals.frozenAmount += b.frozenAmount;
       for (const row of TYPE_ROWS) {
         totals.byType[row.type].kg += b.byType[row.type].kg;
         totals.byType[row.type].amount += b.byType[row.type].amount;
@@ -198,6 +202,14 @@ export function MieReportScreen({
               <Stat label="Pembayaran diterima" value={formatRupiah(view.payments)} />
               <Stat label="Mi terjual" value={formatKg(view.kg)} />
             </div>
+            {/* Mie Frozen is a warung POS product, not mi mentah — tracked as
+                debt but shown separately, never folded into Omzet/Mi terjual
+                above (owner's call, 22 Sep 2026). */}
+            {view.frozenAmount > 0 && (
+              <div className="flex flex-wrap gap-3">
+                <Stat label="Frozen (di luar mi mentah)" value={`${formatRupiah(view.frozenAmount)} · ${formatKg(view.frozenKg)}`} />
+              </div>
+            )}
           </section>
 
           <section className="flex flex-col gap-2">
