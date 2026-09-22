@@ -24,6 +24,18 @@ export function MarginSection({ report, lowMarginItems }: { report: MarginReport
         </div>
       )}
 
+      {/* "+ Item Custom" lines (22 Sep 2026) never appear in the table below
+          them — they have no real HPP to snapshot, so blending them in would
+          make margin% look better than it really is. Shown here instead, so
+          the owner can still see how much custom-priced selling happened. */}
+      {report.customItemCount > 0 && (
+        <div className="bg-info-soft text-info mb-3 rounded-card px-3 py-2 text-sm font-medium">
+          {report.customItemCount} item custom (harga diketik manual, total{" "}
+          {report.customItemOmzet.toLocaleString("id-ID")}) di luar hitungan margin ini — cek Riwayat Pesanan
+          untuk lihat order mana.
+        </div>
+      )}
+
       <Card padded className="mb-3 grid grid-cols-3 gap-2 text-center">
         <div>
           <p className="text-ink-muted text-xs">Omzet</p>

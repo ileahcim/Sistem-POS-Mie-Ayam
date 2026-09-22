@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
-import { expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
+import { cartItemToOrderItemInput, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { AppHeader } from "@/components/ui/app-header";
@@ -70,6 +70,7 @@ export function PreOrderScreen({
       upsertItem({
         productId: product.id,
         productName: product.name,
+        isCustom: false,
         unitPrice: product.price,
         addons: [],
         notes: "",
@@ -98,6 +99,7 @@ export function PreOrderScreen({
     const item: Omit<CartItem, "localId"> = {
       productId: product.id,
       productName: product.name,
+      isCustom: false,
       unitPrice: product.price,
       addons: result.addons,
       notes: result.notes,
@@ -138,12 +140,7 @@ export function PreOrderScreen({
         tableLabel: draft.tableLabel,
         customerName: draft.customerName.trim(),
         scheduledFor: scheduledFor.toISOString(),
-        items: draft.items.map((i) => ({
-          productId: i.productId,
-          addonOptionIds: expandAddonOptionIds(i.addons),
-          notes: i.notes,
-          qty: i.qty,
-        })),
+        items: draft.items.map(cartItemToOrderItemInput),
         // DP is taken afterwards with "+ Catat DP" on the order detail — the
         // picker was removed from this cart to give the list room (21 Sep 2026).
         deposit: null,

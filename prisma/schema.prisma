@@ -451,10 +451,12 @@ model OrderItem {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id])
 
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
+  // Null for a custom item ("+ Item Custom" — free name/price typed by the
+  // cashier, no real Product behind it, CLAUDE.md-worthy brief 22 Sep 2026).
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
 
-  productName String // snapshot
+  productName String // snapshot (typed by the cashier for a custom item)
   unitPrice   Int // snapshot of Product.price
   costPrice   Int? // snapshot of Product.costPrice
   qty         Int    @default(1)

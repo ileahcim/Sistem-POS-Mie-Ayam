@@ -34,6 +34,7 @@ export function resolveComboShortcut(
   return {
     productId: product.id,
     productName: product.name,
+    isCustom: false,
     unitPrice: product.price,
     addons,
     notes: "",

@@ -1,10 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { DELIVERY_FEE_PER_FOOD_ITEM } from "./pricing";
+import { DELIVERY_CHARGEABLE_CATEGORY_NAME } from "@/lib/menu/get-active-menu";
 import { depositPosition, type DepositMethod } from "@/lib/deposits/settle";
+import { customGroupingKey } from "@/lib/cart/types";
 
 export type OrderDetailItem = {
   id: string;
+  // The real Product id for a normal line. For a custom item ("+ Item
+  // Custom") a synthetic per-name grouping key (customGroupingKey) — see
+  // OrderItemDisplayData in build-order-items.ts for why. Use `isCustom`
+  // below to tell the two apart, never a string check on this field.
   productId: string;
+  isCustom: boolean;
   productName: string;
   unitPrice: number;
   addons: { addonOptionId: string; name: string; price: number }[];
@@ -110,9 +117,18 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
   });
   if (!order) return null;
 
+  // Only fetched when the order actually has a custom item ("+ Item
+  // Custom", product relation null) — a live lookup, never hardcoded, same
+  // as build-order-items.ts's buildOrderItemsCreateData.
+  const hasCustomItem = order.items.some((item) => !item.product);
+  const makananCategory = hasCustomItem
+    ? await prisma.category.findUnique({ where: { name: DELIVERY_CHARGEABLE_CATEGORY_NAME } })
+    : null;
+
   const items: OrderDetailItem[] = order.items.map((item) => ({
     id: item.id,
-    productId: item.productId,
+    productId: item.product ? item.productId! : customGroupingKey(item.productName),
+    isCustom: !item.product,
     productName: item.productName,
     unitPrice: item.unitPrice,
     addons: item.addons.map((a) => ({ addonOptionId: a.addonOptionId, name: a.name, price: a.price })),
@@ -121,8 +137,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     lineTotal: item.lineTotal,
     isDeliveryChargeable: item.isDeliveryChargeable,
     isKitchenItem: item.isKitchenItem,
-    categorySortOrder: item.product.category.sortOrder,
-    productSortOrder: item.product.sortOrder,
+    categorySortOrder: item.product ? item.product.category.sortOrder : (makananCategory?.sortOrder ?? 0),
+    productSortOrder: item.product ? item.product.sortOrder : Number.MAX_SAFE_INTEGER,
   }));
 
   const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);

@@ -88,6 +88,11 @@ function OrderItemRow({
       <div className="flex justify-between gap-3">
         <span className="text-base font-semibold text-ink">
           {item.qty}x {item.productName}
+          {item.isCustom && (
+            <span className="ml-2 inline-block align-middle">
+              <Badge variant="warning">Custom</Badge>
+            </span>
+          )}
         </span>
         <PriceText amount={item.lineTotal} weight="secondary" />
       </div>
@@ -101,9 +106,14 @@ function OrderItemRow({
 
       {editable && !confirming && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <Button variant="secondary" disabled={busy} onClick={onEdit}>
-            Edit
-          </Button>
+          {/* A custom item ("+ Item Custom") has no real Product behind it
+              to reopen an addon sheet for — Hapus + tambah ulang covers the
+              correction case instead (owner's scope, 22 Sep 2026). */}
+          {!item.isCustom && (
+            <Button variant="secondary" disabled={busy} onClick={onEdit}>
+              Edit
+            </Button>
+          )}
           {canRemove && (
             <>
               {item.qty > 1 && (

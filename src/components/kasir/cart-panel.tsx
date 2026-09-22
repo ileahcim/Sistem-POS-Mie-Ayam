@@ -26,6 +26,7 @@ export function CartPanel({
   lastAddedLocalId,
   onEdit,
   onRemove,
+  onAddCustomItem,
   onSave,
   saveLabel = "Simpan Pesanan",
   footerExtra,
@@ -40,6 +41,9 @@ export function CartPanel({
   lastAddedLocalId: string | null;
   onEdit: (item: CartItem) => void;
   onRemove: (localId: string) => void;
+  // Undefined on Pesanan Terjadwal's cart — "+ Item Custom" is Kasir- and
+  // "+ Tambah Item"-only (owner's explicit scope, 22 Sep 2026).
+  onAddCustomItem?: () => void;
   onSave: () => void;
   saveLabel?: string;
   // Optional block rendered right under Total, above the save button.
@@ -77,6 +81,12 @@ export function CartPanel({
           )}
         />
     );
+
+  const addCustomItemButton = onAddCustomItem && (
+    <Button variant="ghost" size="default" fullWidth onClick={onAddCustomItem}>
+      + Item Custom
+    </Button>
+  );
 
   const footer = (
     <>
@@ -138,6 +148,7 @@ export function CartPanel({
         footer={footer}
       >
         {itemList}
+        {addCustomItemButton && <div className="mt-2">{addCustomItemButton}</div>}
       </Sheet>
     );
   }
@@ -148,7 +159,10 @@ export function CartPanel({
         <h2 className="text-base font-bold text-ink">Keranjang</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4">{itemList}</div>
+      <div className="flex-1 overflow-y-auto px-4">
+        {itemList}
+        {addCustomItemButton && <div className="py-2">{addCustomItemButton}</div>}
+      </div>
 
       <div className="border-border border-t p-3">{footer}</div>
     </div>

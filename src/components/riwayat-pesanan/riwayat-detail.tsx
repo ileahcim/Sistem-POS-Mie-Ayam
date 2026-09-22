@@ -149,6 +149,13 @@ export function RiwayatDetail({
                 <div className="flex justify-between gap-3">
                   <span className="text-base font-semibold text-ink">
                     {item.qty}x {item.productName}
+                    {/* Owner-visible marker for a manually-typed price (22
+                        Sep 2026) — see CLAUDE.md "+ Item Custom". */}
+                    {item.isCustom && (
+                      <span className="ml-2 inline-block align-middle">
+                        <Badge variant="warning">Custom</Badge>
+                      </span>
+                    )}
                   </span>
                   <PriceText amount={item.lineTotal} weight="secondary" />
                 </div>

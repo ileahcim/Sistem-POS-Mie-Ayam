@@ -90,6 +90,12 @@ export async function addItemsToOrder(orderId: string, items: OrderItemInput[]):
     const twin = order.items.find(
       (existing) =>
         existing.comboKey === data.comboKey &&
+        // comboKey alone isn't enough once a custom item can exist: every
+        // custom item has comboKey null, so without this, two DIFFERENT
+        // custom items (different typed names) would look like twins.
+        // Harmless for a real item — same comboKey already implies same
+        // productName there.
+        existing.productName === data.productName &&
         (existing.notes ?? "") === (data.notes ?? "") &&
         existing.qty > 0 &&
         existing.lineTotal / existing.qty === data.lineTotal / data.qty,

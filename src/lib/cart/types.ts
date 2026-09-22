@@ -18,8 +18,14 @@ export type CartAddon = {
 // server; the server assigns real OrderItem ids on save.
 export type CartItem = {
   localId: string;
+  // For a real menu item, the actual Product id. For a custom item
+  // ("+ Item Custom" — CLAUDE.md-worthy brief, 22 Sep 2026), a SYNTHETIC
+  // per-name grouping key (`custom:<name>`, see customGroupingKey below) —
+  // there's no real Product row, but sameCartLine/line-order.ts still need
+  // some string to tell two different lines apart.
   productId: string;
   productName: string;
+  isCustom: boolean;
   unitPrice: number;
   addons: CartAddon[];
   notes: string;
@@ -31,6 +37,10 @@ export type CartItem = {
   categorySortOrder: number;
   productSortOrder: number;
 };
+
+export function customGroupingKey(name: string): string {
+  return `custom:${name}`;
+}
 
 export type CartDraft = {
   channel: ChannelType | null;
@@ -85,18 +95,27 @@ export function cartItemLineTotal(item: Pick<CartItem, "unitPrice" | "addons" | 
 
 // THE merge rule, one definition for every screen: two lines are the same
 // line when the product, the exact add-on selection (option AND its qty),
-// and the note all match. Order-independent on addons (a cart line's addon
-// array order isn't meaningful) and whitespace-independent on the note, so
-// a note typed with a trailing space still merges.
+// the note, AND the unit price all match. Order-independent on addons (a
+// cart line's addon array order isn't meaningful) and whitespace-independent
+// on the note, so a note typed with a trailing space still merges.
 //
 // Notes used to abort the comparison outright (`if (a.notes || b.notes)
 // return false`), which meant two lines carrying the SAME note never merged
 // — "2x Mie Ayam pedas" came out as two rows of one.
+//
+// unitPrice joined the comparison for custom items (22 Sep 2026): a real
+// menu item's price is always a live lookup from its productId, so two
+// lines of the same product already always share a price — this changes
+// nothing for them. A custom item's price is typed by the cashier and has
+// no such guarantee (same name, different price, typed twice), so without
+// this check two differently-priced custom lines sharing a name would
+// silently merge and drop one of the prices.
 export function sameCartLine(
-  a: Pick<CartItem, "productId" | "addons" | "notes">,
-  b: Pick<CartItem, "productId" | "addons" | "notes">,
+  a: Pick<CartItem, "productId" | "addons" | "notes" | "unitPrice">,
+  b: Pick<CartItem, "productId" | "addons" | "notes" | "unitPrice">,
 ): boolean {
   if (a.productId !== b.productId) return false;
+  if (a.unitPrice !== b.unitPrice) return false;
   if ((a.notes ?? "").trim() !== (b.notes ?? "").trim()) return false;
   if (a.addons.length !== b.addons.length) return false;
   const aIds = [...a.addons.map((x) => `${x.addonOptionId}:${x.qty}`)].sort();
@@ -145,4 +164,24 @@ export function upsertCartLine(
 
   const localId = createLocalId();
   return { items: [...items, { ...incoming, localId }], localId };
+}
+
+// Builds the request shape saveOrder/addItemsToOrder expect (OrderItemInput,
+// build-order-items.ts) — kept here instead of imported from there, because
+// that module pulls in `prisma` and this file is imported by client
+// components (CLAUDE.md-worthy brief: a value import of a Prisma-touching
+// module in a client component breaks the whole route). TypeScript checks
+// the shape structurally against the server action's parameter type, so no
+// import is needed for this to type-check correctly at each call site.
+export function cartItemToOrderItemInput(item: CartItem) {
+  if (item.isCustom) {
+    return { kind: "custom" as const, name: item.productName, price: item.unitPrice, notes: item.notes, qty: item.qty };
+  }
+  return {
+    kind: "product" as const,
+    productId: item.productId,
+    addonOptionIds: expandAddonOptionIds(item.addons),
+    notes: item.notes,
+    qty: item.qty,
+  };
 }

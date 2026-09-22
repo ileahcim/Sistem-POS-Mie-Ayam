@@ -106,14 +106,16 @@ async function aggregateRealCombos(namedByComboKey: Map<string, string>): Promis
   >();
 
   for (const item of items) {
+    // Also the reason a custom item ("+ Item Custom", productId null) can
+    // never reach this point: it's never created with any addons.
     if (item.addons.length === 0) continue;
-    const key = item.comboKey ?? buildComboKey(item.productId, item.addons.map((a) => a.addonOptionId));
+    const key = item.comboKey ?? buildComboKey(item.productId!, item.addons.map((a) => a.addonOptionId));
     const existing = grouped.get(key);
     if (existing) {
       existing.qty += item.qty;
     } else {
       grouped.set(key, {
-        productId: item.productId,
+        productId: item.productId!,
         productName: item.productName,
         addons: groupAddonRows(item.addons.map((a) => ({ addonOptionId: a.addonOptionId, name: a.name }))),
         qty: item.qty,

@@ -16,6 +16,13 @@ export type MarginReport = {
   totalMargin: number;
   anyMissingCostPrice: boolean;
   byProduct: MarginByProduct[];
+  // "+ Item Custom" lines (22 Sep 2026) are deliberately kept OUT of
+  // byProduct/totalOmzet/totalHpp above — their costPrice is always a
+  // literal 0 (nothing to snapshot, not "unknown"), so mixing them into
+  // margin% would misreport genuine product margin as better than it is.
+  // Shown as its own line instead so the rupiah isn't just dropped.
+  customItemCount: number;
+  customItemOmzet: number;
 };
 
 // Margin from the costPrice SNAPSHOT on each OrderItem/OrderItemAddon (never
@@ -34,9 +41,16 @@ export async function getMarginReport(): Promise<MarginReport> {
   });
 
   const byProduct = new Map<string, MarginByProduct>();
+  let customItemCount = 0;
+  let customItemOmzet = 0;
 
   for (const item of items) {
     const omzet = item.lineTotal;
+    if (item.productId == null) {
+      customItemCount += item.qty;
+      customItemOmzet += omzet;
+      continue;
+    }
     const itemCostMissing = item.costPrice == null;
     const addonCostMissing = item.addons.some((a) => a.costPrice == null);
     const hpp =
@@ -72,5 +86,7 @@ export async function getMarginReport(): Promise<MarginReport> {
     totalMargin: totalOmzet - totalHpp,
     anyMissingCostPrice,
     byProduct: rows,
+    customItemCount,
+    customItemOmzet,
   };
 }

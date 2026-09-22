@@ -6,7 +6,7 @@ import Link from "next/link";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import { useCartDraft } from "@/lib/cart/use-cart-draft";
-import { expandAddonOptionIds, type CartItem } from "@/lib/cart/types";
+import { cartItemToOrderItemInput, customGroupingKey, type CartItem } from "@/lib/cart/types";
 import type { ComboShortcut } from "@/lib/combo/types";
 import { MainMenu } from "@/components/ui/main-menu";
 import { OrderAktifButton } from "@/components/ui/order-aktif-button";
@@ -24,6 +24,7 @@ import { CategoryTabs } from "./category-tabs";
 import { ProductGrid } from "./product-grid";
 import { ComboShortcutRow } from "./combo-shortcut-row";
 import { AddonSheet, type AddonSheetResult } from "./addon-sheet";
+import { CustomItemSheet } from "./custom-item-sheet";
 import { CartPanel } from "./cart-panel";
 import { CartBar } from "./cart-bar";
 import { saveOrder } from "@/app/kasir/actions";
@@ -63,6 +64,7 @@ export function KasirScreen({
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
   const [noShiftPopup, setNoShiftPopup] = useState(false);
+  const [customItemSheetOpen, setCustomItemSheetOpen] = useState(false);
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? categories[0];
 
@@ -85,6 +87,7 @@ export function KasirScreen({
       upsertItem({
         productId: product.id,
         productName: product.name,
+        isCustom: false,
         unitPrice: product.price,
         addons: [],
         notes: "",
@@ -113,13 +116,14 @@ export function KasirScreen({
     const item: Omit<CartItem, "localId"> = {
       productId: product.id,
       productName: product.name,
+      isCustom: false,
       unitPrice: product.price,
       addons: result.addons,
       notes: result.notes,
       qty: result.qty,
       isDeliveryChargeable: product.isDeliveryChargeable,
       categorySortOrder: product.categorySortOrder,
-        productSortOrder: product.productSortOrder,
+      productSortOrder: product.productSortOrder,
     };
 
     // Adding a second identical customisation merges with the first, and so
@@ -128,6 +132,28 @@ export function KasirScreen({
     const localId = upsertItem(item, sheetTarget.mode === "edit" ? sheetTarget.item.localId : null);
     setLastAddedLocalId(sheetTarget.mode === "edit" ? null : localId);
     setSheetTarget(null);
+  }
+
+  // "+ Item Custom" — always treated as Makanan for reading order/kertas
+  // dapur (owner's explicit call, CLAUDE.md "Kertas dapur"). Read Makanan's
+  // live sortOrder from the menu already on screen rather than hardcoding it.
+  function handleConfirmCustomItem(result: { name: string; price: number; qty: number }) {
+    const makanan = categories.find((c) => c.name === "Makanan");
+    setLastAddedLocalId(
+      upsertItem({
+        productId: customGroupingKey(result.name),
+        productName: result.name,
+        isCustom: true,
+        unitPrice: result.price,
+        addons: [],
+        notes: "",
+        qty: result.qty,
+        isDeliveryChargeable: true,
+        categorySortOrder: makanan?.sortOrder ?? 0,
+        productSortOrder: Number.MAX_SAFE_INTEGER,
+      }),
+    );
+    setCustomItemSheetOpen(false);
   }
 
   async function handleSave() {
@@ -145,12 +171,7 @@ export function KasirScreen({
         channel: draft.channel,
         tableLabel: draft.tableLabel,
         customerName: draft.customerName.trim() || null,
-        items: draft.items.map((i) => ({
-          productId: i.productId,
-          addonOptionIds: expandAddonOptionIds(i.addons),
-          notes: i.notes,
-          qty: i.qty,
-        })),
+        items: draft.items.map(cartItemToOrderItemInput),
       });
       if (!result.ok) {
         setSaveError(result.error);
@@ -239,6 +260,7 @@ export function KasirScreen({
             lastAddedLocalId={lastAddedLocalId}
             onEdit={handleEditItem}
             onRemove={removeItem}
+            onAddCustomItem={() => setCustomItemSheetOpen(true)}
             onSave={handleSave}
           />
         </div>
@@ -258,6 +280,7 @@ export function KasirScreen({
             lastAddedLocalId={lastAddedLocalId}
             onEdit={handleEditItem}
             onRemove={removeItem}
+            onAddCustomItem={() => setCustomItemSheetOpen(true)}
             onSave={handleSave}
             onClose={() => setCartSheetOpen(false)}
           />
@@ -301,6 +324,12 @@ export function KasirScreen({
             onConfirm={handleConfirmSheet}
             onClose={() => setSheetTarget(null)}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {customItemSheetOpen && (
+          <CustomItemSheet onConfirm={handleConfirmCustomItem} onClose={() => setCustomItemSheetOpen(false)} />
         )}
       </AnimatePresence>
     </div>
