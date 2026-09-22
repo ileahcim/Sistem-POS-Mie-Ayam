@@ -25,6 +25,8 @@ import { VoidOrderButton } from "./void-order-sheet";
 import { DepositCard } from "@/components/pesanan-terjadwal/deposit-card";
 import { CancelDepositOrderButton } from "@/components/pesanan-terjadwal/cancel-deposit-order-sheet";
 import { markServed, removeOrderItem } from "@/app/order-aktif/actions";
+import { buildKitchenTicketData } from "@/lib/orders/build-kitchen-ticket-data";
+import { printKitchenTicketSafely } from "@/lib/printing/print-kitchen-ticket";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -130,6 +132,7 @@ export function OrderDetail({
   isOwner,
   cashDepositAvailable,
   autoPrintReceipt,
+  kitchenTicketEnabled,
 }: {
   order: OrderDetailData;
   menu: MenuCategory[];
@@ -140,11 +143,19 @@ export function OrderDetail({
   // A cash DP needs an open shift (it goes into the drawer); QRIS never does.
   cashDepositAvailable: boolean;
   autoPrintReceipt: boolean;
+  // Off (default, 22 Sep 2026): the "Cetak Tiket Dapur" button and the
+  // TAMBAHAN prompt in AddItemsPanel don't show at all — CLAUDE.md "Kertas
+  // dapur". This same button doubles as the pre-order's manual print (this
+  // component IS the pre-order detail screen — pesanan-terjadwal-list.tsx
+  // links here too).
+  kitchenTicketEnabled: boolean;
 }) {
   const router = useRouter();
   const [markingServed, setMarkingServed] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
+  const [printingKitchenTicket, setPrintingKitchenTicket] = useState(false);
+  const [kitchenTicketError, setKitchenTicketError] = useState<string | null>(null);
 
   const canAddItems = order.status === "OPEN";
   const canEditItems = order.status === "OPEN";
@@ -158,6 +169,26 @@ export function OrderDetail({
   const needsServing =
     !order.servedAt && (order.status === "OPEN" ? order.channel === "DINE_IN" : order.status === "PAID");
   const canPrintPackingList = order.status === "OPEN" && !!packingList;
+  // Built client-side, straight from the order's own items — this is exactly
+  // the "reprint" use case build-kitchen-ticket-data.ts's doc comment
+  // describes. null (and the button hidden) when nothing on the order needs
+  // the kitchen at all, or when the setting is off.
+  const kitchenTicket = kitchenTicketEnabled
+    ? buildKitchenTicketData(
+        { queueNumber: order.queueNumber, queueSuffix: order.queueSuffix, channel: order.channel, tableLabel: order.tableLabel, customerName: order.customerName },
+        order.items,
+        "FULL",
+      )
+    : null;
+
+  async function handlePrintKitchenTicket() {
+    if (!kitchenTicket) return;
+    setPrintingKitchenTicket(true);
+    setKitchenTicketError(null);
+    const failure = await printKitchenTicketSafely(printerDriver, kitchenTicket);
+    setPrintingKitchenTicket(false);
+    if (failure !== null) setKitchenTicketError(failure);
+  }
 
   async function handleMarkServed() {
     setMarkingServed(true);
@@ -258,6 +289,24 @@ export function OrderDetail({
           </div>
         )}
 
+        {/* Manual, never a Ya/Tidak prompt — this is already an explicit tap.
+            Doubles as the pre-order's "print on delivery day" button (this
+            component is also the pre-order detail screen). */}
+        {kitchenTicket && (
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              size="large"
+              fullWidth
+              onClick={handlePrintKitchenTicket}
+              disabled={printingKitchenTicket}
+            >
+              {printingKitchenTicket ? "Mencetak..." : "Cetak Tiket Dapur"}
+            </Button>
+            {kitchenTicketError && <p className="text-danger mt-1 text-sm">Print gagal: {kitchenTicketError}</p>}
+          </div>
+        )}
+
         {order.status === "OPEN" && order.deposits.length === 0 && (
           <div className="mt-3 flex justify-center">
             <SplitAndPayButton order={order} />
@@ -266,7 +315,13 @@ export function OrderDetail({
 
         {canAddItems && (
           <div className="mt-3">
-            <AddItemsPanel orderId={order.id} menu={menu} onAdded={() => router.refresh()} />
+            <AddItemsPanel
+              orderId={order.id}
+              menu={menu}
+              onAdded={() => router.refresh()}
+              printerDriver={printerDriver}
+              kitchenTicketEnabled={kitchenTicketEnabled}
+            />
           </div>
         )}
 

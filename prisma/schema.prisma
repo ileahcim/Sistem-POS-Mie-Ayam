@@ -101,6 +101,16 @@ model Setting {
   // a number field (see "Konteks pengguna" in CLAUDE.md).
   preorderReminderMinutes Int @default(120)
 
+  // Off (default): the kitchen ticket feature does not exist at all — no
+  // print prompt anywhere, same flow as before this feature. On: saving an
+  // order and adding items to one both ask the cashier "Cetak kertas dapur?"
+  // (never automatic — see CLAUDE.md "Kertas dapur"), and the manual "Cetak
+  // Tiket Dapur" button appears on the order detail screen. Default OFF on
+  // purpose: 22 Sep 2026 is the warung's first real operating day, and its
+  // flow must stay byte-identical to what was already tested until the owner
+  // switches this on themselves.
+  kitchenTicketEnabled Boolean @default(false)
+
   updatedAt DateTime @updatedAt
 }
 

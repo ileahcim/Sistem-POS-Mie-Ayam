@@ -7,6 +7,7 @@ import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver, PrintResult } from "@/lib/printing/types";
 import {
   updateAutoPrintReceipt,
+  updateKitchenTicketEnabled,
   updatePreorderReminderMinutes,
   updatePrinterDriver,
   updatePrintLogo,
@@ -455,6 +456,19 @@ export function SettingsScreen({
           />
 
           <PrinterCard settings={settings} />
+
+          <ToggleCard
+            title="Kertas dapur"
+            description={
+              <>
+                Nyala: menyimpan pesanan dan menambah item ke pesanan menampilkan pilihan &ldquo;Cetak kertas
+                dapur?&rdquo; Ya/Tidak — tidak pernah otomatis. Mati (default): fitur ini tidak ada sama sekali, tidak
+                ada pilihan yang muncul.
+              </>
+            }
+            initialValue={settings.kitchenTicketEnabled}
+            onSave={updateKitchenTicketEnabled}
+          />
 
           <ToggleCard
             title="Cetak logo di struk"

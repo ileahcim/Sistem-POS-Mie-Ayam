@@ -11,13 +11,13 @@
 //
 // Pure data + formatting: no React, no ESC/POS, safe to import anywhere.
 
-import type { DepositReceiptData, PackingListData, ReceiptData } from "./types";
+import type { DepositReceiptData, KitchenTicketData, PackingListData, ReceiptData } from "./types";
 import { formatRupiah, mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
 import { centeredRule, paperRule, wrapHeading, wrapWords, RECEIPT_CHARS_PER_LINE } from "./paper";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { depositPosition } from "@/lib/deposits/settle";
-import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
+import { portionPriceOf, sortOrderLines, layoutOrderLines } from "@/lib/orders/line-order";
 
 // The thermal logo (see scripts/make-thermal-logo.py) is only the bowl and
 // "CTR", 224 dots (≈28 mm) wide. No caption under it: the warung name from
@@ -40,12 +40,16 @@ export type LayoutLine =
   // A full-width line of literal characters: "====…", "----…", or the
   // centered "===== Terima kasih! =====" — the very string the printer gets.
   | { kind: "rule"; text: string }
-  // "No. Order : 113"
-  | { kind: "meta"; label: string; value: string }
+  // "No. Order : 113". bold is only ever set by the kitchen ticket, whose
+  // meta block (antrian/tipe/nama/jam) must stand out so the kitchen can
+  // match the slip to the right table — every other caller leaves it unset.
+  | { kind: "meta"; label: string; value: string; bold?: boolean }
   // Name on the left, price/qty glued to the right edge.
   | { kind: "pair"; role: PairRole; left: string; right: string; checkbox?: boolean }
-  // Indented line under an item: add-ons or a note.
-  | { kind: "sub"; text: string; role: "addon" | "note" };
+  // Indented line under an item: add-ons or a note. bold is only ever set by
+  // the kitchen ticket's note line ("catatan dibuat menonjol") — a struk/DP
+  // note stays plain, unaffected by this flag.
+  | { kind: "sub"; text: string; role: "addon" | "note"; bold?: boolean };
 
 const CHANNEL_LABEL: Record<ReceiptData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -78,7 +82,7 @@ const text = (value: string, align: "left" | "center", role: TextRole): LayoutLi
   align,
   role,
 });
-const meta = (label: string, value: string): LayoutLine => ({ kind: "meta", label, value });
+const meta = (label: string, value: string, bold = false): LayoutLine => ({ kind: "meta", label, value, bold });
 const rule = (char: "=" | "-"): LayoutLine => ({ kind: "rule", text: paperRule(char) });
 const pair = (role: PairRole, left: string, right: string, checkbox = false): LayoutLine => ({
   kind: "pair",
@@ -270,5 +274,51 @@ export function buildPackingListLayout(data: PackingListData): LayoutLine[] {
   }
 
   lines.push(rule("="), text("Bukan bukti bayar", "center", "note"));
+  return lines;
+}
+
+const KITCHEN_TICKET_TITLE: Record<KitchenTicketData["kind"], string> = {
+  FULL: "DAPUR",
+  ADDITIONAL: "TAMBAHAN",
+};
+
+// The kitchen slip — see CLAUDE.md "Kertas dapur". No store header/logo (it
+// never leaves the building), so this is the shortest of the four printouts:
+// a bold title + meta block the kitchen can match against the table, then
+// the items — grouped per product exactly like the cart/struk (line-order.ts,
+// same GROUPING_VISIBLE_FROM threshold), never with prices.
+export function buildKitchenTicketLayout(data: KitchenTicketData): LayoutLine[] {
+  const tipe =
+    data.channel === "DINE_IN" && data.tableLabel
+      ? `${CHANNEL_LABEL[data.channel]} - ${data.tableLabel}`
+      : CHANNEL_LABEL[data.channel];
+
+  const lines: LayoutLine[] = [
+    text(KITCHEN_TICKET_TITLE[data.kind], "center", "heading"),
+    rule("="),
+    meta("Antrian", data.queueNumber != null ? formatQueueLabel(data.queueNumber, data.queueSuffix) : "Pre-order", true),
+    meta("Tipe", tipe, true),
+    ...(data.customerName ? [meta("Nama", data.customerName, true)] : []),
+    meta("Jam", formatJam(data.printedAt), true),
+    rule("="),
+  ];
+
+  const { entries } = layoutOrderLines(sortOrderLines(data.items, (i) => i.portionPrice ?? 0));
+  for (const entry of entries) {
+    if (entry.kind === "line") {
+      const item = entry.line;
+      lines.push(text(`${item.qty}x ${item.productName}`, "left", "body"));
+      if (item.addons.length > 0) lines.push({ kind: "sub", role: "addon", text: item.addons.join(", ") });
+      // The only prominent line on this ticket besides the meta block — a
+      // cook glancing at a stack of tickets must not miss "pedas banget".
+      if (item.notes) lines.push({ kind: "sub", role: "note", text: `>> ${item.notes} <<`, bold: true });
+    } else if (entry.kind === "groupTotal") {
+      lines.push(text(`${entry.productName}: ${entry.portions} porsi`, "left", "heading"));
+    } else {
+      lines.push(rule("-"));
+    }
+  }
+
+  lines.push(rule("="));
   return lines;
 }

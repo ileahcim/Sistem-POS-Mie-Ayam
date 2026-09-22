@@ -21,10 +21,11 @@
 // (emoji, etc.) become "?". This is the safe-enough choice for a thermal
 // receipt; the copy on the database and screen is never touched.
 
-import type { DepositReceiptData, LogoRaster, PackingListData, ReceiptData } from "./types";
+import type { DepositReceiptData, KitchenTicketData, LogoRaster, PackingListData, ReceiptData } from "./types";
 import { RECEIPT_CHARS_PER_LINE } from "./paper";
 import {
   buildDepositReceiptLayout,
+  buildKitchenTicketLayout,
   buildPackingListLayout,
   buildReceiptLayout,
   type LayoutLine,
@@ -203,7 +204,8 @@ function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined):
         break;
       case "meta":
         align(false);
-        parts.push(line(metaLine(item.label, item.value)));
+        if (item.bold) parts.push(BOLD_ON, line(metaLine(item.label, item.value)), BOLD_OFF);
+        else parts.push(line(metaLine(item.label, item.value)));
         break;
       case "pair":
         align(false);
@@ -213,7 +215,8 @@ function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined):
         break;
       case "sub":
         align(false);
-        parts.push(line(` ${item.text}`));
+        if (item.bold) parts.push(BOLD_ON, line(` ${item.text}`), BOLD_OFF);
+        else parts.push(line(` ${item.text}`));
         break;
     }
   }
@@ -233,6 +236,12 @@ export function buildDepositReceiptBytes(data: DepositReceiptData): Uint8Array {
 
 export function buildPackingListBytes(data: PackingListData): Uint8Array {
   return concat(INIT, ...renderLayout(buildPackingListLayout(data), data.logoRaster), feed(END_FEED_LINES));
+}
+
+// No logo — the kitchen ticket never carries store branding (see
+// receipt-layout.ts's buildKitchenTicketLayout).
+export function buildKitchenTicketBytes(data: KitchenTicketData): Uint8Array {
+  return concat(INIT, ...renderLayout(buildKitchenTicketLayout(data), null), feed(END_FEED_LINES));
 }
 
 // "1234567890" repeated — count the last digit on the first physical row to

@@ -3,7 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/get-current-user";
 import { buildOrderItemsCreateData, type OrderItemInput } from "@/lib/orders/build-order-items";
+import { buildKitchenTicketData } from "@/lib/orders/build-kitchen-ticket-data";
 import { TABLE_LABELS, type ChannelType, type TableLabel } from "@/lib/cart/types";
+import type { KitchenTicketData } from "@/lib/printing/types";
 
 export type SaveOrderInput = {
   channel: ChannelType;
@@ -13,7 +15,10 @@ export type SaveOrderInput = {
 };
 
 export type SaveOrderResult =
-  | { ok: true; orderId: string; queueNumber: number }
+  // kitchenTicket is null when nothing on the order needs the kitchen at all
+  // (only Kulkas/Lain-lain/Frozen items) — the caller only offers the "Cetak
+  // kertas dapur?" prompt when this is non-null AND the setting is on.
+  | { ok: true; orderId: string; queueNumber: number; kitchenTicket: KitchenTicketData | null }
   | { ok: false; error: string };
 
 // Prices/names are re-read from the DB (inside buildOrderItemsCreateData),
@@ -37,9 +42,9 @@ export async function saveOrder(input: SaveOrderInput): Promise<SaveOrderResult>
     return { ok: false, error: "Belum ada shift terbuka. Buka shift dulu sebelum transaksi." };
   }
 
-  let itemsData;
+  let itemsData, display;
   try {
-    itemsData = await buildOrderItemsCreateData(input.items);
+    ({ items: itemsData, display } = await buildOrderItemsCreateData(input.items));
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Gagal memproses item." };
   }
@@ -64,5 +69,11 @@ export async function saveOrder(input: SaveOrderInput): Promise<SaveOrderResult>
     return { order, queueNumber: shift.lastQueueNumber };
   });
 
-  return { ok: true, orderId: order.id, queueNumber };
+  const kitchenTicket = buildKitchenTicketData(
+    { queueNumber, queueSuffix: "", channel: input.channel, tableLabel: input.tableLabel, customerName: input.customerName },
+    display,
+    "FULL",
+  );
+
+  return { ok: true, orderId: order.id, queueNumber, kitchenTicket };
 }

@@ -28,6 +28,7 @@ export default async function PembayaranPage({
       autoPrintReceipt={settings.autoPrintReceipt}
       printerDriver={settings.printerDriver}
       nav={nav}
+      kitchenTicketEnabled={settings.kitchenTicketEnabled}
     />
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import type { DepositReceiptData, Printer, PrintResult, ReceiptData, PackingListData } from "../types";
+import type { DepositReceiptData, KitchenTicketData, Printer, PrintResult, ReceiptData, PackingListData } from "../types";
 
 export type MockPrintJob =
   | { kind: "receipt"; data: ReceiptData }
   | { kind: "deposit-receipt"; data: DepositReceiptData }
-  | { kind: "packing-list"; data: PackingListData };
+  | { kind: "packing-list"; data: PackingListData }
+  | { kind: "kitchen-ticket"; data: KitchenTicketData };
 
 type Listener = (job: MockPrintJob) => void;
 
@@ -34,6 +35,11 @@ export class MockPrinter implements Printer {
 
   async printPackingList(data: PackingListData): Promise<PrintResult> {
     for (const listener of listeners) listener({ kind: "packing-list", data });
+    return { ok: true };
+  }
+
+  async printKitchenTicket(data: KitchenTicketData): Promise<PrintResult> {
+    for (const listener of listeners) listener({ kind: "kitchen-ticket", data });
     return { ok: true };
   }
 

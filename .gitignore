@@ -46,3 +46,6 @@ next-env.d.ts
 
 # foto/tangkapan layar mentah dari WhatsApp (bukan bagian proyek)
 /New folder/
+
+# tangkapan layar verifikasi — jangan disimpan di repo (aturan pemilik, 22 Sep 2026)
+/screenshots/

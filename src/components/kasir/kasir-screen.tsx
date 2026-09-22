@@ -17,6 +17,8 @@ import { LateOrderBanner } from "@/components/ui/late-order-banner";
 import { PreorderReminderBanner } from "@/components/ui/preorder-reminder-banner";
 import type { PreOrderReminder } from "@/lib/orders/get-preorders";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
+import type { PrinterDriver } from "@/lib/printing/types";
+import { useKitchenTicketPrompt } from "@/components/printing/use-kitchen-ticket-prompt";
 import { ChannelTableBar } from "./channel-table-bar";
 import { CategoryTabs } from "./category-tabs";
 import { ProductGrid } from "./product-grid";
@@ -34,6 +36,8 @@ export function KasirScreen({
   nav,
   shiftOpen,
   preorderReminders,
+  printerDriver,
+  kitchenTicketEnabled,
 }: {
   categories: MenuCategory[];
   comboShortcuts: ComboShortcut[];
@@ -43,9 +47,14 @@ export function KasirScreen({
   // CASHIER never gets here — see kasir/page.tsx). The screen stays fully
   // browsable; only saving is blocked, and the server blocks it too.
   shiftOpen: boolean;
+  printerDriver: PrinterDriver;
+  // Off (default, 22 Sep 2026): no "Cetak kertas dapur?" prompt at all — see
+  // CLAUDE.md "Kertas dapur".
+  kitchenTicketEnabled: boolean;
 }) {
   const router = useRouter();
   const { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, clear } = useCartDraft();
+  const { offer: offerKitchenTicket, prompt: kitchenTicketPrompt } = useKitchenTicketPrompt({ printerDriver });
   const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? "");
   const [sheetTarget, setSheetTarget] = useState<SheetTarget | null>(null);
   const [lastAddedLocalId, setLastAddedLocalId] = useState<string | null>(null);
@@ -151,6 +160,7 @@ export function KasirScreen({
       setSavedNotice(`Order #${result.queueNumber} tersimpan.`);
       setCartSheetOpen(false);
       router.refresh();
+      if (kitchenTicketEnabled && result.kitchenTicket) offerKitchenTicket(result.kitchenTicket);
     } finally {
       setSaving(false);
     }
@@ -158,6 +168,7 @@ export function KasirScreen({
 
   return (
     <div className="flex h-dvh flex-col">
+      {kitchenTicketPrompt}
       {/* Late orders first: those are food already waiting, the pre-order
           bar is about food not started yet. */}
       <LateOrderBanner lateCount={nav.lateCount} />

@@ -21,9 +21,9 @@ import { cn } from "@/components/ui/cn";
 
 // "No. Order   : 67" — label column fixed-width (monospace `ch` unit) so the
 // colons line up down the block, the same 10 columns escpos.ts pads to.
-function MetaRow({ label, value }: { label: string; value: string }) {
+function MetaRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className="flex">
+    <div className={cn("flex", bold && "font-bold")}>
       <span className="inline-block w-[10ch] shrink-0">{label}</span>
       <span>: {value}</span>
     </div>
@@ -60,7 +60,7 @@ function PaperLine({ line }: { line: LayoutLine }) {
       // gets — at this width it spans the paper on its own, no shrinking.
       return <div className="whitespace-pre">{line.text}</div>;
     case "meta":
-      return <MetaRow label={line.label} value={line.value} />;
+      return <MetaRow label={line.label} value={line.value} bold={line.bold} />;
     case "pair":
       // justify-between lands the value on the right edge, where escpos.ts
       // pads it to with spaces. Total is bold end to end; a daftar packing
@@ -76,7 +76,7 @@ function PaperLine({ line }: { line: LayoutLine }) {
       );
     case "sub":
       // One leading space on paper, so one column of indent here.
-      return <div className="pl-[1ch]">{line.text}</div>;
+      return <div className={cn("pl-[1ch]", line.bold && "font-bold")}>{line.text}</div>;
   }
 }
 

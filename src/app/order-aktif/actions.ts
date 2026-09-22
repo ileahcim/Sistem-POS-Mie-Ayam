@@ -3,8 +3,17 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/get-current-user";
 import { buildOrderItemsCreateData, type OrderItemInput } from "@/lib/orders/build-order-items";
+import { buildKitchenTicketData } from "@/lib/orders/build-kitchen-ticket-data";
+import type { KitchenTicketData } from "@/lib/printing/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+export type AddItemsResult =
+  // kitchenTicket ("TAMBAHAN") covers ONLY the lines just added by this call,
+  // never the whole order — see CLAUDE.md "Kertas dapur". null when none of
+  // them need the kitchen at all.
+  | { ok: true; kitchenTicket: KitchenTicketData | null }
+  | { ok: false; error: string };
 
 export async function markServed(orderId: string): Promise<ActionResult> {
   await requireUser();
@@ -51,7 +60,7 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Acti
 // Adds new lines to a saved order. Undoing a mis-tap is removeOrderItem
 // below; once the order is PAID neither is available (a paid order is
 // frozen — extra items become a new order).
-export async function addItemsToOrder(orderId: string, items: OrderItemInput[]): Promise<ActionResult> {
+export async function addItemsToOrder(orderId: string, items: OrderItemInput[]): Promise<AddItemsResult> {
   await requireUser();
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
@@ -60,9 +69,9 @@ export async function addItemsToOrder(orderId: string, items: OrderItemInput[]):
     return { ok: false, error: "Order ini sudah dibayar/tidak aktif — tidak bisa ditambah item." };
   }
 
-  let itemsData;
+  let itemsData, display;
   try {
-    itemsData = await buildOrderItemsCreateData(items);
+    ({ items: itemsData, display } = await buildOrderItemsCreateData(items));
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Gagal memproses item." };
   }
@@ -96,7 +105,17 @@ export async function addItemsToOrder(orderId: string, items: OrderItemInput[]):
       : []),
   ]);
 
-  return { ok: true };
+  // "TAMBAHAN" ticket for exactly the lines just added (display), never the
+  // order's pre-existing lines — whether a given line bumped an existing row
+  // or created a new one makes no difference here, `display` is the newly
+  // added quantity either way.
+  const kitchenTicket = buildKitchenTicketData(
+    { queueNumber: order.queueNumber, queueSuffix: order.queueSuffix, channel: order.channel, tableLabel: order.tableLabel, customerName: order.customerName },
+    display,
+    "ADDITIONAL",
+  );
+
+  return { ok: true, kitchenTicket };
 }
 
 // Mis-tapped an item onto a saved order (adding was already possible, undoing

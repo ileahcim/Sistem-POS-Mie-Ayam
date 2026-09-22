@@ -13,6 +13,7 @@ export type StoreSettings = {
   printerDriver: PrinterDriver;
   printLogo: boolean;
   preorderReminderMinutes: number;
+  kitchenTicketEnabled: boolean;
 };
 
 const FALLBACK: StoreSettings = {
@@ -27,6 +28,7 @@ const FALLBACK: StoreSettings = {
   printerDriver: "webbluetooth",
   printLogo: true,
   preorderReminderMinutes: 120,
+  kitchenTicketEnabled: false,
 };
 
 // The singleton row is created by prisma/seed.ts, but fall back gracefully
@@ -48,6 +50,7 @@ export async function getSettings(): Promise<StoreSettings> {
     printerDriver: setting.printerDriver as PrinterDriver,
     printLogo: setting.printLogo,
     preorderReminderMinutes: setting.preorderReminderMinutes,
+    kitchenTicketEnabled: setting.kitchenTicketEnabled,
   };
 }
 

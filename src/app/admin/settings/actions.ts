@@ -19,6 +19,15 @@ export async function updateSheetBlurEnabled(sheetBlurEnabled: boolean): Promise
   return { ok: true };
 }
 
+// Off (default): the kitchen ticket feature is entirely invisible — no print
+// prompt on save/tambah item, no "Cetak Tiket Dapur" button anywhere. See
+// CLAUDE.md "Kertas dapur".
+export async function updateKitchenTicketEnabled(kitchenTicketEnabled: boolean): Promise<ActionResult> {
+  await requireRole("OWNER");
+  await prisma.setting.update({ where: { id: "singleton" }, data: { kitchenTicketEnabled } });
+  return { ok: true };
+}
+
 const PRINTER_DRIVERS: PrinterDriver[] = ["mock", "webbluetooth", "rawbt"];
 
 // Which driver the client printer factory will use from now on (see

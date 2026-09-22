@@ -36,6 +36,8 @@ export default async function KasirPage() {
       nav={nav}
       shiftOpen={!!openShift}
       preorderReminders={preorderReminders}
+      printerDriver={settings.printerDriver}
+      kitchenTicketEnabled={settings.kitchenTicketEnabled}
     />
   );
 }

@@ -57,9 +57,12 @@ export async function savePreOrder(input: SavePreOrderInput): Promise<SavePreOrd
     return { ok: false, error: "Tanggal & jam kirim harus di masa depan." };
   }
 
+  // No kitchen ticket at pre-order creation time — see CLAUDE.md "Kertas
+  // dapur": it's printed manually from the detail screen on delivery day, so
+  // `display` (the kitchen-facing counterpart) is never needed here.
   let itemsData;
   try {
-    itemsData = await buildOrderItemsCreateData(input.items);
+    ({ items: itemsData } = await buildOrderItemsCreateData(input.items));
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Gagal memproses item." };
   }

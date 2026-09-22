@@ -38,6 +38,7 @@ export default async function OrderDetailPage({
       isOwner={user?.role === "OWNER"}
       cashDepositAvailable={!!openShift}
       autoPrintReceipt={settings.autoPrintReceipt}
+      kitchenTicketEnabled={settings.kitchenTicketEnabled}
     />
   );
 }

@@ -12,6 +12,11 @@ export type OrderDetailItem = {
   qty: number;
   lineTotal: number;
   isDeliveryChargeable: boolean;
+  // Snapshot of Category.isKitchenItem at order time (OrderItem.isKitchenItem
+  // in the schema) — Makanan/Minuman Racik need prep, Kulkas/Lain-lain/Frozen
+  // don't. Drives both the Order Aktif prep timer and, since 22 Sep 2026,
+  // which lines print on a kertas dapur (build-kitchen-ticket-data.ts).
+  isKitchenItem: boolean;
   // Read live off the product and its category (OrderItem doesn't snapshot
   // them) — they only ever drive the reading order, see line-order.ts, so
   // following a later re-ordering of the menu is the right behaviour.
@@ -115,6 +120,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     qty: item.qty,
     lineTotal: item.lineTotal,
     isDeliveryChargeable: item.isDeliveryChargeable,
+    isKitchenItem: item.isKitchenItem,
     categorySortOrder: item.product.category.sortOrder,
     productSortOrder: item.product.sortOrder,
   }));

@@ -9,7 +9,42 @@ export type OrderItemInput = {
   qty: number;
 };
 
-export type OrderItemCreateData = Awaited<ReturnType<typeof buildOrderItemsCreateData>>[number];
+// The row shape prisma.orderItem.create needs — written out explicitly
+// (rather than derived from buildOrderItemsCreateData's return type) so it
+// doesn't circularly depend on the function whose body constructs it.
+export type OrderItemCreateData = {
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  costPrice: number | null;
+  qty: number;
+  notes: string | null;
+  isDeliveryChargeable: boolean;
+  isKitchenItem: boolean;
+  comboKey: string;
+  lineTotal: number;
+  addons: { create: { addonOptionId: string; name: string; price: number; costPrice: number | null }[] };
+};
+
+// Everything a kitchen ticket (or any other future printout) needs about one
+// line that ISN'T part of OrderItemCreateData above — kept as a separate,
+// parallel array rather than extra properties on the create-data objects,
+// because those objects go straight into prisma.orderItem.create and Prisma
+// rejects unknown properties at runtime (a TS-level excess-property check
+// would not catch it here, since itemsData is a variable, not an object
+// literal). See build-kitchen-ticket-data.ts for the consumer.
+export type OrderItemDisplayData = {
+  productId: string;
+  productName: string;
+  qty: number;
+  notes: string | null;
+  unitPrice: number;
+  addons: { name: string; price: number }[];
+  isDeliveryChargeable: boolean;
+  isKitchenItem: boolean;
+  categorySortOrder: number;
+  productSortOrder: number;
+};
 
 // Folds identical inputs into one row before anything is written. The cart
 // already merges on screen (upsertCartLine), but the rule that two identical
@@ -72,19 +107,23 @@ export async function buildOrderItemsCreateData(rawItems: OrderItemInput[]) {
     }
   }
 
-  return items.map((item) => {
+  const createData: OrderItemCreateData[] = [];
+  const display: OrderItemDisplayData[] = [];
+
+  for (const item of items) {
     const product = productById.get(item.productId)!;
     const addons = item.addonOptionIds.map((id) => addonById.get(id)!);
     const unitTotal = product.price + addons.reduce((sum, a) => sum + a.price, 0);
+    const isDeliveryChargeable = product.category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME;
 
-    return {
+    createData.push({
       productId: product.id,
       productName: product.name,
       unitPrice: product.price,
       costPrice: product.costPrice,
       qty: item.qty,
       notes: item.notes || null,
-      isDeliveryChargeable: product.category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME,
+      isDeliveryChargeable,
       isKitchenItem: product.category.isKitchenItem,
       comboKey: buildComboKey(product.id, item.addonOptionIds),
       lineTotal: unitTotal * item.qty,
@@ -96,6 +135,21 @@ export async function buildOrderItemsCreateData(rawItems: OrderItemInput[]) {
           costPrice: a.costPrice,
         })),
       },
-    };
-  });
+    });
+
+    display.push({
+      productId: product.id,
+      productName: product.name,
+      qty: item.qty,
+      notes: item.notes || null,
+      unitPrice: product.price,
+      addons: addons.map((a) => ({ name: a.name, price: a.price })),
+      isDeliveryChargeable,
+      isKitchenItem: product.category.isKitchenItem,
+      categorySortOrder: product.category.sortOrder,
+      productSortOrder: product.sortOrder,
+    });
+  }
+
+  return { items: createData, display };
 }

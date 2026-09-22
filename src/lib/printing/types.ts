@@ -127,6 +127,39 @@ export type PackingListData = {
   items: PackingListItem[];
 };
 
+// "DAPUR" when the whole order is new, "TAMBAHAN" when only items just added
+// to an already-saved order are on it (never the whole order again — the
+// kitchen would cook it twice). See CLAUDE.md "Kertas dapur".
+export type KitchenTicketKind = "FULL" | "ADDITIONAL";
+
+export type KitchenTicketItem = {
+  productId: string; // groups per product, same rule as the cart (line-order.ts)
+  productName: string;
+  addons: string[]; // names only, no prices — this ticket never shows money
+  notes?: string | null;
+  qty: number;
+  isDeliveryChargeable: boolean; // "is this a Makanan line" — the grouping flag GroupableLine uses
+  categorySortOrder?: number;
+  productSortOrder?: number;
+  portionPrice?: number; // sort key only (cheapest variant first), never printed
+};
+
+// The kitchen ticket ("kertas dapur") — torn off and stuck near the stove,
+// so it carries no store branding/logo, just what the kitchen needs: what
+// to cook and which order it belongs to. Only Makanan/Minuman Racik lines
+// ever reach this (isKitchenItem) — see build-kitchen-ticket-data.ts, which
+// filters before this shape is even built.
+export type KitchenTicketData = {
+  kind: KitchenTicketKind;
+  queueNumber: number | null; // null: a pre-order printed manually before it's paid
+  queueSuffix: string;
+  channel: ReceiptChannel;
+  tableLabel?: string | null;
+  customerName?: string | null;
+  printedAt: Date;
+  items: KitchenTicketItem[];
+};
+
 export type PrintResult = { ok: true } | { ok: false; error: string };
 
 // Which print driver is active. Declared here (not in get-printer.ts) so the
@@ -138,6 +171,7 @@ export interface Printer {
   printReceipt(data: ReceiptData): Promise<PrintResult>;
   printDepositReceipt(data: DepositReceiptData): Promise<PrintResult>;
   printPackingList(data: PackingListData): Promise<PrintResult>;
+  printKitchenTicket(data: KitchenTicketData): Promise<PrintResult>;
   // Raw ESC/POS bytes, for hardware diagnostics only (Tes Lebar Kolom) — real
   // receipts always go through printReceipt/printPackingList.
   printBytes(bytes: Uint8Array): Promise<PrintResult>;

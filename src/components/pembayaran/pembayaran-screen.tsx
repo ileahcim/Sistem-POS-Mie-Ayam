@@ -38,12 +38,14 @@ export function PembayaranScreen({
   autoPrintReceipt,
   printerDriver,
   nav,
+  kitchenTicketEnabled,
 }: {
   order: OrderDetail;
   menu: MenuCategory[];
   autoPrintReceipt: boolean;
   printerDriver: PrinterDriver;
   nav: HeaderNav;
+  kitchenTicketEnabled: boolean;
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<PaymentMethod | null>(null);
@@ -267,7 +269,13 @@ export function PembayaranScreen({
 
             {order.status === "OPEN" && (
               <div className="mt-4">
-                <AddItemsPanel orderId={order.id} menu={menu} onAdded={() => router.refresh()} />
+                <AddItemsPanel
+                  orderId={order.id}
+                  menu={menu}
+                  onAdded={() => router.refresh()}
+                  printerDriver={printerDriver}
+                  kitchenTicketEnabled={kitchenTicketEnabled}
+                />
               </div>
             )}
 

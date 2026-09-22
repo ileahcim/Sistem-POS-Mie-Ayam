@@ -14,6 +14,8 @@ import { CategoryTabs } from "@/components/kasir/category-tabs";
 import { ProductGrid } from "@/components/kasir/product-grid";
 import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-sheet";
 import { addItemsToOrder } from "@/app/order-aktif/actions";
+import type { PrinterDriver } from "@/lib/printing/types";
+import { useKitchenTicketPrompt } from "@/components/printing/use-kitchen-ticket-prompt";
 
 // Shared by the order detail screen and the payment screen — both need the
 // same "one more forgotten item" affordance on an OPEN order. Confirmed
@@ -23,10 +25,16 @@ export function AddItemsPanel({
   orderId,
   menu,
   onAdded,
+  printerDriver,
+  kitchenTicketEnabled,
 }: {
   orderId: string;
   menu: MenuCategory[];
   onAdded: () => void;
+  printerDriver: PrinterDriver;
+  // Off (default, 22 Sep 2026): no "Cetak kertas dapur?" (TAMBAHAN) prompt at
+  // all — see CLAUDE.md "Kertas dapur".
+  kitchenTicketEnabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState(menu[0]?.id ?? "");
@@ -34,6 +42,7 @@ export function AddItemsPanel({
   const [sheetProduct, setSheetProduct] = useState<MenuProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { offer: offerKitchenTicket, prompt: kitchenTicketPrompt } = useKitchenTicketPrompt({ printerDriver });
 
   const activeCategory = menu.find((c) => c.id === activeCategoryId) ?? menu[0];
   const cartQtyByProduct = useMemo(() => {
@@ -105,6 +114,7 @@ export function AddItemsPanel({
       setPendingItems([]);
       setOpen(false);
       onAdded();
+      if (kitchenTicketEnabled && result.kitchenTicket) offerKitchenTicket(result.kitchenTicket);
     } finally {
       setSaving(false);
     }
@@ -112,14 +122,18 @@ export function AddItemsPanel({
 
   if (!open) {
     return (
-      <Button variant="ghost" size="default" fullWidth onClick={() => setOpen(true)}>
-        + Tambah Item
-      </Button>
+      <>
+        {kitchenTicketPrompt}
+        <Button variant="ghost" size="default" fullWidth onClick={() => setOpen(true)}>
+          + Tambah Item
+        </Button>
+      </>
     );
   }
 
   return (
     <Card className="overflow-hidden">
+      {kitchenTicketPrompt}
       <CategoryTabs categories={menu} activeId={activeCategory?.id ?? ""} onSelect={setActiveCategoryId} />
       <ProductGrid
         products={activeCategory?.products ?? []}
