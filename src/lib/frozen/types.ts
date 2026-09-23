@@ -5,6 +5,8 @@
 // the warung's cash drawer, and this ledger never touches Shift/Order/
 // Expense/omzet or the Mi Mentah ledger. Priced per PIECE (pcs), not kg,
 // and there is no "jenis" concept at all: every pickup is the same product.
+import type { NotePaymentMethod } from "@/lib/note/payment-method";
+
 export type FrozenLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT";
 
 // Kinds that carry a plain amount (no pcs/price) and are added from the
@@ -25,6 +27,9 @@ export const FROZEN_PAYMENT_PRESETS = [50000, 100000, 200000, 500000];
 export type FrozenLedgerEntryDTO = {
   id: string;
   kind: FrozenLedgerKind;
+  // PAYMENT rows only; null on other kinds and on pre-23-Sep-2026 payments
+  // — rendered as "Tidak dicatat", never guessed. Same rule as Mi Mentah.
+  paymentMethod: NotePaymentMethod | null;
   pcs: number | null;
   pricePerPcs: number | null;
   amount: number;

@@ -28,6 +28,7 @@ export async function getFrozenCustomerDetail(customerId: string): Promise<Froze
     return {
       id: e.id,
       kind: e.kind,
+      paymentMethod: e.paymentMethod,
       pcs: e.pcs,
       pricePerPcs: e.pricePerPcs,
       amount: e.amount,

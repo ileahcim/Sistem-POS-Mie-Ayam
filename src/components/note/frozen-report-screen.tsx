@@ -8,6 +8,7 @@ import { bucketFrozen, defaultRangeFor, isDefaultRange, type FrozenGranularity }
 import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import { DateRangePresets } from "@/components/ui/date-range-presets";
 import { formatId } from "@/lib/timezone";
+import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatRupiah } from "@/lib/printing/format";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
@@ -104,7 +105,8 @@ export function FrozenReportScreen({
       title: p.customerName,
       date: p.date,
       time: p.time,
-      detail: drill === "payments" ? null : perPcs,
+      // See mie-report-screen.tsx — "Tidak dicatat" for pre-column rows.
+      detail: drill === "payments" ? formatNotePaymentMethod(p.paymentMethod) : perPcs,
       note: p.note,
       value: drill === "pcs" ? (pcsLabel ?? "—") : formatRupiah(p.amount),
       sub: drill === "pcs" ? formatRupiah(p.amount) : null,

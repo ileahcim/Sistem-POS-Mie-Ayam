@@ -16,6 +16,8 @@ import { AppHeader } from "@/components/ui/app-header";
 import { cn } from "@/components/ui/cn";
 import { FROZEN_PAYMENT_PRESETS } from "@/lib/frozen/types";
 import { useFrozenReceiptPrompt } from "@/components/printing/use-frozen-receipt-prompt";
+import type { NotePaymentMethod } from "@/lib/note/payment-method";
+import { PaymentMethodPicker } from "./payment-method-picker";
 
 export function NewFrozenPaymentForm({
   customers,
@@ -63,17 +65,21 @@ export function NewFrozenPaymentForm({
   }
   const [date, setDate] = useState(todayDateStr());
   const [note, setNote] = useState("");
+  // No default — see new-payment-form.tsx for why.
+  const [paymentMethod, setPaymentMethod] = useState<NotePaymentMethod | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSave = !saving && customerId && amount !== "" && Number(amount) > 0;
+  const canSave = !saving && customerId && amount !== "" && Number(amount) > 0 && paymentMethod !== null;
 
   async function handleSave() {
+    if (!paymentMethod) return;
     setSaving(true);
     setError(null);
     const result = await createFrozenPayment({
       customerId,
       amount: Number(amount),
+      paymentMethod,
       date: dateInputToIso(date),
       note,
     });
@@ -182,6 +188,8 @@ export function NewFrozenPaymentForm({
                   : "Lunas penuh (tidak ada utang)"}
               </button>
             </div>
+
+            <PaymentMethodPicker value={paymentMethod} onChange={setPaymentMethod} />
 
             <label className="flex flex-col gap-1">
               <span className="text-ink-muted text-sm font-medium">Tanggal</span>

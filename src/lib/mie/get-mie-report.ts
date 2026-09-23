@@ -38,6 +38,7 @@ export async function getMieReportPoints(): Promise<{ points: MieReportPoint[]; 
     points: entries.map((e) => ({
       id: e.id,
       kind: e.kind as "ORDER" | "PAYMENT",
+      paymentMethod: e.paymentMethod,
       // The DB enum still has the retired FROZEN value (existing rows, not
       // yet migrated — see types.ts) — bucket-mie.ts skips anything its
       // byType map doesn't recognize, so this cast is safe.

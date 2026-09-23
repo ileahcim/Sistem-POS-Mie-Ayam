@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { localDateStr } from "@/lib/timezone";
+import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatMieEntryLabel, mieEntrySignedAmount, type MieProductType } from "./types";
 
 export type MieExportCustomerRow = {
@@ -16,6 +17,9 @@ export type MieExportEntryRow = {
   kg: number | null;
   hargaPerKg: number | null;
   nominal: number; // signed — see mieEntrySignedAmount; summing this column reproduces the balance
+  // PAYMENT rows only; "" elsewhere. A payment recorded before the column
+  // existed exports as "Tidak dicatat", never as a guessed Cash/QRIS.
+  metode: string;
   catatan: string;
   dicatatOleh: string;
 };
@@ -59,6 +63,7 @@ export async function getMieExportData(): Promise<{
         kg: e.kg,
         hargaPerKg: e.pricePerKg,
         nominal: mieEntrySignedAmount(e),
+        metode: e.kind === "PAYMENT" ? formatNotePaymentMethod(e.paymentMethod) : "",
         catatan: e.note ?? "",
         dicatatOleh: e.createdBy.name,
       });

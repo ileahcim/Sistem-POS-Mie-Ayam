@@ -14,6 +14,7 @@ import {
   formatMieEntryLabel,
   type MieProductType,
 } from "@/lib/mie/types";
+import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatRupiah } from "@/lib/printing/format";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
@@ -144,7 +145,9 @@ export function MieReportScreen({
       title: p.customerName,
       date: p.date,
       time: p.time,
-      detail: drill === "payments" ? null : perKg,
+      // Payments show their method here — "Tidak dicatat" for rows recorded
+      // before the column existed, never silently blank and never guessed.
+      detail: drill === "payments" ? formatNotePaymentMethod(p.paymentMethod) : perKg,
       note: p.note,
       value: drill === "kg" ? (kgLabel ?? "—") : formatRupiah(p.amount),
       sub: drill === "kg" ? formatRupiah(p.amount) : null,

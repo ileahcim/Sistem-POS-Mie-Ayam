@@ -7,6 +7,8 @@ import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { createMiePayment } from "@/app/note/actions";
+import type { NotePaymentMethod } from "@/lib/note/payment-method";
+import { PaymentMethodPicker } from "./payment-method-picker";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,17 +64,23 @@ export function NewPaymentForm({
   }
   const [date, setDate] = useState(todayDateStr());
   const [note, setNote] = useState("");
+  // No default: a new payment must say Cash or QRIS out loud. Pre-selecting
+  // one would quietly make it the answer for every payment recorded in a
+  // hurry, which is exactly the guessing this column exists to avoid.
+  const [paymentMethod, setPaymentMethod] = useState<NotePaymentMethod | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSave = !saving && customerId && amount !== "" && Number(amount) > 0;
+  const canSave = !saving && customerId && amount !== "" && Number(amount) > 0 && paymentMethod !== null;
 
   async function handleSave() {
+    if (!paymentMethod) return;
     setSaving(true);
     setError(null);
     const result = await createMiePayment({
       customerId,
       amount: Number(amount),
+      paymentMethod,
       date: dateInputToIso(date),
       note,
     });
@@ -167,6 +175,8 @@ export function NewPaymentForm({
                   : "Lunas penuh (tidak ada utang)"}
               </button>
             </div>
+
+            <PaymentMethodPicker value={paymentMethod} onChange={setPaymentMethod} />
 
             <label className="flex flex-col gap-1">
               <span className="text-ink-muted text-sm font-medium">Tanggal</span>

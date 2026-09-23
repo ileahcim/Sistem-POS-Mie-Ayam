@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { localDateStr, wibDateRange } from "@/lib/timezone";
 import type { MieAdjustmentKind, MieProductType } from "@/lib/mie/types";
+import {
+  isNotePaymentMethod,
+  resolveNotePaymentMethodEdit,
+  type NotePaymentMethod,
+} from "@/lib/note/payment-method";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -99,6 +104,7 @@ export async function createMieOrder(input: CreateMieOrderInput): Promise<Action
 export type CreateMiePaymentInput = {
   customerId: string;
   amount: number;
+  paymentMethod: NotePaymentMethod;
   date: string;
   note: string;
 };
@@ -110,6 +116,11 @@ export async function createMiePayment(input: CreateMiePaymentInput): Promise<Ac
   if (!customer || !customer.isActive) return { ok: false, error: "Pelanggan tidak ditemukan." };
 
   if (!Number.isFinite(input.amount) || input.amount <= 0) return { ok: false, error: "Nominal tidak valid." };
+  // Required for NEW payments only — rows recorded before this column
+  // existed keep their honest NULL (see schema.prisma).
+  if (!isNotePaymentMethod(input.paymentMethod)) {
+    return { ok: false, error: "Pilih metode pembayaran (Cash atau QRIS)." };
+  }
   const date = new Date(input.date);
   if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
 
@@ -118,6 +129,7 @@ export async function createMiePayment(input: CreateMiePaymentInput): Promise<Ac
       customerId: input.customerId,
       kind: "PAYMENT",
       amount: Math.round(input.amount),
+      paymentMethod: input.paymentMethod,
       date,
       note: input.note.trim() || null,
       createdById: user.id,
@@ -226,6 +238,9 @@ export type UpdateMieEntryInput = {
   kg?: number; // ORDER only
   pricePerKg?: number; // ORDER only
   amount?: number; // non-ORDER only — an ORDER's amount is always kg × price
+  // PAYMENT only. `null` means "leave it unrecorded", which is only allowed
+  // while the row has never had a method — see the rule in updateMieEntry.
+  paymentMethod?: NotePaymentMethod | null;
   date: string;
   note: string;
 };
@@ -257,9 +272,22 @@ export async function updateMieEntry(entryId: string, input: UpdateMieEntryInput
   if ((entry.kind === "CORRECTION_ADD" || entry.kind === "CORRECTION_SUBTRACT") && !note) {
     return { ok: false, error: "Keterangan koreksi tidak boleh kosong." };
   }
+
+  // Payment method, PAYMENT rows only. An old row whose method was never
+  // recorded may stay that way (we refuse to invent one), or be filled in
+  // if the owner still remembers — but a method that IS recorded can only
+  // be switched between Cash and QRIS, never erased back to unknown, since
+  // that would destroy a fact rather than correct one.
+  const paymentMethod = resolveNotePaymentMethodEdit(
+    entry.kind === "PAYMENT",
+    entry.paymentMethod,
+    input.paymentMethod,
+  );
+  if (!paymentMethod.ok) return paymentMethod;
+
   await prisma.mieLedgerEntry.update({
     where: { id: entryId },
-    data: { amount: Math.round(amount), date, note },
+    data: { amount: Math.round(amount), date, note, ...paymentMethod.data },
   });
   return { ok: true };
 }

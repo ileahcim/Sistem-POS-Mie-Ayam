@@ -16,6 +16,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
+import { PaymentMethodPicker } from "./payment-method-picker";
 
 const INPUT = "rounded-input border-border h-12 w-full border px-3 text-base";
 
@@ -197,10 +198,14 @@ export function EntrySheet({
   const [amount, setAmount] = useState<number | "">(entry.amount);
   const [date, setDate] = useState(isoToDateInput(entry.date));
   const [note, setNote] = useState(entry.note ?? "");
+  // Starts from whatever the row actually has — null for a payment recorded
+  // before the column existed, and it may honestly stay null.
+  const [paymentMethod, setPaymentMethod] = useState(entry.paymentMethod);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(initialAction === "delete");
   const [error, setError] = useState<string | null>(null);
 
+  const isPayment = entry.kind === "PAYMENT";
   const kgNumber = Number(kg.replace(",", "."));
   const kgValid = kg.trim() !== "" && Number.isFinite(kgNumber) && kgNumber > 0;
   const canSave = isOrder
@@ -212,6 +217,7 @@ export function EntrySheet({
     setError(null);
     const result = await updateMieEntry(entry.id, {
       ...(isOrder ? { kg: kgNumber, pricePerKg: Number(pricePerKg) } : { amount: Number(amount) }),
+      ...(isPayment ? { paymentMethod } : {}),
       date: dateInputToIso(date),
       note,
     });
@@ -294,6 +300,13 @@ export function EntrySheet({
           <Field label="Nominal" htmlFor="entry-amount">
             <RupiahInput id="entry-amount" value={amount} onChange={setAmount} className="h-12 text-base" />
           </Field>
+        )}
+        {isPayment && (
+          <PaymentMethodPicker
+            value={paymentMethod}
+            onChange={setPaymentMethod}
+            allowUnknown={entry.paymentMethod === null}
+          />
         )}
         <Field label="Tanggal" htmlFor="entry-date">
           <input id="entry-date" type="date" className={INPUT} value={date} onChange={(e) => setDate(e.target.value)} />

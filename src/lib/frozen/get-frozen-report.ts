@@ -33,6 +33,7 @@ export async function getFrozenReportPoints(): Promise<{ points: FrozenReportPoi
     points: entries.map((e) => ({
       id: e.id,
       kind: e.kind as "ORDER" | "PAYMENT",
+      paymentMethod: e.paymentMethod,
       pcs: e.pcs,
       pricePerPcs: e.pricePerPcs,
       amount: e.amount,

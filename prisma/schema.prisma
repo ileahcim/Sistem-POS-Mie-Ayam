@@ -615,6 +615,16 @@ model MieSetting {
 // pickup is the same product.
 // ---------------------------------------------------------------------------
 
+// Metode bayar untuk baris PAYMENT di buku Note — dipakai BERSAMA oleh
+// MieLedgerEntry dan FrozenLedgerEntry: satu konsep yang sama, jadi satu
+// enum, bukan dua yang kembar. Sengaja terpisah dari PaymentMethod milik
+// POS (yang punya TRANSFER/SPLIT dan ikut rekonsiliasi laci) — uang Note
+// tidak pernah menyentuh laci warung, kolom ini murni pencatatan.
+enum NotePaymentMethod {
+  CASH
+  QRIS
+}
+
 enum FrozenLedgerKind {
   ORDER // "Pengambilan" — pcs taken, priced per pcs
   PAYMENT
@@ -650,6 +660,9 @@ model FrozenLedgerEntry {
 
   amount Int // Rupiah, always positive — see `kind` comment on MieLedgerEntry for the sign convention
 
+  // PAYMENT-only, and nullable on purpose — see MieLedgerEntry.paymentMethod.
+  paymentMethod NotePaymentMethod?
+
   date DateTime // business date — owner-settable, defaults to today
   note String?
 
@@ -679,6 +692,15 @@ model MieLedgerEntry {
   pricePerKg  Int? // snapshot at order time — never re-read from MieProductDefault later
 
   amount Int // Rupiah, always positive — see `kind` comment above for sign
+
+  // PAYMENT-only. NULL means "tidak dicatat", which is a real, permanent
+  // state for every payment recorded before 23 Sep 2026 — the column was
+  // added nullable precisely so those rows are never guessed at. Required
+  // for NEW payments (enforced in the server actions, not by the DB, so the
+  // old rows stay valid). Owner can fill an old row in later from the edit
+  // sheet if they still remember; an already-set method can be switched
+  // between Cash and QRIS but never cleared back to unknown.
+  paymentMethod NotePaymentMethod?
 
   date DateTime // business date — owner-settable, defaults to today (not necessarily createdAt)
   note String?

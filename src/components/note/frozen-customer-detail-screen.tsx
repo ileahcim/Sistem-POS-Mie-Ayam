@@ -7,6 +7,7 @@ import type { FrozenCustomerDetail } from "@/lib/frozen/get-frozen-customer-deta
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver } from "@/lib/printing/types";
 import { formatFrozenEntryLabel, frozenEntryReducesDebt } from "@/lib/frozen/types";
+import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatId } from "@/lib/timezone";
 import { deleteFrozenCustomer, setFrozenCustomerActive } from "@/app/note/frozen-actions";
 import { printFrozenReceiptSafely } from "@/lib/printing/print-frozen-receipt";
@@ -172,6 +173,11 @@ export function FrozenCustomerDetailScreen({
                       {e.kind === "ORDER" && e.pcs != null && e.pricePerPcs != null && (
                         <p className="text-ink-muted text-sm">
                           {e.pcs.toLocaleString("id-ID")} pcs × Rp{e.pricePerPcs.toLocaleString("id-ID")}/pcs
+                        </p>
+                      )}
+                      {e.kind === "PAYMENT" && (
+                        <p className={cn("text-sm", e.paymentMethod ? "text-ink-muted" : "text-ink-faint italic")}>
+                          {formatNotePaymentMethod(e.paymentMethod)}
                         </p>
                       )}
                       {e.note && <p className="text-ink-faint text-xs">{e.note}</p>}

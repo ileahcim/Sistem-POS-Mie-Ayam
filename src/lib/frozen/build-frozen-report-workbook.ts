@@ -30,6 +30,7 @@ export async function buildFrozenReportWorkbook(): Promise<ExcelJS.Workbook> {
     { header: "Pcs", key: "pcs", width: 8 },
     { header: "Harga/Pcs", key: "hargaPerPcs", width: 12, style: { numFmt: MONEY_FORMAT } },
     { header: "Nominal", key: "nominal", width: 14, style: { numFmt: MONEY_FORMAT } },
+    { header: "Metode", key: "metode", width: 14 },
     { header: "Catatan", key: "catatan", width: 24 },
     { header: "Dicatat Oleh", key: "dicatatOleh", width: 16 },
   ];

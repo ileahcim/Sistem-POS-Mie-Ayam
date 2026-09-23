@@ -6,6 +6,7 @@ import { AnimatePresence } from "motion/react";
 import type { MieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { formatMieEntryLabel, mieEntryReducesDebt } from "@/lib/mie/types";
+import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatId } from "@/lib/timezone";
 import { deleteMieCustomer, setMieCustomerActive } from "@/app/note/actions";
 import { LinkButton } from "@/components/ui/link-button";
@@ -132,6 +133,11 @@ export function CustomerDetailScreen({
                       {e.kind === "ORDER" && e.kg != null && e.pricePerKg != null && (
                         <p className="text-ink-muted text-sm">
                           {e.kg.toLocaleString("id-ID")} kg × Rp{e.pricePerKg.toLocaleString("id-ID")}/kg
+                        </p>
+                      )}
+                      {e.kind === "PAYMENT" && (
+                        <p className={cn("text-sm", e.paymentMethod ? "text-ink-muted" : "text-ink-faint italic")}>
+                          {formatNotePaymentMethod(e.paymentMethod)}
                         </p>
                       )}
                       {e.note && <p className="text-ink-faint text-xs">{e.note}</p>}

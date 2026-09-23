@@ -11,6 +11,8 @@
 // still carry it until the owner approves moving that data — see
 // LEGACY_FROZEN_LABEL below for how those old rows still render without
 // this type ever being able to produce a new one.
+import type { NotePaymentMethod } from "@/lib/note/payment-method";
+
 export type MieProductType = "MIE_KERITING" | "MIE_LURUS" | "PANGSIT" | "CUSTOM";
 export type MieLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT";
 
@@ -55,6 +57,9 @@ export const MIE_PAYMENT_PRESETS = [50000, 100000, 200000, 500000];
 export type MieLedgerEntryDTO = {
   id: string;
   kind: MieLedgerKind;
+  // PAYMENT rows only; null on every other kind AND on payments recorded
+  // before the column existed — rendered as "Tidak dicatat", never guessed.
+  paymentMethod: NotePaymentMethod | null;
   productType: MieProductType | null;
   customLabel: string | null;
   kg: number | null;

@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { localDateStr, wibDateRange } from "@/lib/timezone";
 import { frozenEntrySignedAmount, type FrozenAdjustmentKind } from "@/lib/frozen/types";
+import {
+  isNotePaymentMethod,
+  resolveNotePaymentMethodEdit,
+  type NotePaymentMethod,
+} from "@/lib/note/payment-method";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -122,6 +127,7 @@ export async function createFrozenOrder(input: CreateFrozenOrderInput): Promise<
 export type CreateFrozenPaymentInput = {
   customerId: string;
   amount: number;
+  paymentMethod: NotePaymentMethod;
   date: string;
   note: string;
 };
@@ -137,6 +143,10 @@ export async function createFrozenPayment(input: CreateFrozenPaymentInput): Prom
   if (!customer || !customer.isActive) return { ok: false, error: "Pelanggan tidak ditemukan." };
 
   if (!Number.isFinite(input.amount) || input.amount <= 0) return { ok: false, error: "Nominal tidak valid." };
+  // Required for NEW payments only — see createMiePayment / schema.prisma.
+  if (!isNotePaymentMethod(input.paymentMethod)) {
+    return { ok: false, error: "Pilih metode pembayaran (Cash atau QRIS)." };
+  }
   const date = new Date(input.date);
   if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
 
@@ -146,6 +156,7 @@ export async function createFrozenPayment(input: CreateFrozenPaymentInput): Prom
       customerId: input.customerId,
       kind: "PAYMENT",
       amount: amountPaid,
+      paymentMethod: input.paymentMethod,
       date,
       note: input.note.trim() || null,
       createdById: user.id,
@@ -247,6 +258,7 @@ export type UpdateFrozenEntryInput = {
   pcs?: number; // ORDER only
   pricePerPcs?: number; // ORDER only
   amount?: number; // non-ORDER only
+  paymentMethod?: NotePaymentMethod | null; // PAYMENT only — see updateMieEntry
   date: string;
   note: string;
 };
@@ -278,9 +290,18 @@ export async function updateFrozenEntry(entryId: string, input: UpdateFrozenEntr
   if ((entry.kind === "CORRECTION_ADD" || entry.kind === "CORRECTION_SUBTRACT") && !note) {
     return { ok: false, error: "Keterangan koreksi tidak boleh kosong." };
   }
+
+  // Same single rule as Mi Mentah — see resolveNotePaymentMethodEdit.
+  const paymentMethod = resolveNotePaymentMethodEdit(
+    entry.kind === "PAYMENT",
+    entry.paymentMethod,
+    input.paymentMethod,
+  );
+  if (!paymentMethod.ok) return paymentMethod;
+
   await prisma.frozenLedgerEntry.update({
     where: { id: entryId },
-    data: { amount: Math.round(amount), date, note },
+    data: { amount: Math.round(amount), date, note, ...paymentMethod.data },
   });
   return { ok: true };
 }

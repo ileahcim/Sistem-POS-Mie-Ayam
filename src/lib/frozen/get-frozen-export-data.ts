@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { localDateStr } from "@/lib/timezone";
+import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatFrozenEntryLabel, frozenEntrySignedAmount } from "./types";
 
 export type FrozenExportCustomerRow = {
@@ -16,6 +17,7 @@ export type FrozenExportEntryRow = {
   pcs: number | null;
   hargaPerPcs: number | null;
   nominal: number; // signed — summing this column reproduces the balance
+  metode: string; // PAYMENT only; "Tidak dicatat" for pre-column rows — see Mi Mentah's export
   catatan: string;
   dicatatOleh: string;
 };
@@ -56,6 +58,7 @@ export async function getFrozenExportData(): Promise<{
         pcs: e.pcs,
         hargaPerPcs: e.pricePerPcs,
         nominal: frozenEntrySignedAmount(e),
+        metode: e.kind === "PAYMENT" ? formatNotePaymentMethod(e.paymentMethod) : "",
         catatan: e.note ?? "",
         dicatatOleh: e.createdBy.name,
       });
