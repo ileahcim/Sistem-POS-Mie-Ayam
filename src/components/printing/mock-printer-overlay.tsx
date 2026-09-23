@@ -7,6 +7,7 @@ import { ReceiptView } from "./receipt-view";
 import { DepositReceiptView } from "./deposit-receipt-view";
 import { PackingListView } from "./packing-list-view";
 import { KitchenTicketView } from "./kitchen-ticket-view";
+import { FrozenReceiptView } from "./frozen-receipt-view";
 
 // Always mounted (see root layout) regardless of which driver is active in
 // production, so switching PRINTER_DRIVER back to "mock" for debugging
@@ -46,7 +47,9 @@ export function MockPrinterOverlay() {
                     ? "Preview Bukti Uang Muka (MockPrinter)"
                     : job.kind === "packing-list"
                       ? "Preview Daftar Packing (MockPrinter)"
-                      : "Preview Tiket Dapur (MockPrinter)"}
+                      : job.kind === "frozen-receipt"
+                        ? "Preview Bukti Frozen (MockPrinter)"
+                        : "Preview Tiket Dapur (MockPrinter)"}
               </span>
               <button
                 type="button"
@@ -63,6 +66,8 @@ export function MockPrinterOverlay() {
                 <DepositReceiptView data={job.data} />
               ) : job.kind === "packing-list" ? (
                 <PackingListView data={job.data} />
+              ) : job.kind === "frozen-receipt" ? (
+                <FrozenReceiptView data={job.data} />
               ) : (
                 <KitchenTicketView data={job.data} />
               )}

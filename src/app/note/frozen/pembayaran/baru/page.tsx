@@ -1,0 +1,27 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { getFrozenCustomers } from "@/lib/frozen/get-frozen-customers";
+import { getSettings } from "@/lib/settings/get-settings";
+import { getHeaderNav } from "@/lib/header/get-header-nav";
+import { NewFrozenPaymentForm } from "@/components/note/new-frozen-payment-form";
+
+export default async function NewFrozenPaymentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customerId?: string }>;
+}) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "OWNER") redirect("/kasir");
+
+  const { customerId } = await searchParams;
+  const [customers, settings, nav] = await Promise.all([getFrozenCustomers(), getSettings(), getHeaderNav()]);
+  return (
+    <NewFrozenPaymentForm
+      customers={customers}
+      initialCustomerId={customerId}
+      printerDriver={settings.printerDriver}
+      store={{ storeName: settings.storeName, address: settings.address, phone: settings.phone, printLogo: settings.printLogo }}
+      nav={nav}
+    />
+  );
+}

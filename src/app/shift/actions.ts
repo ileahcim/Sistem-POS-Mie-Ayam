@@ -131,9 +131,16 @@ export async function closeShift(countedCash: number): Promise<CloseShiftResult>
       total: orderTotalFromLines(o.items, o.channel),
       method: o.paymentMethod,
       depositsApplied: o.deposits.reduce((sum, d) => sum + d.amount, 0),
+      splitQrisAmount: o.splitQrisAmount,
     })),
     expenseTotal,
-    depositEntries: depositEntries.map((e) => ({ kind: e.kind, method: e.method, amount: e.amount })),
+    // DP itself is never SPLIT — only the sale that settles it can be
+    // (validateDeposit restricts recordDeposit to CASH/QRIS, TRANSFER legacy).
+    depositEntries: depositEntries.map((e) => ({
+      kind: e.kind,
+      method: e.method as "CASH" | "QRIS" | "TRANSFER",
+      amount: e.amount,
+    })),
   });
   const { cashSales, nonCashSales, expectedCash } = closing;
   const difference = countedCash - expectedCash;

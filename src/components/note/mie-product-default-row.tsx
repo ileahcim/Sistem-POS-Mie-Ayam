@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MieProductType } from "@/lib/mie/types";
 import { updateMiePasarPrice, updateMieProductDefault } from "@/app/note/actions";
+import { updateFrozenPrice } from "@/app/note/frozen-actions";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +21,10 @@ export function MieProductDefaultRow({
   hint,
   defaultPricePerKg,
 }: {
-  target: { kind: "default"; productType: Exclude<MieProductType, "CUSTOM"> } | { kind: "pasar" };
+  target:
+    | { kind: "default"; productType: Exclude<MieProductType, "CUSTOM"> }
+    | { kind: "pasar" }
+    | { kind: "frozenPrice" };
   label: string;
   hint?: string;
   defaultPricePerKg: number | null;
@@ -44,7 +48,9 @@ export function MieProductDefaultRow({
       const result =
         target.kind === "pasar"
           ? await updateMiePasarPrice(Number(value))
-          : await updateMieProductDefault(target.productType, Number(value));
+          : target.kind === "frozenPrice"
+            ? await updateFrozenPrice(Number(value))
+            : await updateMieProductDefault(target.productType, Number(value));
       if (!result.ok) {
         setError(result.error);
         return;
@@ -66,7 +72,7 @@ export function MieProductDefaultRow({
       {hint && <p className="text-ink-muted -mt-1 text-xs">{hint}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <RupiahInput value={value} onChange={setValue} placeholder="0" className="h-11 w-40 text-base" />
-        <span className="text-ink-muted text-sm">/ kg</span>
+        <span className="text-ink-muted text-sm">/ {target.kind === "frozenPrice" ? "pcs" : "kg"}</span>
       </div>
       {error && <p className="text-danger text-sm">{error}</p>}
       {dirty && (

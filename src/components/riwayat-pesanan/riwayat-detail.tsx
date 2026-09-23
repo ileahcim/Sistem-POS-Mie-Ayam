@@ -16,6 +16,7 @@ import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty, formatRupiah } from "@/lib/printing/format";
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
+import { formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
 import { VoidOrderButton } from "@/components/order-aktif/void-order-sheet";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
@@ -110,7 +111,11 @@ export function RiwayatDetail({
           <Badge variant={STATUS_VARIANT[order.status] ?? "neutral"}>
             {STATUS_LABEL[order.status] ?? order.status}
           </Badge>
-          {order.paymentMethod && <span className="text-ink-muted text-sm">via {order.paymentMethod}</span>}
+          {order.paymentMethod && (
+            <span className="text-ink-muted text-sm">
+              via {formatPaymentMethodDetail(order.paymentMethod, order.splitCashAmount, order.splitQrisAmount)}
+            </span>
+          )}
           {order.customerName && <span className="text-ink-muted text-sm">· {order.customerName}</span>}
         </div>
 
@@ -217,6 +222,8 @@ export function RiwayatDetail({
                 }
                 total={order.total}
                 paymentMethod={order.paymentMethod}
+                splitCashAmount={order.splitCashAmount}
+                splitQrisAmount={order.splitQrisAmount}
                 shiftClosed={order.shiftStatus === "CLOSED"}
                 onVoided={() => router.refresh()}
               />

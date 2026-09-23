@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { AppHeader } from "@/components/ui/app-header";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { CustomerList } from "./customer-list";
+import { NoteBookTabs } from "./note-book-tabs";
 
 function SummaryCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
@@ -38,6 +39,7 @@ export function NoteScreen({
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
+          <NoteBookTabs active="mie" />
           {/* The door to the monitoring screen — first thing on the page and
               visually lifted, since as a plain ghost button in the row of
               actions below it read as just another small link. */}

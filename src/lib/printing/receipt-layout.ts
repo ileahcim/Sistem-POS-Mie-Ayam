@@ -11,7 +11,7 @@
 //
 // Pure data + formatting: no React, no ESC/POS, safe to import anywhere.
 
-import type { DepositReceiptData, KitchenTicketData, PackingListData, ReceiptData } from "./types";
+import type { DepositReceiptData, FrozenReceiptData, KitchenTicketData, PackingListData, ReceiptData } from "./types";
 import { formatRupiah, mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
 import { centeredRule, paperRule, wrapHeading, wrapWords, RECEIPT_CHARS_PER_LINE } from "./paper";
 import { formatId } from "@/lib/timezone";
@@ -61,6 +61,7 @@ const PAYMENT_LABEL: Record<ReceiptData["paymentMethod"], string> = {
   CASH: "Cash",
   QRIS: "QRIS",
   TRANSFER: "Transfer",
+  SPLIT: "Cash + QRIS",
 };
 
 function formatTanggal(date: Date): string {
@@ -160,14 +161,23 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
   lines.push(rule("-"), pair("total", "Total", formatRupiah(data.total)), rule("-"));
   const deposits = data.deposits ?? [];
   if (deposits.length === 0) {
-    // An ordinary order: byte for byte what it printed before DP existed.
-    lines.push(pair("plain", `Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.cashTendered ?? data.total)));
-    // Only ever set on an old order — payOrder no longer computes change.
-    if (data.changeGiven != null && data.changeGiven > 0) {
-      lines.push(pair("plain", "Kembali", formatRupiah(data.changeGiven)));
+    if (data.paymentMethod === "SPLIT") {
+      // Split payment (CLAUDE.md-worthy brief, 22 Sep 2026): two lines, one
+      // per method actually collected — never the single "Bayar (...)" line.
+      lines.push(
+        pair("plain", "Bayar (Cash)", formatRupiah(data.splitCashAmount ?? 0)),
+        pair("plain", "Bayar (QRIS)", formatRupiah(data.splitQrisAmount ?? 0)),
+      );
+    } else {
+      // An ordinary order: byte for byte what it printed before DP existed.
+      lines.push(pair("plain", `Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.cashTendered ?? data.total)));
+      // Only ever set on an old order — payOrder no longer computes change.
+      if (data.changeGiven != null && data.changeGiven > 0) {
+        lines.push(pair("plain", "Kembali", formatRupiah(data.changeGiven)));
+      }
     }
   } else {
-    lines.push(...depositLines(deposits, data.total, data.paymentMethod));
+    lines.push(...depositLines(deposits, data.total, data.paymentMethod, data.splitCashAmount, data.splitQrisAmount));
   }
   lines.push(rule("="), { kind: "rule", text: centeredRule(data.footerNote ?? "Terima kasih!") });
   return lines;
@@ -180,6 +190,8 @@ function depositLines(
   deposits: NonNullable<ReceiptData["deposits"]>,
   total: number,
   paymentMethod: ReceiptData["paymentMethod"],
+  splitCashAmount: number | null | undefined,
+  splitQrisAmount: number | null | undefined,
 ): LayoutLine[] {
   const position = depositPosition(total, deposits.map((d) => d.amount));
   const lines: LayoutLine[] = deposits.map((d) =>
@@ -189,7 +201,15 @@ function depositLines(
   if (position.excess > 0) {
     lines.push(pair("plain", "Kembalikan", formatRupiah(position.excess)));
   } else if (position.remainder > 0) {
-    lines.push(pair("plain", `Sisa dibayar (${PAYMENT_LABEL[paymentMethod]})`, formatRupiah(position.remainder)));
+    if (paymentMethod === "SPLIT") {
+      // Split applies to the SISA only — the DP lines above are untouched.
+      lines.push(
+        pair("plain", "Bayar (Cash)", formatRupiah(splitCashAmount ?? 0)),
+        pair("plain", "Bayar (QRIS)", formatRupiah(splitQrisAmount ?? 0)),
+      );
+    } else {
+      lines.push(pair("plain", `Sisa dibayar (${PAYMENT_LABEL[paymentMethod]})`, formatRupiah(position.remainder)));
+    }
   } else {
     // Fully covered by DP: nothing was collected, so no method to name.
     lines.push(pair("plain", "Sisa dibayar", formatRupiah(0)));
@@ -250,6 +270,43 @@ export function buildDepositReceiptLayout(data: DepositReceiptData): LayoutLine[
   lines.push(rule("-"));
   if (position.excess > 0) lines.push(pair("total", "Dikembalikan saat diambil", formatRupiah(position.excess)));
   else lines.push(pair("total", "Sisa dibayar saat diambil", formatRupiah(position.remainder)));
+
+  lines.push(rule("="), { kind: "rule", text: centeredRule(data.footerNote ?? "Terima kasih!") });
+  return lines;
+}
+
+// "BUKTI PENGAMBILAN/PEMBAYARAN FROZEN" — the Buku Frozen's own small proof-
+// of-transaction receipt (CLAUDE.md-worthy brief, 22 Sep 2026). Store header
+// from Setting like a normal struk, but no queue number/order number at all
+// (this isn't a POS order) — just who, when, what happened this time, and
+// the balance after it, with an explicit bold "Belum dibayar"/"Sisa" line so
+// it's never mistaken for a closed-out debt.
+export function buildFrozenReceiptLayout(data: FrozenReceiptData): LayoutLine[] {
+  const title = data.kind === "PENGAMBILAN" ? "BUKTI PENGAMBILAN FROZEN" : "BUKTI PEMBAYARAN FROZEN";
+  const lines: LayoutLine[] = [
+    ...headerLines(data, title),
+    ...metaWrapped("Pelanggan", data.customerName),
+    meta("Tanggal", formatTanggal(data.printedAt)),
+    meta("Jam", formatJam(data.printedAt)),
+    rule("="),
+  ];
+
+  if (data.kind === "PENGAMBILAN") {
+    lines.push(
+      pair("item", `${data.pcs ?? 0} pcs`, formatRupiah(data.pickupTotal ?? 0)),
+      { kind: "sub", role: "addon", text: `${formatRupiah(data.pricePerPcs ?? 0)}/pcs` },
+      rule("-"),
+      pair("total", "Total", formatRupiah(data.pickupTotal ?? 0)),
+      rule("-"),
+      pair("total", "Belum dibayar", formatRupiah(data.debtAfter)),
+    );
+  } else {
+    lines.push(
+      pair("plain", "Dibayar", formatRupiah(data.amountPaid ?? 0)),
+      rule("-"),
+      pair("total", "Sisa", formatRupiah(data.debtAfter)),
+    );
+  }
 
   lines.push(rule("="), { kind: "rule", text: centeredRule(data.footerNote ?? "Terima kasih!") });
   return lines;

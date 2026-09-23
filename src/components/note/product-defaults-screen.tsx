@@ -12,10 +12,12 @@ import { MieProductDefaultRow } from "./mie-product-default-row";
 export function ProductDefaultsScreen({
   defaults,
   pasarPricePerKg,
+  frozenPricePerPcs,
   nav,
 }: {
   defaults: MieProductDefaults;
   pasarPricePerKg: number | null;
+  frozenPricePerPcs: number | null;
   nav: HeaderNav;
 }) {
   return (
@@ -55,6 +57,19 @@ export function ProductDefaultsScreen({
               label="Mie Pasar"
               hint={`${MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]} · tombol "Mie Pasar" di form pesanan`}
               defaultPricePerKg={pasarPricePerKg}
+            />
+          </Card>
+
+          <p className="text-ink-muted mt-2 text-sm">
+            Harga default Buku Frozen (per pcs) — dipakai sebagai saran awal di form pengambilan, tetap bisa diubah
+            per pelanggan saat itu juga.
+          </p>
+          <Card>
+            <MieProductDefaultRow
+              target={{ kind: "frozenPrice" }}
+              label="Frozen"
+              hint="Harga per pcs — form Pengambilan Frozen"
+              defaultPricePerKg={frozenPricePerPcs}
             />
           </Card>
         </div>

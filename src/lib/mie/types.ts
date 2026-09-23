@@ -2,10 +2,16 @@
 // plain string unions (same convention as the rest of this codebase, e.g.
 // Order's channel/status types — never importing the generated Prisma enum
 // directly into a DTO type).
-// FROZEN = Mie Frozen, a warung POS product (not raw mi mentah) whose debt
-// is still tracked here but excluded from the Ringkasan's mi-mentah
-// omzet/kg totals — owner's call, 22 Sep 2026, see bucket-mie.ts.
-export type MieProductType = "MIE_KERITING" | "MIE_LURUS" | "PANGSIT" | "FROZEN" | "CUSTOM";
+//
+// FROZEN was here for one night (22 Sep 2026) as a "jenis mi" — reverted:
+// Mie Frozen is consigned to a reseller and settled entirely outside this
+// buku (see FrozenCustomer/FrozenLedgerEntry, its own buku), priced per pcs
+// not kg. The DB enum still has the FROZEN value (Postgres can't cleanly
+// drop one) and a handful of real ledger rows/the "KMK Frozen" customer
+// still carry it until the owner approves moving that data — see
+// LEGACY_FROZEN_LABEL below for how those old rows still render without
+// this type ever being able to produce a new one.
+export type MieProductType = "MIE_KERITING" | "MIE_LURUS" | "PANGSIT" | "CUSTOM";
 export type MieLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT";
 
 // Kinds that carry a plain amount (no kg/price) and are added from the
@@ -22,29 +28,20 @@ export const MIE_PRODUCT_LABEL: Record<Exclude<MieProductType, "CUSTOM">, string
   MIE_KERITING: "Mi Keriting",
   MIE_LURUS: "Mi Lurus",
   PANGSIT: "Pangsit",
-  FROZEN: "Frozen",
 };
 
-// Used by the order form's jenis buttons AND /note/produk's default-price
-// rows — FROZEN belongs in both ("sejajar" with the others, priced the same
-// way, owner's call). It's the NARROWER MIE_MENTAH_PRODUCT_TYPES below
-// (bucket-mie.ts) that leaves FROZEN out, specifically for the Ringkasan's
-// mi-mentah omzet/kg totals and per-jenis breakdown.
-export const MIE_FIXED_PRODUCT_TYPES: Exclude<MieProductType, "CUSTOM">[] = [
-  "MIE_KERITING",
-  "MIE_LURUS",
-  "PANGSIT",
-  "FROZEN",
-];
+// Label for a legacy ledger row still tagged with the DB's retired FROZEN
+// value (a real "KMK Frozen" customer + rows exist in production from the
+// one-night experiment, 22 Sep 2026) — MieProductType no longer includes
+// "FROZEN" so nothing can write a new one, but existing rows must still
+// render as something readable instead of blank/undefined until the owner
+// approves moving them into the Frozen buku. See formatMieEntryLabel below.
+export const LEGACY_FROZEN_LABEL = "Frozen (akan dipindah)";
 
-// The actual raw-noodle types — what the Ringkasan's headline omzet/kg and
-// "Per jenis mi" table count. FROZEN is deliberately excluded (see
-// MieProductType's doc comment above).
-export const MIE_MENTAH_PRODUCT_TYPES: Exclude<MieProductType, "CUSTOM" | "FROZEN">[] = [
-  "MIE_KERITING",
-  "MIE_LURUS",
-  "PANGSIT",
-];
+// Used by the order form's jenis buttons AND /note/produk's default-price
+// rows, and by the Ringkasan's headline omzet/kg + "Per jenis mi" table —
+// one list again now that Frozen has its own separate buku.
+export const MIE_FIXED_PRODUCT_TYPES: Exclude<MieProductType, "CUSTOM">[] = ["MIE_KERITING", "MIE_LURUS", "PANGSIT"];
 
 // Tap-first presets for recording while standing in the production area
 // (CLAUDE.md "Catatan Mi Mentah"). "Mie Pasar" is the daily market order:
@@ -77,6 +74,10 @@ export function formatMieEntryLabel(entry: Pick<MieLedgerEntryDTO, "kind" | "pro
   if (entry.kind === "CORRECTION_ADD") return "Koreksi (+)";
   if (entry.kind === "CORRECTION_SUBTRACT") return "Koreksi (−)";
   if (entry.productType === "CUSTOM") return entry.customLabel || "Custom";
+  // A live row can still carry the DB's retired "FROZEN" value (existing
+  // production data, not yet migrated — see the type's doc comment) even
+  // though MieProductType can no longer type-check as that value.
+  if ((entry.productType as string) === "FROZEN") return LEGACY_FROZEN_LABEL;
   return entry.productType ? MIE_PRODUCT_LABEL[entry.productType] : "—";
 }
 

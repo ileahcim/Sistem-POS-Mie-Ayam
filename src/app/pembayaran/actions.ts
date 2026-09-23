@@ -6,10 +6,11 @@ import { getOrderDetail, type OrderDetail } from "@/lib/orders/get-order-detail"
 import { buildReceiptData } from "@/lib/orders/build-receipt-data";
 import { orderTotalFromLines } from "@/lib/orders/order-total";
 import { allocateDeposits, methodWhenFullyPrepaid, type DepositMethod } from "@/lib/deposits/settle";
+import { validateSplitCashAmount } from "@/lib/orders/validate-split-payment";
 import { getSettings } from "@/lib/settings/get-settings";
 import type { ReceiptData } from "@/lib/printing/types";
 
-export type PaymentMethod = "CASH" | "QRIS" | "TRANSFER";
+export type PaymentMethod = "CASH" | "QRIS" | "TRANSFER" | "SPLIT";
 
 export type PayOrderResult =
   | { ok: true; receipt: ReceiptData }
@@ -31,6 +32,10 @@ export async function payOrder(
   orderId: string,
   method: PaymentMethod,
   cashTendered: number | null,
+  // Only meaningful when method === "SPLIT": the cash slice the cashier
+  // typed. QRIS slice is always derived server-side (order.total - this),
+  // never trusted from the client.
+  splitCashAmount: number | null = null,
 ): Promise<PayOrderResult> {
   const user = await requireUser();
 
@@ -45,10 +50,18 @@ export async function payOrder(
   // A pre-order that took DP settles in its own transaction: only the remainder
   // is collected, and the DP is applied (or the excess handed back) in the same
   // commit. Everything below is the ordinary path, untouched by DP.
-  if (order.deposits.length > 0) return payWithDeposits(order, user.id, method, cashTendered);
+  if (order.deposits.length > 0) {
+    return payWithDeposits(order, user.id, method, cashTendered, splitCashAmount);
+  }
 
   if (cashTendered != null && cashTendered < order.total) {
     return { ok: false, error: "Uang tendered kurang dari total." };
+  }
+  let splitQrisAmount: number | null = null;
+  if (method === "SPLIT") {
+    const error = validateSplitCashAmount(splitCashAmount ?? NaN, order.total);
+    if (error) return { ok: false, error };
+    splitQrisAmount = order.total - (splitCashAmount as number);
   }
 
   const changeGiven = cashTendered != null ? cashTendered - order.total : null;
@@ -91,6 +104,8 @@ export async function payOrder(
             servedAt,
             cashTendered,
             changeGiven,
+            splitCashAmount: method === "SPLIT" ? splitCashAmount : null,
+            splitQrisAmount,
           },
         });
         if (claimed.count !== 1) throw new PaymentRefused(RACED);
@@ -109,6 +124,8 @@ export async function payOrder(
         servedAt,
         cashTendered,
         changeGiven,
+        splitCashAmount: method === "SPLIT" ? splitCashAmount : null,
+        splitQrisAmount,
       },
     });
     if (claimed.count !== 1) return { ok: false, error: RACED };
@@ -134,6 +151,7 @@ async function payWithDeposits(
   userId: string,
   method: PaymentMethod,
   cashTendered: number | null,
+  splitCashAmount: number | null,
 ): Promise<PayOrderResult> {
   const paidAt = new Date();
   const servedAt = order.servedAt ? undefined : order.channel !== "DINE_IN" ? paidAt : undefined;
@@ -166,6 +184,15 @@ async function payWithDeposits(
       // to choose at the till — label the order after the DP that covered it.
       const paymentMethod = allocation.remainder === 0 ? methodWhenFullyPrepaid(allocation.applied) : method;
 
+      // Split applies to the SISA only (what's actually collected now), never
+      // to the DP itself — the DP's own rule is untouched (see shift-math.ts).
+      let splitQrisAmount: number | null = null;
+      if (paymentMethod === "SPLIT" && allocation.remainder > 0) {
+        const error = validateSplitCashAmount(splitCashAmount ?? NaN, allocation.remainder);
+        if (error) throw new PaymentRefused(error);
+        splitQrisAmount = allocation.remainder - (splitCashAmount as number);
+      }
+
       // Same rule as any pre-order: it is attached to the shift open NOW, the
       // delivery day's, not the day it was phoned in.
       let shiftId = fresh.shiftId;
@@ -185,7 +212,18 @@ async function payWithDeposits(
 
       await tx.order.update({
         where: { id: order.id },
-        data: { shiftId, queueNumber, status: "PAID", paymentMethod, paidAt, servedAt, cashTendered, changeGiven },
+        data: {
+          shiftId,
+          queueNumber,
+          status: "PAID",
+          paymentMethod,
+          paidAt,
+          servedAt,
+          cashTendered,
+          changeGiven,
+          splitCashAmount: paymentMethod === "SPLIT" ? splitCashAmount : null,
+          splitQrisAmount,
+        },
       });
 
       const settlement = [

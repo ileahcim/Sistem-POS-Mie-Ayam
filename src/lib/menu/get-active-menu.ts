@@ -68,30 +68,39 @@ export async function getActiveMenu(): Promise<MenuCategory[]> {
     },
   });
 
-  return categories.map((category) => ({
-    id: category.id,
-    name: category.name,
-    sortOrder: category.sortOrder,
-    isKitchenItem: category.isKitchenItem,
-    products: category.products.map((product) => ({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      imageUrl: product.imageUrl,
-      isDeliveryChargeable: category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME,
-      categorySortOrder: category.sortOrder,
-      productSortOrder: product.sortOrder,
-      addonGroups: product.addonGroups.map((pag) => ({
-        id: pag.addonGroup.id,
-        name: pag.addonGroup.name,
-        minSelect: pag.addonGroup.minSelect,
-        maxSelect: pag.addonGroup.maxSelect,
-        options: pag.addonGroup.options.map((opt) => ({
-          id: opt.id,
-          name: opt.name,
-          price: opt.price,
+  // A category with nothing tappable in it is never useful to show as a
+  // tab — every caller (Kasir, Pre-order Baru, Tambah Item, Foto Produk)
+  // only lists categories to pick a product from. This is what makes the
+  // Frozen tab disappear once "Mie Frozen" becomes the category's only
+  // product and gets deactivated (that product toggle itself is a separate,
+  // owner-approved data change — see CLAUDE.md-worthy brief "Buku Frozen
+  // Terpisah", 22 Sep 2026).
+  return categories
+    .filter((category) => category.products.length > 0)
+    .map((category) => ({
+      id: category.id,
+      name: category.name,
+      sortOrder: category.sortOrder,
+      isKitchenItem: category.isKitchenItem,
+      products: category.products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        imageUrl: product.imageUrl,
+        isDeliveryChargeable: category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME,
+        categorySortOrder: category.sortOrder,
+        productSortOrder: product.sortOrder,
+        addonGroups: product.addonGroups.map((pag) => ({
+          id: pag.addonGroup.id,
+          name: pag.addonGroup.name,
+          minSelect: pag.addonGroup.minSelect,
+          maxSelect: pag.addonGroup.maxSelect,
+          options: pag.addonGroup.options.map((opt) => ({
+            id: opt.id,
+            name: opt.name,
+            price: opt.price,
+          })),
         })),
       })),
-    })),
-  }));
+    }));
 }

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { localDateStr } from "@/lib/timezone";
-import { formatMieEntryLabel, mieEntrySignedAmount } from "./types";
+import { formatMieEntryLabel, mieEntrySignedAmount, type MieProductType } from "./types";
 
 export type MieExportCustomerRow = {
   nama: string;
@@ -53,7 +53,9 @@ export async function getMieExportData(): Promise<{
       entryRows.push({
         tanggal: localDateStr(e.date),
         pelanggan: c.name,
-        jenis: formatMieEntryLabel(e),
+        // DB enum still has the retired FROZEN value (existing rows, not yet
+        // migrated) — formatMieEntryLabel renders it via LEGACY_FROZEN_LABEL.
+        jenis: formatMieEntryLabel({ ...e, productType: e.productType as MieProductType | null }),
         kg: e.kg,
         hargaPerKg: e.pricePerKg,
         nominal: mieEntrySignedAmount(e),

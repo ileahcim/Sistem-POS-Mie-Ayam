@@ -17,6 +17,7 @@ import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
+import { formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
 import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
 import { expandAddonOptionIds, groupOrderItemAddons } from "@/lib/cart/types";
 import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list";
@@ -389,6 +390,8 @@ export function OrderDetail({
               orderLabel={order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : `No. ${order.orderNumber}`}
               total={order.total}
               paymentMethod={order.paymentMethod}
+              splitCashAmount={order.splitCashAmount}
+              splitQrisAmount={order.splitQrisAmount}
               shiftClosed={order.shiftStatus === "CLOSED"}
               onVoided={() => router.push(`/riwayat-pesanan/${order.id}`)}
             />
@@ -425,7 +428,9 @@ export function OrderDetail({
 
         {order.status === "PAID" && (
           <div className="mt-3 flex justify-center">
-            <Badge variant="success">Sudah dibayar ({order.paymentMethod})</Badge>
+            <Badge variant="success">
+              Sudah dibayar ({formatPaymentMethodDetail(order.paymentMethod, order.splitCashAmount, order.splitQrisAmount)})
+            </Badge>
           </div>
         )}
       </div>

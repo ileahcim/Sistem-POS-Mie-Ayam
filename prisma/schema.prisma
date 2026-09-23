@@ -42,6 +42,7 @@ model User {
   ordersVoided    Order[]     @relation("OrderVoidedBy")
   ordersCancelled Order[]     @relation("OrderCancelledBy")
   mieLedgerEntriesCreated MieLedgerEntry[]
+  frozenLedgerEntriesCreated FrozenLedgerEntry[]
   depositEntriesCreated   PreorderDeposit[]
 }
 
@@ -316,6 +317,11 @@ enum PaymentMethod {
   CASH
   QRIS
   TRANSFER
+  // "Cash + QRIS" — the customer's cash falls short, so part is tendered
+  // cash and the rest QRIS, in ONE payment (CLAUDE.md-worthy brief, 22 Sep
+  // 2026). Order.splitCashAmount/splitQrisAmount below carry the split;
+  // every other PaymentMethod leaves both null.
+  SPLIT
 }
 
 model Order {
@@ -369,6 +375,12 @@ model Order {
   paidAt        DateTime?
   cashTendered  Int? // only set when the cashier used a quick cash-denomination button
   changeGiven   Int?
+  // Split payment breakdown — set together, only when paymentMethod is
+  // SPLIT. They sum to whatever was actually collected THIS payment: the
+  // full total normally, or just the remainder when a DP already covered
+  // part of it (CLAUDE.md-worthy brief, 22 Sep 2026). Both null otherwise.
+  splitCashAmount Int?
+  splitQrisAmount Int?
 
   // Pre-order: hidden from Order Aktif until this time arrives, shown under
   // "Pesanan Terjadwal" until then.
@@ -527,9 +539,16 @@ enum MieProductType {
   MIE_KERITING
   MIE_LURUS
   PANGSIT
-  // Mie Frozen — a warung POS product, NOT raw mi mentah (owner's call, 22
-  // Sep 2026). Still recorded here (the customer genuinely owes for it) but
-  // kept out of the Ringkasan's mi-mentah omzet/kg totals — see bucket-mie.ts.
+  // RETIRED 22 Sep 2026 — a one-night experiment that put Frozen debt inside
+  // the raw-noodle ledger as a "jenis". Wrong model: Frozen is consigned to
+  // a reseller and settled separately from mi mentah (see FrozenCustomer/
+  // FrozenLedgerEntry below, its own buku). Existing FROZEN-tagged rows
+  // (including customer "KMK Frozen") are still HERE, pending the owner's
+  // approval to move them — see the migration preview in the "Buku Frozen"
+  // brief. This label is kept only because Postgres can't cleanly drop an
+  // enum value without rewriting the column — app code never writes a new
+  // one (MieProductType the TS type excludes it); src/lib/mie/types.ts
+  // renders any remaining legacy row via LEGACY_FROZEN_LABEL.
   FROZEN
   CUSTOM
 }
@@ -576,6 +595,67 @@ model MieProductDefault {
 model MieSetting {
   id              String @id @default("singleton")
   pasarPricePerKg Int?
+  // Frozen buku's default Rp/pcs (owner-editable from /note/produk, same
+  // page as the mi-mentah defaults) — starting suggestion before a customer
+  // has any pickup history of their own (see FrozenLedgerEntry's price
+  // autofill rule). Seeded 9000 by migration 20260923..._frozen_buku; never
+  // guessed after that, same "don't invent a money number" rule as everywhere
+  // else in this module.
+  frozenPricePerPcs Int?
+}
+
+// ---------------------------------------------------------------------------
+// Buku Frozen — Mie Frozen consigned to a reseller (e.g. "KMK Frozen"): they
+// sell it on and settle with the owner later, in cash straight to the owner.
+// NOT the warung's cash drawer, NOT mi mentah — a third, fully separate
+// ledger world living in the same Note module (CLAUDE.md-worthy brief, 22
+// Sep 2026). Mirrors MieCustomer/MieLedgerEntry's shape exactly (balance is
+// always a sum over rows, corrections are new rows, soft delete only) but
+// priced per PIECE (pcs), not per kg, and with no "jenis" at all — every
+// pickup is the same product.
+// ---------------------------------------------------------------------------
+
+enum FrozenLedgerKind {
+  ORDER // "Pengambilan" — pcs taken, priced per pcs
+  PAYMENT
+  OPENING_BALANCE
+  CORRECTION_ADD
+  CORRECTION_SUBTRACT
+}
+
+model FrozenCustomer {
+  id       String  @id @default(cuid())
+  name     String
+  note     String?
+  isActive Boolean @default(true) // soft delete, same convention as MieCustomer
+
+  createdAt DateTime @default(now())
+
+  entries FrozenLedgerEntry[]
+}
+
+// One unified ledger, exactly like MieLedgerEntry — balance is never a
+// stored column, always the sum of signed amounts over these rows (see
+// frozenEntrySignedAmount in lib/frozen/types.ts).
+model FrozenLedgerEntry {
+  id         String         @id @default(cuid())
+  customerId String
+  customer   FrozenCustomer @relation(fields: [customerId], references: [id])
+
+  kind FrozenLedgerKind
+
+  // ORDER-only fields — null for PAYMENT/OPENING_BALANCE/CORRECTION_*.
+  pcs         Int?
+  pricePerPcs Int? // snapshot at pickup time — never re-read from MieSetting later
+
+  amount Int // Rupiah, always positive — see `kind` comment on MieLedgerEntry for the sign convention
+
+  date DateTime // business date — owner-settable, defaults to today
+  note String?
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
 }
 
 // A single unified ledger, not separate Order/Payment tables — the

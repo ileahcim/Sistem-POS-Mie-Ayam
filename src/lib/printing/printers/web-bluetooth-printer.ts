@@ -26,8 +26,8 @@
 // Indonesian error string, never a throw. Printers are transport pipes and
 // a failed print must never block a completed order.
 
-import type { DepositReceiptData, KitchenTicketData, PackingListData, Printer, PrintResult, ReceiptData } from "../types";
-import { buildDepositReceiptBytes, buildKitchenTicketBytes, buildPackingListBytes, buildReceiptBytes } from "../escpos";
+import type { DepositReceiptData, FrozenReceiptData, KitchenTicketData, PackingListData, Printer, PrintResult, ReceiptData } from "../types";
+import { buildDepositReceiptBytes, buildFrozenReceiptBytes, buildKitchenTicketBytes, buildPackingListBytes, buildReceiptBytes } from "../escpos";
 import { withLogo } from "../logo-raster";
 
 // Well-known BLE serial / ESC-POS-over-BLE service UUIDs to probe first.
@@ -255,6 +255,9 @@ export const webBluetoothPrinter: Printer = {
   // No withLogo — the kitchen ticket has no logo/store header at all.
   async printKitchenTicket(data: KitchenTicketData): Promise<PrintResult> {
     return writeBytes(buildKitchenTicketBytes(data));
+  },
+  async printFrozenReceipt(data: FrozenReceiptData): Promise<PrintResult> {
+    return writeBytes(buildFrozenReceiptBytes(await withLogo(data)));
   },
   async printBytes(bytes: Uint8Array): Promise<PrintResult> {
     return writeBytes(bytes);

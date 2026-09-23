@@ -66,6 +66,8 @@ export async function buildReportWorkbook(): Promise<ExcelJS.Workbook> {
     { header: "Meja", key: "meja", width: 8 },
     { header: "Nama Pelanggan", key: "namaPelanggan", width: 20 },
     { header: "Metode Bayar", key: "metodeBayar", width: 12 },
+    { header: "Split - Cash", key: "splitCashAmount", width: 12, style: { numFmt: MONEY_FORMAT } },
+    { header: "Split - QRIS", key: "splitQrisAmount", width: 12, style: { numFmt: MONEY_FORMAT } },
     { header: "Subtotal", key: "subtotal", width: 12, style: { numFmt: MONEY_FORMAT } },
     { header: "Ongkir", key: "ongkir", width: 10, style: { numFmt: MONEY_FORMAT } },
     { header: "Total", key: "total", width: 12, style: { numFmt: MONEY_FORMAT } },

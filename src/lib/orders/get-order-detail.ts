@@ -61,10 +61,14 @@ export type OrderDetail = {
   servedAt: string | null;
   createdAt: string;
   scheduledFor: string | null; // pre-order delivery date/time, null for a regular order
-  paymentMethod: "CASH" | "QRIS" | "TRANSFER" | null;
+  paymentMethod: "CASH" | "QRIS" | "TRANSFER" | "SPLIT" | null;
   paidAt: string | null;
   cashTendered: number | null;
   changeGiven: number | null;
+  // Only set when paymentMethod === "SPLIT" — see CLAUDE.md-worthy brief
+  // "Split payment", 22 Sep 2026.
+  splitCashAmount: number | null;
+  splitQrisAmount: number | null;
   voidReason: string | null;
   voidedAt: string | null;
   voidedByName: string | null;
@@ -177,6 +181,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     paidAt: order.paidAt?.toISOString() ?? null,
     cashTendered: order.cashTendered,
     changeGiven: order.changeGiven,
+    splitCashAmount: order.splitCashAmount,
+    splitQrisAmount: order.splitQrisAmount,
     voidReason: order.voidReason,
     voidedAt: order.voidedAt?.toISOString() ?? null,
     voidedByName: order.voidedBy?.name ?? null,

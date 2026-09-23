@@ -15,9 +15,13 @@
 
 export type ClosingOrder = {
   total: number;
-  method: "CASH" | "QRIS" | "TRANSFER" | null;
+  method: "CASH" | "QRIS" | "TRANSFER" | "SPLIT" | null;
   // DP applied to this order when it was paid (sum of its APPLIED entries).
   depositsApplied: number;
+  // Only meaningful when method === "SPLIT" — the QRIS slice of what was
+  // actually collected THIS payment (order.splitQrisAmount). The cash slice
+  // is derived, never stored separately here (see qrisPortionOf below).
+  splitQrisAmount?: number | null;
 };
 
 export type ClosingDepositEntry = {
@@ -55,16 +59,47 @@ const sum = (values: Iterable<number>) => {
   return total;
 };
 
+// The QRIS-attributed slice of one order's total. CASH/SPLIT orders default
+// the rest (including any DP riding along — see the module doc comment) into
+// the cash side; only an order whose method is explicitly QRIS/TRANSFER, or
+// the QRIS slice of a SPLIT order, ever counts here. This is the one place
+// that generalizes "which bucket does this order's money belong to" — every
+// sum below is built from it, so cashSales/nonCashSales/depositsAppliedCash
+// can never disagree about a SPLIT order's split.
+function qrisPortionOf(o: ClosingOrder): number {
+  if (o.method === "QRIS" || o.method === "TRANSFER") return o.total;
+  if (o.method === "SPLIT") return o.splitQrisAmount ?? 0;
+  return 0;
+}
+
+// True for a CASH or SPLIT order — i.e. any order whose remainder wasn't
+// paid wholly in QRIS. DP applied to such an order rides inside the cash
+// side (see qrisPortionOf) exactly the way a plain CASH order already
+// worked before SPLIT existed, so depositsAppliedCash below stays correct.
+function isCashLike(method: ClosingOrder["method"]): boolean {
+  return method === "CASH" || method === "SPLIT";
+}
+
 export function computeShiftClosing(input: ClosingInput): ClosingNumbers {
-  const cashOrders = input.paidOrders.filter((o) => o.method === "CASH");
-  const nonCashOrders = input.paidOrders.filter((o) => o.method === "QRIS" || o.method === "TRANSFER");
+  // cashSales/nonCashSales: each order's total is divided between the two
+  // by qrisPortionOf, so a SPLIT order lands its cash slice in one and its
+  // QRIS slice in the other — counted once, together, never zero and never
+  // twice (see qrisPortionOf's doc comment). With no SPLIT order anywhere
+  // this reduces EXACTLY to the pre-SPLIT formula: a CASH order's qrisPortion
+  // is 0 (all of it in cashSales), a QRIS order's is its whole total (all of
+  // it in nonCashSales) — byte-identical to the old cashOrders/nonCashOrders
+  // filter-and-sum.
+  const cashSales = sum(input.paidOrders.map((o) => o.total - qrisPortionOf(o)));
+  const nonCashSales = sum(input.paidOrders.map(qrisPortionOf));
 
-  const cashSales = sum(cashOrders.map((o) => o.total));
-  const nonCashSales = sum(nonCashOrders.map((o) => o.total));
-
-  // Only DP applied to CASH-paid orders sits inside cashSales; DP applied to a
-  // QRIS order is inside nonCashSales and never was cash-in-drawer math.
-  const depositsAppliedCash = sum(cashOrders.map((o) => o.depositsApplied));
+  // Only DP applied to a cash-like order (CASH, or SPLIT whose cash slice
+  // absorbs it — see isCashLike) sits inside cashSales; DP applied to a QRIS
+  // order is inside nonCashSales and never was cash-in-drawer math. Same
+  // rule as before SPLIT existed, just no longer keyed off a whole-order
+  // CASH filter.
+  const depositsAppliedCash = sum(
+    input.paidOrders.filter((o) => isCashLike(o.method)).map((o) => o.depositsApplied),
+  );
   const cashCollected = cashSales - depositsAppliedCash;
 
   const entries = (kind: ClosingDepositEntry["kind"], cash: boolean) =>

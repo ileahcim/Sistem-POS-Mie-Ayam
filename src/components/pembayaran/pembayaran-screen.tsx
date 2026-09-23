@@ -22,15 +22,21 @@ import { SplitAndPayButton } from "@/components/order-aktif/split-and-pay-sheet"
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { formatId } from "@/lib/timezone";
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
+import { validateSplitCashAmount } from "@/lib/orders/validate-split-payment";
+import { RupiahInput } from "@/components/ui/rupiah-input";
 import { payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
 
-// Cash and QRIS only — no Transfer button. Payment is always "tap method,
-// tap Bayar": cashReceived is always the order total, no denomination
-// input, no change calculation. See CLAUDE.md "Pembayaran".
+// Cash, QRIS, or both at once ("Cash + QRIS" — CLAUDE.md-worthy brief, 22
+// Sep 2026, for a customer whose cash falls short). Payment is otherwise
+// still "tap method, tap Bayar": no denomination input or change calc for
+// plain Cash/QRIS — only Cash + QRIS asks for one number (the cash slice).
 const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "CASH", label: "Cash" },
   { value: "QRIS", label: "QRIS" },
+  { value: "SPLIT", label: "Cash + QRIS" },
 ];
+
+const SPLIT_CASH_PRESETS = [10000, 20000, 50000];
 
 export function PembayaranScreen({
   order,
@@ -49,6 +55,9 @@ export function PembayaranScreen({
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<PaymentMethod | null>(null);
+  // Cash slice of a split payment — the only number the cashier ever types
+  // here; the QRIS slice is always derived (amountDue - this), never typed.
+  const [splitCash, setSplitCash] = useState<number | "">("");
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
@@ -70,7 +79,13 @@ export function PembayaranScreen({
   // "Kembalikan Rp X", never as a silent zero.
   const hasDeposit = order.deposits.length > 0;
   const nothingToCollect = hasDeposit && order.amountDue === 0;
-  const canPay = nothingToCollect || !!method;
+  // What's actually being collected right now — the full total normally, or
+  // just the sisa when a DP already covers part of it.
+  const amountDue = hasDeposit ? order.amountDue : order.total;
+  const splitCashError =
+    method === "SPLIT" ? validateSplitCashAmount(typeof splitCash === "number" ? splitCash : NaN, amountDue) : null;
+  const splitQris = method === "SPLIT" && typeof splitCash === "number" ? Math.max(0, amountDue - splitCash) : 0;
+  const canPay = (nothingToCollect || !!method) && (method !== "SPLIT" || splitCashError === null);
   const payLabel = !hasDeposit
     ? `Bayar - ${formatRupiah(order.total)}`
     : nothingToCollect
@@ -101,7 +116,12 @@ export function PembayaranScreen({
     try {
       // With nothing to collect the server labels the order after the DP that
       // covered it; the value sent here is then ignored.
-      const result = await payOrder(order.id, method ?? "CASH", null);
+      const result = await payOrder(
+        order.id,
+        method ?? "CASH",
+        null,
+        method === "SPLIT" ? (splitCash as number) : null,
+      );
       if (!result.ok) {
         setError(result.error);
         return;
@@ -307,6 +327,39 @@ export function PembayaranScreen({
                 </button>
               ))}
             </div>
+            )}
+
+            {method === "SPLIT" && (
+              <div className="mt-3 flex flex-col gap-2">
+                <span className="text-ink-muted text-sm font-medium">Jumlah tunai</span>
+                <RupiahInput value={splitCash} onChange={setSplitCash} placeholder="0" className="h-12 text-base" />
+                <div className="flex flex-wrap gap-2">
+                  {SPLIT_CASH_PRESETS.filter((p) => p < amountDue).map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setSplitCash(preset)}
+                      aria-pressed={splitCash === preset}
+                      className={cn(
+                        "rounded-pill h-11 px-4 text-sm font-semibold",
+                        splitCash === preset ? "bg-primary text-white" : "bg-muted text-ink",
+                      )}
+                    >
+                      {preset / 1000}rb
+                    </button>
+                  ))}
+                </div>
+                {splitCashError ? (
+                  <p className="text-danger text-sm">{splitCashError}</p>
+                ) : (
+                  typeof splitCash === "number" &&
+                  splitCash > 0 && (
+                    <p className="text-ink-muted text-sm">
+                      Tunai {formatRupiah(splitCash)} · QRIS {formatRupiah(splitQris)}
+                    </p>
+                  )
+                )}
+              </div>
             )}
 
             {error && <p className="text-danger mt-3 text-sm">{error}</p>}

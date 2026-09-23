@@ -4,7 +4,7 @@
 // shape without knowing where the data came from.
 
 export type ReceiptChannel = "DINE_IN" | "BUNGKUS" | "ANTAR";
-export type ReceiptPaymentMethod = "CASH" | "QRIS" | "TRANSFER";
+export type ReceiptPaymentMethod = "CASH" | "QRIS" | "TRANSFER" | "SPLIT";
 
 export type ReceiptAddon = {
   name: string;
@@ -65,6 +65,10 @@ export type ReceiptData = {
   paymentMethod: ReceiptPaymentMethod;
   cashTendered?: number | null;
   changeGiven?: number | null;
+  // Only set when paymentMethod === "SPLIT" — the struk then prints two
+  // "Bayar (Cash)"/"Bayar (QRIS)" lines instead of one, see receipt-layout.ts.
+  splitCashAmount?: number | null;
+  splitQrisAmount?: number | null;
   // DP received before this order was paid. Absent/empty for every ordinary
   // order — then the struk is exactly what it always was. When present, the
   // struk shows each DP under Total and the remainder actually paid now, and
@@ -162,6 +166,34 @@ export type KitchenTicketData = {
   items: KitchenTicketItem[];
 };
 
+// "BUKTI PENGAMBILAN/PEMBAYARAN FROZEN" — the Buku Frozen's own small proof-
+// of-transaction receipt (CLAUDE.md-worthy brief, 22 Sep 2026). One type with
+// a `kind` discriminant rather than two separate types: the two receipts
+// share the store header, customer name, date, one total-ish line and one
+// debt-balance line, and only differ in title + 1-2 item lines — the same
+// amount of abstraction as ReceiptData handling several payment shapes.
+export type FrozenReceiptData = {
+  storeName: string;
+  address?: string | null;
+  phone?: string | null;
+  kind: "PENGAMBILAN" | "PEMBAYARAN";
+  customerName: string;
+  printedAt: Date;
+  // PENGAMBILAN only:
+  pcs?: number;
+  pricePerPcs?: number;
+  pickupTotal?: number;
+  // PEMBAYARAN only:
+  amountPaid?: number;
+  // Both — the balance AFTER this transaction, always shown with an
+  // explicit "Belum dibayar" (PENGAMBILAN) / "Sisa" (PEMBAYARAN) label,
+  // never left implicit.
+  debtAfter: number;
+  logoRaster?: LogoRaster | null;
+  printLogo?: boolean;
+  footerNote?: string;
+};
+
 export type PrintResult = { ok: true } | { ok: false; error: string };
 
 // Which print driver is active. Declared here (not in get-printer.ts) so the
@@ -174,6 +206,7 @@ export interface Printer {
   printDepositReceipt(data: DepositReceiptData): Promise<PrintResult>;
   printPackingList(data: PackingListData): Promise<PrintResult>;
   printKitchenTicket(data: KitchenTicketData): Promise<PrintResult>;
+  printFrozenReceipt(data: FrozenReceiptData): Promise<PrintResult>;
   // Raw ESC/POS bytes, for hardware diagnostics only (Tes Lebar Kolom) — real
   // receipts always go through printReceipt/printPackingList.
   printBytes(bytes: Uint8Array): Promise<PrintResult>;

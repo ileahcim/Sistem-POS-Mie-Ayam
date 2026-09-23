@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { DELIVERY_FEE_PER_FOOD_ITEM } from "@/lib/orders/pricing";
 import { localDateStr, localTimeStr } from "@/lib/timezone";
+import { PAYMENT_METHOD_LABEL } from "@/lib/orders/payment-method-label";
 
 export type ExportTransactionRow = {
   orderNumber: number;
@@ -10,6 +11,10 @@ export type ExportTransactionRow = {
   meja: string;
   namaPelanggan: string;
   metodeBayar: string;
+  // Only non-zero for a SPLIT order — see CLAUDE.md-worthy brief "Split
+  // payment", 22 Sep 2026.
+  splitCashAmount: number;
+  splitQrisAmount: number;
   subtotal: number;
   ongkir: number;
   total: number;
@@ -38,7 +43,9 @@ export async function getAllPaidTransactions(): Promise<ExportTransactionRow[]> 
       channel: order.channel,
       meja: order.tableLabel ?? "",
       namaPelanggan: order.customerName ?? "",
-      metodeBayar: order.paymentMethod ?? "",
+      metodeBayar: order.paymentMethod ? PAYMENT_METHOD_LABEL[order.paymentMethod] : "",
+      splitCashAmount: order.splitCashAmount ?? 0,
+      splitQrisAmount: order.splitQrisAmount ?? 0,
       subtotal,
       ongkir,
       total: subtotal + ongkir,

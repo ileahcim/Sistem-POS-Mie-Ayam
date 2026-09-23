@@ -21,10 +21,11 @@
 // (emoji, etc.) become "?". This is the safe-enough choice for a thermal
 // receipt; the copy on the database and screen is never touched.
 
-import type { DepositReceiptData, KitchenTicketData, LogoRaster, PackingListData, ReceiptData } from "./types";
+import type { DepositReceiptData, FrozenReceiptData, KitchenTicketData, LogoRaster, PackingListData, ReceiptData } from "./types";
 import { RECEIPT_CHARS_PER_LINE } from "./paper";
 import {
   buildDepositReceiptLayout,
+  buildFrozenReceiptLayout,
   buildKitchenTicketLayout,
   buildPackingListLayout,
   buildReceiptLayout,
@@ -232,6 +233,10 @@ export function buildReceiptBytes(data: ReceiptData): Uint8Array {
 
 export function buildDepositReceiptBytes(data: DepositReceiptData): Uint8Array {
   return concat(INIT, ...renderLayout(buildDepositReceiptLayout(data), data.logoRaster), feed(END_FEED_LINES));
+}
+
+export function buildFrozenReceiptBytes(data: FrozenReceiptData): Uint8Array {
+  return concat(INIT, ...renderLayout(buildFrozenReceiptLayout(data), data.logoRaster), feed(END_FEED_LINES));
 }
 
 export function buildPackingListBytes(data: PackingListData): Uint8Array {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { voidPaidOrder } from "@/app/riwayat-pesanan/actions";
 import { Button } from "@/components/ui/button";
 import { formatRupiah } from "@/lib/printing/format";
+import { formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
 import { ReasonSheet } from "./reason-sheet";
 
 const QUICK_REASONS = ["Salah input pembayaran", "Uang dikembalikan ke pelanggan", "Order dobel"];
@@ -15,13 +16,19 @@ export function VoidOrderButton({
   orderLabel,
   total,
   paymentMethod,
+  splitCashAmount = null,
+  splitQrisAmount = null,
   shiftClosed,
   onVoided,
 }: {
   orderId: string;
   orderLabel: string;
   total: number;
-  paymentMethod: string | null;
+  paymentMethod: "CASH" | "QRIS" | "TRANSFER" | "SPLIT" | null;
+  // Only set when paymentMethod === "SPLIT" — see CLAUDE.md-worthy brief
+  // "Split payment", 22 Sep 2026.
+  splitCashAmount?: number | null;
+  splitQrisAmount?: number | null;
   shiftClosed: boolean;
   onVoided: () => void;
 }) {
@@ -43,14 +50,16 @@ export function VoidOrderButton({
           <div className="bg-danger-soft rounded-card flex flex-col gap-1 p-3 text-sm">
             <p className="text-danger font-semibold">
               Order ini sudah dibayar {formatRupiah(total)}
-              {paymentMethod ? ` (${paymentMethod})` : ""}.
+              {paymentMethod ? ` (${formatPaymentMethodDetail(paymentMethod, splitCashAmount, splitQrisAmount)})` : ""}.
             </p>
             <p className="text-ink">
               {shiftClosed
                 ? "Shift order ini sudah ditutup — laporan shift itu tidak berubah. Uangnya perlu dikembalikan/dicatat manual."
                 : paymentMethod === "CASH"
                   ? "Setelah di-void, order ini tidak dihitung sebagai penjualan cash shift ini — kembalikan uangnya dari laci."
-                  : "Setelah di-void, order ini tidak dihitung sebagai penjualan shift ini."}
+                  : paymentMethod === "SPLIT"
+                    ? `Setelah di-void, order ini tidak dihitung sebagai penjualan shift ini — porsi tunai ${formatRupiah(splitCashAmount ?? 0)} keluar dari laci, porsi QRIS ${formatRupiah(splitQrisAmount ?? 0)} jadi pengembalian non-tunai.`
+                    : "Setelah di-void, order ini tidak dihitung sebagai penjualan shift ini."}
             </p>
           </div>
         }

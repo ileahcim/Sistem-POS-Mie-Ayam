@@ -3,8 +3,6 @@ import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import type { MieReportPoint } from "./get-mie-report";
 import type { MieProductType } from "./types";
 
-type MentahType = Exclude<MieProductType, "FROZEN">;
-
 export type MieGranularity = "harian" | "mingguan" | "bulanan";
 
 export type MieTypeTotals = { kg: number; amount: number };
@@ -13,15 +11,10 @@ export type MieBucket = {
   key: string;
   label: string; // short, for the chart axis
   longLabel: string; // for the table / selected-period heading
-  omzet: number; // sum of ORDER amounts — EXCLUDING Frozen, see frozenAmount
+  omzet: number; // sum of ORDER amounts
   payments: number; // sum of PAYMENT amounts
-  kg: number; // EXCLUDING Frozen
-  byType: Record<MentahType, MieTypeTotals>;
-  // Mie Frozen is a warung POS product, not mi mentah (owner's call, 22 Sep
-  // 2026) — tracked here SEPARATELY, never folded into omzet/kg/byType
-  // above, so it can never inflate the mi-mentah stats those feed.
-  frozenKg: number;
-  frozenAmount: number;
+  kg: number;
+  byType: Record<MieProductType, MieTypeTotals>;
 };
 
 // Default window per granularity — what the screen opens on, and what the
@@ -93,7 +86,7 @@ function labels(start: Date, g: MieGranularity): { label: string; longLabel: str
   };
 }
 
-function emptyByType(): Record<MentahType, MieTypeTotals> {
+function emptyByType(): Record<MieProductType, MieTypeTotals> {
   return {
     MIE_KERITING: { kg: 0, amount: 0 },
     MIE_LURUS: { kg: 0, amount: 0 },
@@ -134,8 +127,6 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
       payments: 0,
       kg: 0,
       byType: emptyByType(),
-      frozenKg: 0,
-      frozenAmount: 0,
     };
     buckets.push(bucket);
     byKey.set(key, bucket);
@@ -153,14 +144,14 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
       bucket.payments += p.amount;
       continue;
     }
-    if (p.productType === "FROZEN") {
-      bucket.frozenKg += p.kg;
-      bucket.frozenAmount += p.amount;
-      continue;
-    }
+    // A live row can still carry the DB's retired "FROZEN" value (existing
+    // production data pending the owner's approval to move it into the
+    // Frozen buku — see types.ts's doc comment) — skip it here entirely
+    // rather than crash on an unknown byType key; it's not mi mentah.
+    const t = bucket.byType[(p.productType ?? "CUSTOM") as MieProductType];
+    if (!t) continue;
     bucket.omzet += p.amount;
     bucket.kg += p.kg;
-    const t = bucket.byType[p.productType ?? "CUSTOM"];
     t.kg += p.kg;
     t.amount += p.amount;
   }

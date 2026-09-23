@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { mieEntrySignedAmount, type MieLedgerEntryDTO } from "./types";
+import { mieEntrySignedAmount, type MieLedgerEntryDTO, type MieProductType } from "./types";
 
 export type MieCustomerDetail = {
   id: string;
@@ -28,7 +28,9 @@ export async function getMieCustomerDetail(customerId: string): Promise<MieCusto
     return {
       id: e.id,
       kind: e.kind,
-      productType: e.productType,
+      // DB enum still has the retired FROZEN value — formatMieEntryLabel
+      // renders any such legacy row with its own label (see types.ts).
+      productType: e.productType as MieProductType | null,
       customLabel: e.customLabel,
       kg: e.kg,
       pricePerKg: e.pricePerKg,
