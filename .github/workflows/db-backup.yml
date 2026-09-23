@@ -1,0 +1,61 @@
+name: Backup database harian
+
+# CLAUDE.md "Backup & Pemulihan" — dump schema public, enkripsi dengan age
+# (asymmetric: runner cuma pegang public key, tidak pernah bisa membuka
+# hasilnya sendiri), simpan di repo PRIVATE terpisah (pos-mi-ayam-backups),
+# bukan di repo ini (yang public). Gagal = GitHub otomatis kirim email ke
+# pemilik repo (perilaku bawaan untuk scheduled workflow yang gagal) — tidak
+# ada langkah notifikasi tambahan yang perlu ditulis di sini.
+on:
+  schedule:
+    # 20:00 UTC = 03:00 WIB — jauh dari jam operasional warung.
+    - cron: "0 20 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout backup repo (destination)
+        uses: actions/checkout@v4
+        with:
+          repository: ileahcim/pos-mi-ayam-backups
+          token: ${{ secrets.BACKUP_REPO_TOKEN }}
+          path: backups-repo
+
+      - name: Install postgresql-client and age
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client age
+
+      - name: Dump database (session pooler, port 5432 — schema public only)
+        env:
+          BACKUP_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+        run: pg_dump "$BACKUP_DB_URL" --schema=public --format=plain --no-owner --no-privileges --file=backup.sql
+
+      - name: Encrypt backup
+        env:
+          BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
+        run: age -r "$BACKUP_AGE_PUBLIC_KEY" -o "backup-$(date -u +%Y%m%d).sql.age" backup.sql
+
+      - name: Store backup, prune to the newest 30
+        run: |
+          set -e
+          mkdir -p backups-repo/daily
+          mv backup-*.sql.age backups-repo/daily/
+          cd backups-repo
+          git config user.name "pos-mi-ayam-backup-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add daily/
+          # Keep only the 30 newest daily-*.sql.age files by filename (dates
+          # sort lexicographically) — everything older gets git-rm'd so the
+          # repo doesn't grow forever.
+          ls -1 daily | grep '^backup-.*\.sql\.age$' | sort | head -n -30 | xargs -r -I{} git rm -q daily/{}
+          if git diff --cached --quiet; then
+            echo "Nothing changed (backup identical to a kept file?) — skipping commit."
+          else
+            git commit -m "Backup $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Wipe the plaintext dump from the runner
+        if: always()
+        run: rm -f backup.sql
