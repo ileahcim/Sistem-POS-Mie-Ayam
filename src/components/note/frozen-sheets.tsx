@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FrozenCustomerDetail } from "@/lib/frozen/get-frozen-customer-detail";
-import type { FrozenAdjustmentKind } from "@/lib/frozen/types";
+import type { FrozenAdjustmentKind, FrozenLedgerEntryDTO } from "@/lib/frozen/types";
 import { FROZEN_ADJUSTMENT_LABEL, formatFrozenEntryLabel } from "@/lib/frozen/types";
 import { todayDateStr, isoToDateInput, dateInputToIso } from "@/lib/mie/date-input";
 import {
@@ -16,8 +16,6 @@ import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
-
-type Entry = FrozenCustomerDetail["entries"][number];
 
 const INPUT = "rounded-input border-border h-12 w-full border px-3 text-base";
 
@@ -176,7 +174,18 @@ export function FrozenAdjustmentSheet({ customerId, onClose }: { customerId: str
 // Edit / hapus satu baris riwayat
 // ---------------------------------------------------------------------------
 
-export function FrozenEntrySheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
+// Takes a plain FrozenLedgerEntryDTO — see EntrySheet in mie-sheets.tsx for
+// why (one edit/delete path shared by the customer ledger and Ringkasan's
+// drill-down list).
+export function FrozenEntrySheet({
+  entry,
+  onClose,
+  initialAction = "edit",
+}: {
+  entry: FrozenLedgerEntryDTO;
+  onClose: () => void;
+  initialAction?: "edit" | "delete";
+}) {
   const router = useRouter();
   const isOrder = entry.kind === "ORDER";
   const isCorrection = entry.kind === "CORRECTION_ADD" || entry.kind === "CORRECTION_SUBTRACT";
@@ -186,7 +195,7 @@ export function FrozenEntrySheet({ entry, onClose }: { entry: Entry; onClose: ()
   const [date, setDate] = useState(isoToDateInput(entry.date));
   const [note, setNote] = useState(entry.note ?? "");
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(initialAction === "delete");
   const [error, setError] = useState<string | null>(null);
 
   const pcsNumber = Number(pcs);

@@ -1,19 +1,32 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import type { MieReportPoint } from "@/lib/mie/get-mie-report";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { bucketMie, defaultRangeFor, isDefaultRange, type MieGranularity } from "@/lib/mie/bucket-mie";
 import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import { DateRangePresets } from "@/components/ui/date-range-presets";
 import { formatId } from "@/lib/timezone";
-import { MIE_FIXED_PRODUCT_TYPES, MIE_PRODUCT_LABEL, type MieProductType } from "@/lib/mie/types";
+import {
+  MIE_FIXED_PRODUCT_TYPES,
+  MIE_PRODUCT_LABEL,
+  formatMieEntryLabel,
+  type MieProductType,
+} from "@/lib/mie/types";
 import { formatRupiah } from "@/lib/printing/format";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { AppHeader } from "@/components/ui/app-header";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
+import { DrilldownStat, LedgerDrilldown, type DrilldownRow } from "./ledger-drilldown";
+import { EntrySheet } from "./mie-sheets";
+
+// Which stat card's list is open. "omzet" and "kg" show the SAME ledger
+// rows (every pesanan in range) — only which number is emphasised differs,
+// exactly as the owner asked ("daftar yang sama, fokus ke kolom kg").
+type Drill = "omzet" | "payments" | "kg";
 
 const OPTIONS: { value: MieGranularity; label: string; unit: string }[] = [
   { value: "harian", label: "Harian", unit: "Hari" },
@@ -37,15 +50,6 @@ function emptyTypeTotals(): Record<MieProductType, { kg: number; amount: number 
     PANGSIT: { kg: 0, amount: 0 },
     CUSTOM: { kg: 0, amount: 0 },
   };
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card padded className="flex min-w-[9.5rem] flex-1 flex-col gap-1">
-      <span className="text-ink-muted text-xs font-medium">{label}</span>
-      <span className="text-ink text-xl font-bold tabular-nums">{value}</span>
-    </Card>
-  );
 }
 
 function formatDay(day: string): string {
@@ -77,6 +81,12 @@ export function MieReportScreen({
   // null = the whole range (the default). Tapping a period row narrows the
   // headline numbers to that period; "Semua" puts them back.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [drill, setDrill] = useState<Drill | null>(null);
+  // The row whose Edit/Hapus was tapped — opens the very same EntrySheet the
+  // customer detail page opens, so there is one edit/delete path with one set
+  // of rules. Its router.refresh() re-reads the page's points, and the cards
+  // above recompute from those, which is why they follow along on their own.
+  const [editing, setEditing] = useState<{ point: MieReportPoint; action: "edit" | "delete" } | null>(null);
   const buckets = useMemo(() => bucketMie(points, granularity, range), [points, granularity, range]);
   const selected = buckets.find((b) => b.key === selectedKey) ?? null;
   const unit = OPTIONS.find((o) => o.value === granularity)!.unit;
@@ -91,11 +101,20 @@ export function MieReportScreen({
   // range — summed from the same buckets, so the two can never disagree.
   const view = useMemo(() => {
     if (selected) return { ...selected, label: selected.longLabel };
-    const totals = { omzet: 0, payments: 0, kg: 0, byType: emptyTypeTotals() };
+    const totals = {
+      omzet: 0,
+      payments: 0,
+      kg: 0,
+      byType: emptyTypeTotals(),
+      orderRows: [] as MieReportPoint[],
+      paymentRows: [] as MieReportPoint[],
+    };
     for (const b of buckets) {
       totals.omzet += b.omzet;
       totals.payments += b.payments;
       totals.kg += b.kg;
+      totals.orderRows.push(...b.orderRows);
+      totals.paymentRows.push(...b.paymentRows);
       for (const row of TYPE_ROWS) {
         totals.byType[row.type].kg += b.byType[row.type].kg;
         totals.byType[row.type].amount += b.byType[row.type].amount;
@@ -103,6 +122,60 @@ export function MieReportScreen({
     }
     return { label: rangeLabel, ...totals };
   }, [selected, buckets, rangeLabel]);
+
+  // Newest first. These are the exact rows the open card's number was summed
+  // from (bucket-mie.ts collects them in the same branch that adds to the
+  // total), so the list's own Total line can never disagree with the card.
+  const drillPoints = useMemo(() => {
+    if (!drill) return [];
+    const source = drill === "payments" ? view.paymentRows : view.orderRows;
+    return [...source].sort((a, b) => (a.day === b.day ? b.time.localeCompare(a.time) : b.day.localeCompare(a.day)));
+  }, [drill, view]);
+
+  const drillRows: DrilldownRow[] = drillPoints.map((p) => {
+    const kgLabel = p.kg != null ? `${p.kg.toLocaleString("id-ID")} kg` : null;
+    const perKg =
+      p.kg != null && p.pricePerKg != null
+        ? `${formatMieEntryLabel(p)} · ${kgLabel} × Rp${p.pricePerKg.toLocaleString("id-ID")}/kg`
+        : null;
+    return {
+      id: p.id,
+      href: `/note/pelanggan/${p.customerId}`,
+      title: p.customerName,
+      date: p.date,
+      time: p.time,
+      detail: drill === "payments" ? null : perKg,
+      note: p.note,
+      value: drill === "kg" ? (kgLabel ?? "—") : formatRupiah(p.amount),
+      sub: drill === "kg" ? formatRupiah(p.amount) : null,
+    };
+  });
+
+  const DRILL_META: Record<Drill, { heading: string; totalLabel: string; totalValue: string; empty: string }> = {
+    omzet: {
+      heading: "Pesanan",
+      totalLabel: "Total omzet",
+      totalValue: formatRupiah(view.omzet),
+      empty: "Tidak ada pesanan di rentang ini.",
+    },
+    payments: {
+      heading: "Pembayaran diterima",
+      totalLabel: "Total pembayaran",
+      totalValue: formatRupiah(view.payments),
+      empty: "Tidak ada pembayaran di rentang ini.",
+    },
+    kg: {
+      heading: "Mi terjual",
+      totalLabel: "Total kg",
+      totalValue: formatKg(view.kg),
+      empty: "Tidak ada pesanan di rentang ini.",
+    },
+  };
+
+  function openEntry(id: string, action: "edit" | "delete") {
+    const point = drillPoints.find((p) => p.id === id);
+    if (point) setEditing({ point, action });
+  }
 
   function pickRange(next: DateRange) {
     setRange(next);
@@ -194,11 +267,40 @@ export function MieReportScreen({
               )}
             </div>
             <div className="flex flex-wrap gap-3">
-              <Stat label="Omzet (pesanan)" value={formatRupiah(view.omzet)} />
-              <Stat label="Pembayaran diterima" value={formatRupiah(view.payments)} />
-              <Stat label="Mi terjual" value={formatKg(view.kg)} />
+              <DrilldownStat
+                label="Omzet (pesanan)"
+                value={formatRupiah(view.omzet)}
+                open={drill === "omzet"}
+                onToggle={() => setDrill(drill === "omzet" ? null : "omzet")}
+              />
+              <DrilldownStat
+                label="Pembayaran diterima"
+                value={formatRupiah(view.payments)}
+                open={drill === "payments"}
+                onToggle={() => setDrill(drill === "payments" ? null : "payments")}
+              />
+              <DrilldownStat
+                label="Mi terjual"
+                value={formatKg(view.kg)}
+                open={drill === "kg"}
+                onToggle={() => setDrill(drill === "kg" ? null : "kg")}
+              />
             </div>
           </section>
+
+          {drill && (
+            <LedgerDrilldown
+              heading={`${DRILL_META[drill].heading} · ${view.label}`}
+              rows={drillRows}
+              totalLabel={DRILL_META[drill].totalLabel}
+              totalValue={DRILL_META[drill].totalValue}
+              emptyText={DRILL_META[drill].empty}
+              footnote="Ketuk nama pelanggan untuk membuka riwayat lengkapnya. Jam yang tampil adalah jam pencatatan. Edit dan hapus di sini sama persis dengan yang ada di halaman pelanggan — saldo berjalan baris sesudahnya ikut berubah, dan baris yang dihapus hilang permanen."
+              onEdit={(id) => openEntry(id, "edit")}
+              onDelete={(id) => openEntry(id, "delete")}
+              onClose={() => setDrill(null)}
+            />
+          )}
 
           <section className="flex flex-col gap-2">
             <h2 className="text-ink text-base font-bold">Per jenis mi</h2>
@@ -282,6 +384,17 @@ export function MieReportScreen({
           </section>
         </div>
       </div>
+
+      <AnimatePresence>
+        {editing && (
+          <EntrySheet
+            key={editing.point.id}
+            entry={editing.point}
+            initialAction={editing.action}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
-import type { MieAdjustmentKind } from "@/lib/mie/types";
+import type { MieAdjustmentKind, MieLedgerEntryDTO } from "@/lib/mie/types";
 import { MIE_ADJUSTMENT_LABEL, formatMieEntryLabel } from "@/lib/mie/types";
 import { todayDateStr, isoToDateInput, dateInputToIso } from "@/lib/mie/date-input";
 import {
@@ -16,8 +16,6 @@ import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
-
-type Entry = MieCustomerDetail["entries"][number];
 
 const INPUT = "rounded-input border-border h-12 w-full border px-3 text-base";
 
@@ -176,7 +174,21 @@ export function AdjustmentSheet({ customerId, onClose }: { customerId: string; o
 // Edit / hapus satu baris riwayat
 // ---------------------------------------------------------------------------
 
-export function EntrySheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
+// Takes a plain MieLedgerEntryDTO, not the customer page's row type — the
+// customer ledger and Ringkasan's drill-down list both hand it one of these,
+// so edit and delete stay a single code path with a single set of rules
+// (runningBalance was never read here). `initialAction: "delete"` just opens
+// on the confirmation this sheet already had, for the Hapus button that sits
+// on a Ringkasan row — not a second delete path.
+export function EntrySheet({
+  entry,
+  onClose,
+  initialAction = "edit",
+}: {
+  entry: MieLedgerEntryDTO;
+  onClose: () => void;
+  initialAction?: "edit" | "delete";
+}) {
   const router = useRouter();
   const isOrder = entry.kind === "ORDER";
   const isCorrection = entry.kind === "CORRECTION_ADD" || entry.kind === "CORRECTION_SUBTRACT";
@@ -186,7 +198,7 @@ export function EntrySheet({ entry, onClose }: { entry: Entry; onClose: () => vo
   const [date, setDate] = useState(isoToDateInput(entry.date));
   const [note, setNote] = useState(entry.note ?? "");
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(initialAction === "delete");
   const [error, setError] = useState<string | null>(null);
 
   const kgNumber = Number(kg.replace(",", "."));

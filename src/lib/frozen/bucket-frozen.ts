@@ -11,6 +11,10 @@ export type FrozenBucket = {
   omzet: number; // sum of ORDER amounts
   payments: number; // sum of PAYMENT amounts
   pcs: number;
+  // The exact rows each total was summed from — see bucket-mie.ts for why
+  // the drill-down list reads these instead of re-filtering the points.
+  orderRows: FrozenReportPoint[];
+  paymentRows: FrozenReportPoint[];
 };
 
 // Default window per granularity — mirrors bucket-mie.ts's DEFAULT_BUCKET_COUNT.
@@ -92,7 +96,15 @@ export function bucketFrozen(points: FrozenReportPoint[], g: FrozenGranularity, 
   const byKey = new Map<string, FrozenBucket>();
   for (let start = first; fmt(start) <= fmt(last); start = step(start, g, 1)) {
     const key = fmt(start);
-    const bucket: FrozenBucket = { key, ...labels(start, g), omzet: 0, payments: 0, pcs: 0 };
+    const bucket: FrozenBucket = {
+      key,
+      ...labels(start, g),
+      omzet: 0,
+      payments: 0,
+      pcs: 0,
+      orderRows: [],
+      paymentRows: [],
+    };
     buckets.push(bucket);
     byKey.set(key, bucket);
     if (buckets.length > MAX_BUCKETS + 1) break;
@@ -105,10 +117,12 @@ export function bucketFrozen(points: FrozenReportPoint[], g: FrozenGranularity, 
     if (!bucket) continue;
     if (p.kind === "PAYMENT") {
       bucket.payments += p.amount;
+      bucket.paymentRows.push(p);
       continue;
     }
     bucket.omzet += p.amount;
-    bucket.pcs += p.pcs;
+    bucket.pcs += p.pcs ?? 0;
+    bucket.orderRows.push(p);
   }
   return buckets;
 }

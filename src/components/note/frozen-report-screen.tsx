@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import type { FrozenReportPoint } from "@/lib/frozen/get-frozen-report";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { bucketFrozen, defaultRangeFor, isDefaultRange, type FrozenGranularity } from "@/lib/frozen/bucket-frozen";
@@ -13,6 +14,12 @@ import { Card } from "@/components/ui/card";
 import { AppHeader } from "@/components/ui/app-header";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
+import { DrilldownStat, LedgerDrilldown, type DrilldownRow } from "./ledger-drilldown";
+import { FrozenEntrySheet } from "./frozen-sheets";
+
+// Mirrors mie-report-screen.tsx's Drill: "omzet" and "pcs" open the same
+// pengambilan rows, only the emphasised number differs.
+type Drill = "omzet" | "payments" | "pcs";
 
 const OPTIONS: { value: FrozenGranularity; label: string; unit: string }[] = [
   { value: "harian", label: "Harian", unit: "Hari" },
@@ -22,15 +29,6 @@ const OPTIONS: { value: FrozenGranularity; label: string; unit: string }[] = [
 
 function formatPcs(pcs: number): string {
   return `${pcs.toLocaleString("id-ID")} pcs`;
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card padded className="flex min-w-[9.5rem] flex-1 flex-col gap-1">
-      <span className="text-ink-muted text-xs font-medium">{label}</span>
-      <span className="text-ink text-xl font-bold tabular-nums">{value}</span>
-    </Card>
-  );
 }
 
 function formatDay(day: string): string {
@@ -53,6 +51,11 @@ export function FrozenReportScreen({
   const [granularity, setGranularity] = useState<FrozenGranularity>("harian");
   const [range, setRange] = useState<DateRange>(() => defaultRangeFor("harian", today));
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [drill, setDrill] = useState<Drill | null>(null);
+  // Opens the same FrozenEntrySheet the customer detail page opens — one
+  // edit/delete path, one set of rules. Its router.refresh() re-reads the
+  // points, so the cards above follow the change on their own.
+  const [editing, setEditing] = useState<{ point: FrozenReportPoint; action: "edit" | "delete" } | null>(null);
   const buckets = useMemo(() => bucketFrozen(points, granularity, range), [points, granularity, range]);
   const selected = buckets.find((b) => b.key === selectedKey) ?? null;
   const unit = OPTIONS.find((o) => o.value === granularity)!.unit;
@@ -65,14 +68,74 @@ export function FrozenReportScreen({
 
   const view = useMemo(() => {
     if (selected) return { ...selected, label: selected.longLabel };
-    const totals = { omzet: 0, payments: 0, pcs: 0 };
+    const totals = {
+      omzet: 0,
+      payments: 0,
+      pcs: 0,
+      orderRows: [] as FrozenReportPoint[],
+      paymentRows: [] as FrozenReportPoint[],
+    };
     for (const b of buckets) {
       totals.omzet += b.omzet;
       totals.payments += b.payments;
       totals.pcs += b.pcs;
+      totals.orderRows.push(...b.orderRows);
+      totals.paymentRows.push(...b.paymentRows);
     }
     return { label: rangeLabel, ...totals };
   }, [selected, buckets, rangeLabel]);
+
+  // Newest first — the exact rows the open card's number was summed from.
+  const drillPoints = useMemo(() => {
+    if (!drill) return [];
+    const source = drill === "payments" ? view.paymentRows : view.orderRows;
+    return [...source].sort((a, b) => (a.day === b.day ? b.time.localeCompare(a.time) : b.day.localeCompare(a.day)));
+  }, [drill, view]);
+
+  const drillRows: DrilldownRow[] = drillPoints.map((p) => {
+    const pcsLabel = p.pcs != null ? formatPcs(p.pcs) : null;
+    const perPcs =
+      p.pcs != null && p.pricePerPcs != null
+        ? `${pcsLabel} × Rp${p.pricePerPcs.toLocaleString("id-ID")}/pcs`
+        : null;
+    return {
+      id: p.id,
+      href: `/note/frozen/pelanggan/${p.customerId}`,
+      title: p.customerName,
+      date: p.date,
+      time: p.time,
+      detail: drill === "payments" ? null : perPcs,
+      note: p.note,
+      value: drill === "pcs" ? (pcsLabel ?? "—") : formatRupiah(p.amount),
+      sub: drill === "pcs" ? formatRupiah(p.amount) : null,
+    };
+  });
+
+  const DRILL_META: Record<Drill, { heading: string; totalLabel: string; totalValue: string; empty: string }> = {
+    omzet: {
+      heading: "Pengambilan",
+      totalLabel: "Total omzet",
+      totalValue: formatRupiah(view.omzet),
+      empty: "Tidak ada pengambilan di rentang ini.",
+    },
+    payments: {
+      heading: "Pembayaran diterima",
+      totalLabel: "Total pembayaran",
+      totalValue: formatRupiah(view.payments),
+      empty: "Tidak ada pembayaran di rentang ini.",
+    },
+    pcs: {
+      heading: "Pcs terjual",
+      totalLabel: "Total pcs",
+      totalValue: formatPcs(view.pcs),
+      empty: "Tidak ada pengambilan di rentang ini.",
+    },
+  };
+
+  function openEntry(id: string, action: "edit" | "delete") {
+    const point = drillPoints.find((p) => p.id === id);
+    if (point) setEditing({ point, action });
+  }
 
   function pickRange(next: DateRange) {
     setRange(next);
@@ -160,11 +223,40 @@ export function FrozenReportScreen({
               )}
             </div>
             <div className="flex flex-wrap gap-3">
-              <Stat label="Omzet (pengambilan)" value={formatRupiah(view.omzet)} />
-              <Stat label="Pembayaran diterima" value={formatRupiah(view.payments)} />
-              <Stat label="Pcs terjual" value={formatPcs(view.pcs)} />
+              <DrilldownStat
+                label="Omzet (pengambilan)"
+                value={formatRupiah(view.omzet)}
+                open={drill === "omzet"}
+                onToggle={() => setDrill(drill === "omzet" ? null : "omzet")}
+              />
+              <DrilldownStat
+                label="Pembayaran diterima"
+                value={formatRupiah(view.payments)}
+                open={drill === "payments"}
+                onToggle={() => setDrill(drill === "payments" ? null : "payments")}
+              />
+              <DrilldownStat
+                label="Pcs terjual"
+                value={formatPcs(view.pcs)}
+                open={drill === "pcs"}
+                onToggle={() => setDrill(drill === "pcs" ? null : "pcs")}
+              />
             </div>
           </section>
+
+          {drill && (
+            <LedgerDrilldown
+              heading={`${DRILL_META[drill].heading} · ${view.label}`}
+              rows={drillRows}
+              totalLabel={DRILL_META[drill].totalLabel}
+              totalValue={DRILL_META[drill].totalValue}
+              emptyText={DRILL_META[drill].empty}
+              footnote="Ketuk nama pelanggan untuk membuka riwayat lengkapnya. Jam yang tampil adalah jam pencatatan. Edit dan hapus di sini sama persis dengan yang ada di halaman pelanggan — saldo berjalan baris sesudahnya ikut berubah, dan baris yang dihapus hilang permanen."
+              onEdit={(id) => openEntry(id, "edit")}
+              onDelete={(id) => openEntry(id, "delete")}
+              onClose={() => setDrill(null)}
+            />
+          )}
 
           <section className="flex flex-col gap-2">
             <h2 className="text-ink text-base font-bold">Omzet per {unit.toLowerCase()}</h2>
@@ -218,6 +310,17 @@ export function FrozenReportScreen({
           </section>
         </div>
       </div>
+
+      <AnimatePresence>
+        {editing && (
+          <FrozenEntrySheet
+            key={editing.point.id}
+            entry={editing.point}
+            initialAction={editing.action}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

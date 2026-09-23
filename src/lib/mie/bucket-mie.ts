@@ -15,6 +15,12 @@ export type MieBucket = {
   payments: number; // sum of PAYMENT amounts
   kg: number;
   byType: Record<MieProductType, MieTypeTotals>;
+  // The exact rows each total above was summed from, kept so the drill-down
+  // list under the stat cards can never show a different set than the number
+  // it opened from — a row is pushed here in the same branch that adds it to
+  // the total, never re-filtered separately.
+  orderRows: MieReportPoint[];
+  paymentRows: MieReportPoint[];
 };
 
 // Default window per granularity — what the screen opens on, and what the
@@ -127,6 +133,8 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
       payments: 0,
       kg: 0,
       byType: emptyByType(),
+      orderRows: [],
+      paymentRows: [],
     };
     buckets.push(bucket);
     byKey.set(key, bucket);
@@ -142,6 +150,7 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
     if (!bucket) continue; // outside the visible window
     if (p.kind === "PAYMENT") {
       bucket.payments += p.amount;
+      bucket.paymentRows.push(p);
       continue;
     }
     // A live row can still carry the DB's retired "FROZEN" value (existing
@@ -150,10 +159,12 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
     // rather than crash on an unknown byType key; it's not mi mentah.
     const t = bucket.byType[(p.productType ?? "CUSTOM") as MieProductType];
     if (!t) continue;
+    const kg = p.kg ?? 0;
     bucket.omzet += p.amount;
-    bucket.kg += p.kg;
-    t.kg += p.kg;
+    bucket.kg += kg;
+    t.kg += kg;
     t.amount += p.amount;
+    bucket.orderRows.push(p);
   }
   return buckets;
 }
