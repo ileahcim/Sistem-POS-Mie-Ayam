@@ -99,8 +99,9 @@ export function OrderAktifList({
                     <span className="w-14 shrink-0 text-lg font-bold text-ink">
                       {formatQueueLabel(order.queueNumber, order.queueSuffix)}
                     </span>
-                    <span className="text-ink flex-1 text-sm font-semibold">
+                    <span className="text-ink flex-1 truncate text-sm font-semibold">
                       {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
+                      {order.customerName ? ` · ${order.customerName}` : ""}
                     </span>
                   </ListRow>
                   {order.hasDeposit ? (

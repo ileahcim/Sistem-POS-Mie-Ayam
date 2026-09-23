@@ -22,6 +22,7 @@ export type ActiveOrder = {
   queueSuffix: string; // "" normally, "A"/"B"/... for a Pisahkan & Bayar child — see queue-label.ts
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
+  customerName: string | null;
   createdAt: string; // ISO — serializable across the server/client boundary
   status: "OPEN" | "PAID";
   totalQty: number;
@@ -69,6 +70,7 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
     queueSuffix: order.queueSuffix,
     channel: order.channel,
     tableLabel: order.tableLabel,
+    customerName: order.customerName,
     createdAt: order.createdAt.toISOString(),
     status: order.status as "OPEN" | "PAID",
     totalQty: order.items.reduce((sum, i) => sum + i.qty, 0),
@@ -93,6 +95,7 @@ export type UnpaidServedOrder = {
   queueSuffix: string;
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
+  customerName: string | null;
   servedAt: string;
   hasDeposit: boolean;
 };
@@ -114,6 +117,7 @@ export async function getUnpaidServedOrders(): Promise<UnpaidServedOrder[]> {
     queueSuffix: order.queueSuffix,
     channel: order.channel,
     tableLabel: order.tableLabel,
+    customerName: order.customerName,
     servedAt: order.servedAt!.toISOString(),
     hasDeposit: order.deposits.length > 0,
   }));

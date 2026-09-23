@@ -14,6 +14,13 @@ export const PAYMENT_METHOD_LABEL: Record<"CASH" | "QRIS" | "TRANSFER" | "SPLIT"
 // A SPLIT order's label expands to show the breakdown inline — everywhere
 // else, this is just the plain label. Returns null only when there's no
 // payment method at all (order not yet paid).
+// Offered at the till (CASH/QRIS/SPLIT only — TRANSFER isn't a method a
+// cashier can pick today, so there's nothing to correct it to or from).
+// Neutral file, not the "use server" actions.ts — that file may only export
+// async functions (CLAUDE.md "File "use server" CUMA boleh...").
+export const CHANGEABLE_PAYMENT_METHODS = ["CASH", "QRIS", "SPLIT"] as const;
+export type ChangeablePaymentMethod = (typeof CHANGEABLE_PAYMENT_METHODS)[number];
+
 export function formatPaymentMethodDetail(
   paymentMethod: "CASH" | "QRIS" | "TRANSFER" | "SPLIT" | null,
   splitCashAmount: number | null,

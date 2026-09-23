@@ -47,6 +47,22 @@ export type OrderDetailDepositOutcome = {
   amount: number;
 };
 
+// One correction of an already-PAID order's payment method — CLAUDE.md
+// "Ubah Metode Bayar", 24 Sep 2026. Oldest first, same reading order as a
+// paper trail; usually empty (never populated for most orders).
+export type OrderDetailPaymentMethodChange = {
+  id: string;
+  fromMethod: "CASH" | "QRIS" | "TRANSFER" | "SPLIT";
+  fromCashAmount: number | null;
+  fromQrisAmount: number | null;
+  toMethod: "CASH" | "QRIS" | "TRANSFER" | "SPLIT";
+  toCashAmount: number | null;
+  toQrisAmount: number | null;
+  reason: string;
+  changedAt: string;
+  changedByName: string;
+};
+
 export type OrderDetail = {
   id: string;
   shiftId: string | null; // null until a shift is attached — see "Pre-order" in CLAUDE.md
@@ -94,6 +110,7 @@ export type OrderDetail = {
   refundDue: number;
   // Only for a CANCELLED order that held DP.
   depositOutcomes: OrderDetailDepositOutcome[];
+  paymentMethodChanges: OrderDetailPaymentMethodChange[];
 };
 
 export async function getOrderDetail(orderId: string): Promise<OrderDetail | null> {
@@ -116,6 +133,10 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       deposits: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         include: { createdBy: { select: { name: true } } },
+      },
+      paymentMethodChanges: {
+        orderBy: { changedAt: "asc" },
+        include: { changedBy: { select: { name: true } } },
       },
     },
   });
@@ -204,5 +225,17 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             .filter((d) => d.kind === "REFUNDED" || d.kind === "FORFEITED")
             .map((d) => ({ kind: d.kind as "REFUNDED" | "FORFEITED", method: d.method as DepositMethod, amount: d.amount }))
         : [],
+    paymentMethodChanges: order.paymentMethodChanges.map((c) => ({
+      id: c.id,
+      fromMethod: c.fromMethod,
+      fromCashAmount: c.fromCashAmount,
+      fromQrisAmount: c.fromQrisAmount,
+      toMethod: c.toMethod,
+      toCashAmount: c.toCashAmount,
+      toQrisAmount: c.toQrisAmount,
+      reason: c.reason,
+      changedAt: c.changedAt.toISOString(),
+      changedByName: c.changedBy.name,
+    })),
   };
 }

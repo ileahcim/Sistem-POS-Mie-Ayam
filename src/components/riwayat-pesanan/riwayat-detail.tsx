@@ -18,6 +18,7 @@ import { groupAddonsForPrint, formatAddonWithQty, formatRupiah } from "@/lib/pri
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
 import { formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
 import { VoidOrderButton } from "@/components/order-aktif/void-order-sheet";
+import { ChangePaymentMethodButton } from "@/components/order-aktif/change-payment-method-sheet";
 
 const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -118,6 +119,43 @@ export function RiwayatDetail({
           )}
           {order.customerName && <span className="text-ink-muted text-sm">· {order.customerName}</span>}
         </div>
+
+        {isOwner && order.status === "PAID" && (
+          <div className="mb-3 flex flex-col gap-2">
+            {order.shiftStatus === "CLOSED" ? (
+              <p className="text-ink-faint text-xs">
+                Shift order ini sudah ditutup — metode bayar tidak bisa diubah lagi (angka shift sudah beku).
+              </p>
+            ) : (
+              <ChangePaymentMethodButton
+                orderId={order.id}
+                orderLabel={
+                  order.queueNumber != null
+                    ? formatQueueLabel(order.queueNumber, order.queueSuffix)
+                    : `No. ${order.orderNumber}`
+                }
+                currentMethod={order.paymentMethod}
+                currentCashAmount={order.splitCashAmount}
+                currentQrisAmount={order.splitQrisAmount}
+                amountCharged={order.amountDue}
+                onChanged={() => router.refresh()}
+              />
+            )}
+          </div>
+        )}
+
+        {order.paymentMethodChanges.length > 0 && (
+          <Card padded className="bg-muted mb-3 flex flex-col gap-1.5 text-xs">
+            <p className="text-ink font-semibold">Riwayat perubahan metode bayar</p>
+            {order.paymentMethodChanges.map((c) => (
+              <p key={c.id} className="text-ink-muted">
+                {formatDateTime(c.changedAt)} · {c.changedByName}:{" "}
+                {formatPaymentMethodDetail(c.fromMethod, c.fromCashAmount, c.fromQrisAmount)} →{" "}
+                {formatPaymentMethodDetail(c.toMethod, c.toCashAmount, c.toQrisAmount)} — {c.reason}
+              </p>
+            ))}
+          </Card>
+        )}
 
         {order.status === "VOID" && order.voidReason && (
           <Card padded className="bg-danger-soft mb-3">

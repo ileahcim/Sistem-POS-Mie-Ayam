@@ -26,6 +26,7 @@ import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-shee
 import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { CancelOrderButton } from "./cancel-order-sheet";
 import { VoidOrderButton } from "./void-order-sheet";
+import { ChangePaymentMethodButton } from "./change-payment-method-sheet";
 import { DepositCard } from "@/components/pesanan-terjadwal/deposit-card";
 import { CancelDepositOrderButton } from "@/components/pesanan-terjadwal/cancel-deposit-order-sheet";
 import { markServed, removeOrderItem, editOrderItem } from "@/app/order-aktif/actions";
@@ -384,7 +385,34 @@ export function OrderDetail({
         )}
 
         {order.status === "PAID" && isOwner && (
-          <div className="mt-6">
+          <div className="mt-6 flex flex-col gap-2">
+            {order.shiftStatus === "CLOSED" ? (
+              <p className="text-ink-faint text-center text-xs">
+                Shift order ini sudah ditutup — metode bayar tidak bisa diubah lagi (angka shift sudah beku).
+              </p>
+            ) : (
+              <ChangePaymentMethodButton
+                orderId={order.id}
+                orderLabel={order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : `No. ${order.orderNumber}`}
+                currentMethod={order.paymentMethod}
+                currentCashAmount={order.splitCashAmount}
+                currentQrisAmount={order.splitQrisAmount}
+                amountCharged={order.amountDue}
+                onChanged={() => router.refresh()}
+              />
+            )}
+            {order.paymentMethodChanges.length > 0 && (
+              <div className="rounded-card bg-muted flex flex-col gap-1.5 p-3 text-xs">
+                <p className="text-ink font-semibold">Riwayat perubahan metode bayar</p>
+                {order.paymentMethodChanges.map((c) => (
+                  <p key={c.id} className="text-ink-muted">
+                    {formatId(new Date(c.changedAt), { dateStyle: "medium", timeStyle: "short" })} · {c.changedByName}:{" "}
+                    {formatPaymentMethodDetail(c.fromMethod, c.fromCashAmount, c.fromQrisAmount)} →{" "}
+                    {formatPaymentMethodDetail(c.toMethod, c.toCashAmount, c.toQrisAmount)} — {c.reason}
+                  </p>
+                ))}
+              </div>
+            )}
             <VoidOrderButton
               orderId={order.id}
               orderLabel={order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : `No. ${order.orderNumber}`}

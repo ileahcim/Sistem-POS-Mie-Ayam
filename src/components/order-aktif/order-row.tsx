@@ -63,6 +63,7 @@ export function OrderRow({
       : "text-ink-muted";
 
   const secondColumn = order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel];
+  const secondColumnText = order.customerName ? `${secondColumn} · ${order.customerName}` : secondColumn;
 
   // Same reading order as the cart, the full order detail, and the printed
   // paper (CLAUDE.md "Urutan baris") — so "what's in this order" reads the
@@ -84,7 +85,13 @@ export function OrderRow({
             expanded panel below, so the two can't be mistaken for each other. */}
         <ListRow onClick={() => setExpanded((v) => !v)} dense noDivider className="min-w-0 flex-1">
           <span className="w-14 shrink-0 text-lg font-bold text-ink">{queueLabel}</span>
-          <span className="text-ink w-20 shrink-0 text-sm font-semibold">{secondColumn}</span>
+          {/* Guest name (Order.customerName, CLAUDE.md "Order & status") shown
+              right beside the channel/table label — it was silently missing
+              here entirely (never wired in), not lost by the 23 Sep revision
+              as first reported; bug found and fixed 24 Sep 2026. */}
+          <span className="text-ink max-w-[9rem] shrink-0 truncate text-sm font-semibold">
+            {secondColumnText}
+          </span>
           <span className="text-ink-muted flex-1 truncate text-sm">{itemSummary}</span>
           {order.queueNumber == null && <Badge variant="info">Pre-order</Badge>}
           {isBulk && <Badge variant="info">Borongan</Badge>}

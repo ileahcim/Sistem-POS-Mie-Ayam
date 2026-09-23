@@ -41,6 +41,7 @@ model User {
   ordersCreated   Order[]     @relation("OrderCreatedBy")
   ordersVoided    Order[]     @relation("OrderVoidedBy")
   ordersCancelled Order[]     @relation("OrderCancelledBy")
+  paymentMethodChangesMade PaymentMethodChange[] @relation("OrderPaymentMethodChangedBy")
   mieLedgerEntriesCreated MieLedgerEntry[]
   frozenLedgerEntriesCreated FrozenLedgerEntry[]
   depositEntriesCreated   PreorderDeposit[]
@@ -404,11 +405,43 @@ model Order {
 
   items    OrderItem[]
   deposits PreorderDeposit[]
+  paymentMethodChanges PaymentMethodChange[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([shiftId, queueNumber, queueSuffix])
+}
+
+// A correction to an already-PAID order's payment method — e.g. Cash tapped
+// by mistake instead of QRIS (CLAUDE.md "Ubah Metode Bayar", 24 Sep 2026).
+// Void doesn't fit this: the sale itself was correct, only the method was
+// mistyped, and voiding + re-ordering would burn a fresh queue number and
+// split one real event into two history rows. Append-only log (own table,
+// not columns on Order like void*/cancel*) because — unlike Void, which can
+// only ever happen once — a payment method could in principle be corrected
+// more than once, and every correction must stay visible, not just the
+// latest one. *CashAmount/*QrisAmount are only ever set alongside a SPLIT
+// method, mirroring Order.splitCashAmount/splitQrisAmount.
+model PaymentMethodChange {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  fromMethod     PaymentMethod
+  fromCashAmount Int?
+  fromQrisAmount Int?
+  toMethod       PaymentMethod
+  toCashAmount   Int?
+  toQrisAmount   Int?
+
+  reason String
+
+  changedById String
+  changedBy   User     @relation("OrderPaymentMethodChangedBy", fields: [changedById], references: [id])
+  changedAt   DateTime @default(now())
+
+  @@index([orderId])
 }
 
 // What happened to a slice of a pre-order's DP (uang muka).
