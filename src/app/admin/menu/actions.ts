@@ -150,3 +150,35 @@ export async function setAddonOptionActive(optionId: string, isActive: boolean):
   if (result.count === 0) return { ok: false, error: "Add-on tidak ditemukan." };
   return { ok: true };
 }
+
+// "Perkiraan Bakso Terpakai" (Dashboard) — the 12 owner-editable ball
+// counts behind that estimate (CLAUDE.md, 24 Sep 2026; schema.prisma's
+// BaksoUsageSetting doc comment). Singleton row, same update shape as the
+// admin Setting form.
+export type BaksoUsageSettingInput = {
+  baksoPolosKecil: number;
+  baksoUratKecil: number;
+  baksoUratUrat: number;
+  baksoTelurKecil: number;
+  baksoTelurTelur: number;
+  toppingBaksoKecil: number;
+  toppingBaksoUratUrat: number;
+  toppingBaksoTelurTelur: number;
+  baksoKecilProdukKecil: number;
+  baksoSetengahKecil: number;
+  baksoUratBijianUrat: number;
+  baksoTelurBijianTelur: number;
+};
+
+export async function updateBaksoUsageSetting(input: BaksoUsageSettingInput): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  const entries = Object.entries(input) as [keyof BaksoUsageSettingInput, number][];
+  for (const [key, value] of entries) {
+    if (!Number.isFinite(value) || value < 0) return { ok: false, error: `Angka "${key}" tidak valid.` };
+  }
+
+  const rounded = Object.fromEntries(entries.map(([key, value]) => [key, Math.round(value)])) as BaksoUsageSettingInput;
+  await prisma.baksoUsageSetting.update({ where: { id: "singleton" }, data: rounded });
+  return { ok: true };
+}

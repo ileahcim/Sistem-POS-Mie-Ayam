@@ -1,6 +1,7 @@
 import type { ShiftHistoryRow } from "@/lib/dashboard/get-shift-history";
 import type { OmzetShiftPoint } from "@/lib/dashboard/get-omzet-history";
-import type { DashboardOrder } from "@/lib/dashboard/get-sales-data";
+import type { DashboardOrder, DashboardOrderTiming } from "@/lib/dashboard/get-sales-data";
+import type { BaksoUsageSettingValues } from "@/lib/dashboard/bakso-usage";
 import type { ReceivableOrder } from "@/lib/orders/get-receivable-orders";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { FadeIn } from "@/components/ui/fade-in";
@@ -19,6 +20,8 @@ export function DashboardScreen({
   shifts,
   omzetHistory,
   salesOrders,
+  timings,
+  baksoUsageSetting,
   today,
   receivables,
   nav,
@@ -26,6 +29,8 @@ export function DashboardScreen({
   shifts: ShiftHistoryRow[];
   omzetHistory: OmzetShiftPoint[];
   salesOrders: DashboardOrder[];
+  timings: DashboardOrderTiming[];
+  baksoUsageSetting: BaksoUsageSettingValues;
   today: string;
   receivables: ReceivableOrder[];
   nav: HeaderNav;
@@ -62,7 +67,12 @@ export function DashboardScreen({
             <OmzetSection history={omzetHistory} />
           </FadeIn>
           <FadeIn delay={0.1}>
-            <SalesReportSection orders={salesOrders} today={today} />
+            <SalesReportSection
+              orders={salesOrders}
+              timings={timings}
+              baksoUsageSetting={baksoUsageSetting}
+              today={today}
+            />
           </FadeIn>
           <FadeIn delay={0.25}>
             <PiutangSection orders={receivables} />

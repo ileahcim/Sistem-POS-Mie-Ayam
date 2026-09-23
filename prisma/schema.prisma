@@ -54,6 +54,40 @@ model User {
 // settings page (stage 5).
 // ---------------------------------------------------------------------------
 
+// "Perkiraan Bakso Terpakai" (Dashboard, CLAUDE.md, 24 Sep 2026) — informal
+// ESTIMATE, not an inventory/stock system (no deduction, no low-stock
+// alert). Editable from Manajemen Menu instead of hardcoded, because the
+// owner's recipe can change; the aggregation itself still identifies WHICH
+// order lines contribute by matching product/addon NAMES in code (same
+// established pattern as NAMED_COMBOS / DELIVERY_CHARGEABLE_CATEGORY_NAME) —
+// only the ball COUNTS below are data. Singleton row, same shape as Setting.
+model BaksoUsageSetting {
+  id String @id @default("singleton")
+
+  // Product "Bakso" bowl, by which (if any) "Jenis Bakso" addon is chosen —
+  // mutually exclusive, not additive (choosing Urat/Telur REPLACES some of
+  // the plain balls with one bigger one, not adds on top).
+  baksoPolosKecil Int @default(7)
+  baksoUratKecil  Int @default(4)
+  baksoUratUrat   Int @default(1)
+  baksoTelurKecil Int @default(4)
+  baksoTelurTelur Int @default(1)
+
+  // "Tambah Bakso" addon group options, on Mie Ayam/Pangsit Rebus/Ceker —
+  // always additive on top of the host product (which has 0 of its own).
+  toppingBaksoKecil      Int @default(3)
+  toppingBaksoUratUrat   Int @default(1)
+  toppingBaksoTelurTelur Int @default(1)
+
+  // Standalone bakso products (bijian / half-portion) — no addons involved.
+  baksoKecilProdukKecil Int @default(3)
+  baksoSetengahKecil    Int @default(4)
+  baksoUratBijianUrat   Int @default(1)
+  baksoTelurBijianTelur Int @default(1)
+
+  updatedAt DateTime @updatedAt
+}
+
 model Setting {
   id            String  @id @default("singleton")
   storeName     String

@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import type { PreOrderSummary } from "@/lib/orders/get-preorders";
+import type { TomorrowPreorderRecap } from "@/lib/orders/get-tomorrow-preorder-recap";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { Card } from "@/components/ui/card";
+import { TomorrowRecapCard } from "./tomorrow-recap-card";
 import { ListRow } from "@/components/ui/list-row";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/link-button";
@@ -28,9 +30,11 @@ function formatScheduledFor(iso: string): string {
 // closed) — this page and "+ Buat Pre-order" never check shift state.
 export function PesananTerjadwalList({
   orders,
+  recap,
   nav,
 }: {
   orders: PreOrderSummary[];
+  recap: TomorrowPreorderRecap | null;
   nav: HeaderNav;
 }) {
   const router = useRouter();
@@ -48,6 +52,7 @@ export function PesananTerjadwalList({
       />
 
       <div className="flex-1 overflow-y-auto p-4">
+        {recap && <TomorrowRecapCard recap={recap} />}
         <Card>
           {orders.length === 0 ? (
             <EmptyState

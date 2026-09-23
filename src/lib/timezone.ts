@@ -57,6 +57,11 @@ export function localTimeStr(date: Date): string {
   return `${pad2(p.hour)}:${pad2(p.minute)}`;
 }
 
+// Hour of day (0-23) in Jakarta local time — e.g. Dashboard's Jam Sibuk chart.
+export function localHour(date: Date): number {
+  return getLocalParts(date).hour;
+}
+
 export function localDateParts(date: Date): { year: number; month: number; day: number } {
   const { year, month, day } = getLocalParts(date);
   return { year, month, day };

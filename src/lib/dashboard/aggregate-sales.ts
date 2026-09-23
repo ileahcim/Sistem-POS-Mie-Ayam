@@ -1,4 +1,4 @@
-import type { DashboardOrder } from "./get-sales-data";
+import type { DashboardOrder, DashboardOrderTiming } from "./get-sales-data";
 import { DELIVERY_FEE_PER_FOOD_ITEM } from "@/lib/orders/pricing";
 import { LOW_MARGIN_THRESHOLD_PERCENT } from "@/lib/margin/config";
 import { computeMarginPercent } from "@/lib/hpp/margin-math";
@@ -273,4 +273,27 @@ export function computeCustomItemGroups(orders: DashboardOrder[]): CustomItemGro
   }
 
   return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
+export type BusyHourBucket = { hour: number; count: number };
+
+// "Jam Sibuk" (CLAUDE.md, 24 Sep 2026): order count per hour of day, in the
+// filtered range. Only the hours between the earliest and latest hour that
+// actually has an order are included (zero-filled in between) — so the
+// chart tracks the warung's real operating hours instead of hardcoding a
+// guess, without dragging in a full empty 00-23 axis every time.
+export function computeBusyHours(timings: DashboardOrderTiming[], range: DateRange): BusyHourBucket[] {
+  const safe = normalizeRange(range);
+  const filtered = timings.filter((t) => t.day >= safe.from && t.day <= safe.to);
+  if (filtered.length === 0) return [];
+
+  const counts = new Map<number, number>();
+  for (const t of filtered) counts.set(t.hour, (counts.get(t.hour) ?? 0) + 1);
+  const hours = [...counts.keys()];
+  const minHour = Math.min(...hours);
+  const maxHour = Math.max(...hours);
+
+  const buckets: BusyHourBucket[] = [];
+  for (let h = minHour; h <= maxHour; h++) buckets.push({ hour: h, count: counts.get(h) ?? 0 });
+  return buckets;
 }

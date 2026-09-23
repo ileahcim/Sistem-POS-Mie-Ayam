@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { localDateStr } from "@/lib/timezone";
+import { localDateStr, localHour } from "@/lib/timezone";
 
 export type DashboardOrderItem = {
   // Null for a custom item ("+ Item Custom") — see CLAUDE.md "Order & status".
@@ -71,4 +71,24 @@ export async function getDashboardOrders(): Promise<{ orders: DashboardOrder[]; 
       })),
     })),
   };
+}
+
+export type DashboardOrderTiming = {
+  day: string; // "YYYY-MM-DD", Jakarta calendar date of createdAt — when the order was PLACED, not paid
+  hour: number; // 0-23, Jakarta local hour of createdAt
+};
+
+// Raw data behind Dashboard's "Jam Sibuk" chart (CLAUDE.md, 24 Sep 2026) —
+// unbounded fetch, same pattern as getDashboardOrders above, filtered by the
+// same shared date-range control client-side (computeBusyHours,
+// aggregate-sales.ts). Deliberately a BROADER status set than
+// getDashboardOrders: this measures when orders come IN (kitchen/staffing
+// load), not sales, so OPEN/RECEIVABLE count too — only VOID and CANCELLED
+// are excluded (CLAUDE.md-worthy brief: "Order VOID dan BATAL tidak dihitung").
+export async function getDashboardOrderTimings(): Promise<DashboardOrderTiming[]> {
+  const orders = await prisma.order.findMany({
+    where: { status: { notIn: ["VOID", "CANCELLED"] } },
+    select: { createdAt: true },
+  });
+  return orders.map((order) => ({ day: localDateStr(order.createdAt), hour: localHour(order.createdAt) }));
 }

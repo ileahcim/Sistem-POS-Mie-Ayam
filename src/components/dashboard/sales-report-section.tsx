@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { DashboardOrder } from "@/lib/dashboard/get-sales-data";
+import type { DashboardOrder, DashboardOrderTiming } from "@/lib/dashboard/get-sales-data";
 import {
   filterOrdersByRange,
   computeTopProducts,
@@ -10,7 +10,9 @@ import {
   computeLowMarginItems,
   computeChannelBreakdown,
   computeCustomItemGroups,
+  computeBusyHours,
 } from "@/lib/dashboard/aggregate-sales";
+import { computeBaksoUsage, type BaksoUsageSettingValues } from "@/lib/dashboard/bakso-usage";
 import { DATE_RANGE_PRESETS, normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import { DateRangePresets } from "@/components/ui/date-range-presets";
 import { Card } from "@/components/ui/card";
@@ -19,6 +21,8 @@ import { TopItemsSection } from "./top-items-section";
 import { MarginSection } from "./margin-section";
 import { CustomItemSection } from "./custom-item-section";
 import { ChannelBreakdownSection } from "./channel-breakdown-section";
+import { BusyHoursSection } from "./busy-hours-section";
+import { BaksoUsageSection } from "./bakso-usage-section";
 
 function formatDay(day: string): string {
   const [y, m, d] = day.split("-").map(Number);
@@ -44,7 +48,17 @@ const DEFAULT_PRESET_KEY = "30-hari";
 // Harian/Mingguan/Bulanan control (CLAUDE.md "Aturan angka"). Piutang
 // (section 6) isn't time-scoped either — a debt doesn't stop being owed
 // based on which period is selected.
-export function SalesReportSection({ orders, today }: { orders: DashboardOrder[]; today: string }) {
+export function SalesReportSection({
+  orders,
+  timings,
+  baksoUsageSetting,
+  today,
+}: {
+  orders: DashboardOrder[];
+  timings: DashboardOrderTiming[];
+  baksoUsageSetting: BaksoUsageSettingValues;
+  today: string;
+}) {
   const [range, setRange] = useState<DateRange>(
     () => DATE_RANGE_PRESETS.find((p) => p.key === DEFAULT_PRESET_KEY)!.range(today),
   );
@@ -61,13 +75,16 @@ export function SalesReportSection({ orders, today }: { orders: DashboardOrder[]
   const lowMarginItems = useMemo(() => computeLowMarginItems(filtered), [filtered]);
   const channelBreakdown = useMemo(() => computeChannelBreakdown(filtered), [filtered]);
   const customItemGroups = useMemo(() => computeCustomItemGroups(filtered), [filtered]);
+  const busyHours = useMemo(() => computeBusyHours(timings, safeRange), [timings, safeRange]);
+  const baksoUsage = useMemo(() => computeBaksoUsage(filtered, baksoUsageSetting), [filtered, baksoUsageSetting]);
 
   return (
     <div className="flex flex-col gap-6">
       <Card padded className="flex flex-col gap-3">
         <h2 className="text-ink text-base font-bold">Rentang laporan penjualan</h2>
         <p className="text-ink-muted -mt-2 text-sm">
-          Berlaku untuk Menu & Topping Terlaris, Margin, Item Custom, dan Per Channel di bawah.
+          Berlaku untuk Menu & Topping Terlaris, Margin, Item Custom, Per Channel, Jam Sibuk, dan Perkiraan Bakso
+          Terpakai di bawah.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
@@ -98,6 +115,8 @@ export function SalesReportSection({ orders, today }: { orders: DashboardOrder[]
       <MarginSection report={marginReport} lowMarginItems={lowMarginItems} rangeLabel={rangeLabel} />
       <CustomItemSection groups={customItemGroups} rangeLabel={rangeLabel} />
       <ChannelBreakdownSection rows={channelBreakdown} rangeLabel={rangeLabel} />
+      <BusyHoursSection buckets={busyHours} rangeLabel={rangeLabel} />
+      <BaksoUsageSection totals={baksoUsage} rangeLabel={rangeLabel} />
     </div>
   );
 }

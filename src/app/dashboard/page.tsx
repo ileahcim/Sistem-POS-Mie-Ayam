@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getShiftHistory } from "@/lib/dashboard/get-shift-history";
 import { getOmzetHistory } from "@/lib/dashboard/get-omzet-history";
-import { getDashboardOrders } from "@/lib/dashboard/get-sales-data";
+import { getDashboardOrders, getDashboardOrderTimings } from "@/lib/dashboard/get-sales-data";
 import { getReceivableOrders } from "@/lib/orders/get-receivable-orders";
+import { getBaksoUsageSetting } from "@/lib/settings/get-bakso-usage-setting";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { DashboardScreen } from "@/components/dashboard/dashboard-screen";
 
@@ -17,10 +18,12 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const [shifts, omzetHistory, sales, receivables, nav] = await Promise.all([
+  const [shifts, omzetHistory, sales, timings, baksoUsageSetting, receivables, nav] = await Promise.all([
     getShiftHistory(),
     getOmzetHistory(),
     getDashboardOrders(),
+    getDashboardOrderTimings(),
+    getBaksoUsageSetting(),
     getReceivableOrders(),
     getHeaderNav(),
   ]);
@@ -30,6 +33,8 @@ export default async function DashboardPage() {
       shifts={shifts}
       omzetHistory={omzetHistory}
       salesOrders={sales.orders}
+      timings={timings}
+      baksoUsageSetting={baksoUsageSetting}
       today={sales.today}
       receivables={receivables}
       nav={nav}

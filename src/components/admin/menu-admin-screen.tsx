@@ -1,4 +1,5 @@
 import type { AdminCategory, AdminAddonGroup } from "@/lib/menu/get-menu-admin-data";
+import type { BaksoUsageSettingValues } from "@/lib/dashboard/bakso-usage";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { ProductAdminRow } from "./product-admin-row";
 import { NewProductForm } from "./new-product-form";
 import { AddonOptionAdminRow } from "./addon-option-admin-row";
 import { NewAddonOptionForm } from "./new-addon-option-form";
+import { BaksoUsageSettingsForm } from "./bakso-usage-section";
 
 // Server-renderable shell, same split as HppScreen — only the per-row
 // editors need "use client". Two sections mirroring how the owner already
@@ -16,10 +18,12 @@ import { NewAddonOptionForm } from "./new-addon-option-form";
 export function MenuAdminScreen({
   categories,
   addonGroups,
+  baksoUsage,
   nav,
 }: {
   categories: AdminCategory[];
   addonGroups: AdminAddonGroup[];
+  baksoUsage: BaksoUsageSettingValues;
   nav: HeaderNav;
 }) {
   const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name }));
@@ -90,6 +94,8 @@ export function MenuAdminScreen({
               developer untuk itu.
             </p>
           </section>
+
+          <BaksoUsageSettingsForm initial={baksoUsage} />
         </div>
       </div>
     </div>
