@@ -81,7 +81,6 @@ export function OrderAktifList({
                 now={now}
                 prepBaseMinutes={prepBaseMinutes}
                 prepMinutesPerPortion={prepMinutesPerPortion}
-                onTap={() => router.push(`/order-aktif/${order.id}`)}
                 onCancelled={() => router.refresh()}
               />
             ))

@@ -1,21 +1,30 @@
-import type { MarginReport } from "@/lib/dashboard/get-margin-report";
-import type { LowMarginItem } from "@/lib/dashboard/get-low-margin-items";
+import type { MarginReport, LowMarginItem } from "@/lib/dashboard/aggregate-sales";
 import { Card } from "@/components/ui/card";
 import { PriceText } from "@/components/ui/price-text";
 import { Badge } from "@/components/ui/badge";
-import { DASHBOARD_WINDOW_DAYS } from "@/lib/dashboard/config";
 
 // Section 4. Margin comes purely from the costPrice SNAPSHOT on each sold
-// line (see get-margin-report.ts) — costPrice starts at 0/unset for every
-// product until the owner fills it in manually (CLAUDE.md "Order & status"),
-// so an unlabeled margin number here would silently read as "this barely
-// makes money" when it might just mean "HPP was never entered." The warning
-// banner and the per-product badge exist specifically so that's never
-// ambiguous.
-export function MarginSection({ report, lowMarginItems }: { report: MarginReport; lowMarginItems: LowMarginItem[] }) {
+// line (see aggregate-sales.ts's computeMarginReport) — costPrice starts at
+// 0/unset for every product until the owner fills it in manually (CLAUDE.md
+// "Order & status"), so an unlabeled margin number here would silently read
+// as "this barely makes money" when it might just mean "HPP was never
+// entered." The warning banner and the per-product badge exist specifically
+// so that's never ambiguous. Follows the same shared date-range filter as
+// Menu & Topping Terlaris and Per Channel (23 Sep 2026 — used to be locked
+// to a fixed 30-day window while the others were too; see
+// sales-report-section.tsx for the shared control).
+export function MarginSection({
+  report,
+  lowMarginItems,
+  rangeLabel,
+}: {
+  report: MarginReport;
+  lowMarginItems: LowMarginItem[];
+  rangeLabel: string;
+}) {
   return (
     <section>
-      <h2 className="text-ink mb-2 text-base font-bold">Margin ({DASHBOARD_WINDOW_DAYS} hari)</h2>
+      <h2 className="text-ink mb-2 text-base font-bold">Margin ({rangeLabel})</h2>
 
       {report.anyMissingCostPrice && (
         <div className="bg-warning-soft text-warning mb-3 rounded-card px-3 py-2 text-sm font-medium">
@@ -75,7 +84,7 @@ export function MarginSection({ report, lowMarginItems }: { report: MarginReport
       {lowMarginItems.length > 0 && (
         <div className="mt-3">
           <h3 className="text-ink-muted mb-1.5 text-sm font-bold uppercase tracking-wide">
-            Margin Rendah / Rugi ({DASHBOARD_WINDOW_DAYS} hari)
+            Margin Rendah / Rugi ({rangeLabel})
           </h3>
           <Card>
             <div className="divide-border divide-y">

@@ -1,8 +1,19 @@
 import { prisma } from "@/lib/prisma";
+import { DELIVERY_CHARGEABLE_CATEGORY_NAME } from "@/lib/menu/get-active-menu";
 
 export type ActiveOrderItem = {
+  id: string;
   productName: string;
   qty: number;
+  unitPrice: number;
+  addons: { name: string; price: number }[];
+  notes: string | null;
+  // Same reading-order keys as OrderDetailItem (line-order.ts's
+  // sortOrderLines) — a custom item falls back to the Makanan category's
+  // sortOrder, same trick as get-order-detail.ts, so it doesn't jump to the
+  // very front of the list under the default 0 fallback.
+  categorySortOrder: number;
+  productSortOrder: number;
 };
 
 export type ActiveOrder = {
@@ -33,8 +44,24 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
       OR: [{ scheduledFor: null }, { scheduledFor: { lte: new Date() } }],
     },
     orderBy: { createdAt: "asc" },
-    include: { items: true, deposits: { select: { id: true }, take: 1 } },
+    include: {
+      items: {
+        include: {
+          addons: { select: { name: true, price: true } },
+          product: { select: { sortOrder: true, category: { select: { sortOrder: true } } } },
+        },
+      },
+      deposits: { select: { id: true }, take: 1 },
+    },
   });
+
+  // Only fetched when some active order actually has a custom item (product
+  // relation null) — a live lookup, never hardcoded, same as
+  // get-order-detail.ts / build-order-items.ts.
+  const hasCustomItem = orders.some((o) => o.items.some((i) => !i.product));
+  const makananCategory = hasCustomItem
+    ? await prisma.category.findUnique({ where: { name: DELIVERY_CHARGEABLE_CATEGORY_NAME } })
+    : null;
 
   return orders.map((order) => ({
     id: order.id,
@@ -46,7 +73,16 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
     status: order.status as "OPEN" | "PAID",
     totalQty: order.items.reduce((sum, i) => sum + i.qty, 0),
     portionsToCook: order.items.reduce((sum, i) => sum + (i.isKitchenItem ? i.qty : 0), 0),
-    items: order.items.map((i) => ({ productName: i.productName, qty: i.qty })),
+    items: order.items.map((i) => ({
+      id: i.id,
+      productName: i.productName,
+      qty: i.qty,
+      unitPrice: i.unitPrice,
+      addons: i.addons,
+      notes: i.notes,
+      categorySortOrder: i.product ? i.product.category.sortOrder : (makananCategory?.sortOrder ?? 0),
+      productSortOrder: i.product ? i.product.sortOrder : Number.MAX_SAFE_INTEGER,
+    })),
     hasDeposit: order.deposits.length > 0,
   }));
 }

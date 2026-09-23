@@ -1,18 +1,13 @@
 import type { ShiftHistoryRow } from "@/lib/dashboard/get-shift-history";
 import type { OmzetShiftPoint } from "@/lib/dashboard/get-omzet-history";
-import type { TopItemRow } from "@/lib/dashboard/get-top-items";
-import type { MarginReport } from "@/lib/dashboard/get-margin-report";
-import type { LowMarginItem } from "@/lib/dashboard/get-low-margin-items";
-import type { ChannelBreakdownRow } from "@/lib/dashboard/get-channel-breakdown";
+import type { DashboardOrder } from "@/lib/dashboard/get-sales-data";
 import type { ReceivableOrder } from "@/lib/orders/get-receivable-orders";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { FadeIn } from "@/components/ui/fade-in";
 import { AppHeader } from "@/components/ui/app-header";
 import { ShiftHistorySection } from "./shift-history-section";
 import { OmzetSection } from "./omzet-section";
-import { TopItemsSection } from "./top-items-section";
-import { MarginSection } from "./margin-section";
-import { ChannelBreakdownSection } from "./channel-breakdown-section";
+import { SalesReportSection } from "./sales-report-section";
 import { PiutangSection } from "./piutang-section";
 
 // Sections render top-to-bottom in the exact priority order the owner
@@ -23,21 +18,15 @@ import { PiutangSection } from "./piutang-section";
 export function DashboardScreen({
   shifts,
   omzetHistory,
-  topProducts,
-  topToppings,
-  marginReport,
-  lowMarginItems,
-  channelBreakdown,
+  salesOrders,
+  today,
   receivables,
   nav,
 }: {
   shifts: ShiftHistoryRow[];
   omzetHistory: OmzetShiftPoint[];
-  topProducts: TopItemRow[];
-  topToppings: TopItemRow[];
-  marginReport: MarginReport;
-  lowMarginItems: LowMarginItem[];
-  channelBreakdown: ChannelBreakdownRow[];
+  salesOrders: DashboardOrder[];
+  today: string;
   receivables: ReceivableOrder[];
   nav: HeaderNav;
 }) {
@@ -73,13 +62,7 @@ export function DashboardScreen({
             <OmzetSection history={omzetHistory} />
           </FadeIn>
           <FadeIn delay={0.1}>
-            <TopItemsSection products={topProducts} toppings={topToppings} />
-          </FadeIn>
-          <FadeIn delay={0.15}>
-            <MarginSection report={marginReport} lowMarginItems={lowMarginItems} />
-          </FadeIn>
-          <FadeIn delay={0.2}>
-            <ChannelBreakdownSection rows={channelBreakdown} />
+            <SalesReportSection orders={salesOrders} today={today} />
           </FadeIn>
           <FadeIn delay={0.25}>
             <PiutangSection orders={receivables} />

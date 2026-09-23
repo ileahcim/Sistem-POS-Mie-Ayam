@@ -1,8 +1,7 @@
-import type { TopItemRow } from "@/lib/dashboard/get-top-items";
+import type { TopItemRow } from "@/lib/dashboard/aggregate-sales";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { PriceText } from "@/components/ui/price-text";
-import { DASHBOARD_WINDOW_DAYS } from "@/lib/dashboard/config";
 
 function ItemList({ title, items }: { title: string; items: TopItemRow[] }) {
   return (
@@ -27,12 +26,20 @@ function ItemList({ title, items }: { title: string; items: TopItemRow[] }) {
 }
 
 // Section 3 — top products and top toppings, ranked independently by qty
-// sold over the shared rolling window (not the same as Tahap 10's combo
+// sold over the shared date-range filter (not the same as Tahap 10's combo
 // shortcuts, which rank whole product+addon combinations).
-export function TopItemsSection({ products, toppings }: { products: TopItemRow[]; toppings: TopItemRow[] }) {
+export function TopItemsSection({
+  products,
+  toppings,
+  rangeLabel,
+}: {
+  products: TopItemRow[];
+  toppings: TopItemRow[];
+  rangeLabel: string;
+}) {
   return (
     <section>
-      <h2 className="text-ink mb-2 text-base font-bold">Menu & Topping Terlaris ({DASHBOARD_WINDOW_DAYS} hari)</h2>
+      <h2 className="text-ink mb-2 text-base font-bold">Menu & Topping Terlaris ({rangeLabel})</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ItemList title="Menu" items={products} />
         <ItemList title="Topping" items={toppings} />

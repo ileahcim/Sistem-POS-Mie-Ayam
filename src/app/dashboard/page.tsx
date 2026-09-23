@@ -2,10 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getShiftHistory } from "@/lib/dashboard/get-shift-history";
 import { getOmzetHistory } from "@/lib/dashboard/get-omzet-history";
-import { getTopProducts, getTopToppings } from "@/lib/dashboard/get-top-items";
-import { getMarginReport } from "@/lib/dashboard/get-margin-report";
-import { getLowMarginItems } from "@/lib/dashboard/get-low-margin-items";
-import { getChannelBreakdown } from "@/lib/dashboard/get-channel-breakdown";
+import { getDashboardOrders } from "@/lib/dashboard/get-sales-data";
 import { getReceivableOrders } from "@/lib/orders/get-receivable-orders";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { DashboardScreen } from "@/components/dashboard/dashboard-screen";
@@ -20,24 +17,10 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const [
-    shifts,
-    omzetHistory,
-    topProducts,
-    topToppings,
-    marginReport,
-    lowMarginItems,
-    channelBreakdown,
-    receivables,
-    nav,
-  ] = await Promise.all([
+  const [shifts, omzetHistory, sales, receivables, nav] = await Promise.all([
     getShiftHistory(),
     getOmzetHistory(),
-    getTopProducts(),
-    getTopToppings(),
-    getMarginReport(),
-    getLowMarginItems(),
-    getChannelBreakdown(),
+    getDashboardOrders(),
     getReceivableOrders(),
     getHeaderNav(),
   ]);
@@ -46,11 +29,8 @@ export default async function DashboardPage() {
     <DashboardScreen
       shifts={shifts}
       omzetHistory={omzetHistory}
-      topProducts={topProducts}
-      topToppings={topToppings}
-      marginReport={marginReport}
-      lowMarginItems={lowMarginItems}
-      channelBreakdown={channelBreakdown}
+      salesOrders={sales.orders}
+      today={sales.today}
       receivables={receivables}
       nav={nav}
     />

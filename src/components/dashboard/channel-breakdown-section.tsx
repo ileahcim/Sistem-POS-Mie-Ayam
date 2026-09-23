@@ -1,7 +1,6 @@
-import type { ChannelBreakdownRow } from "@/lib/dashboard/get-channel-breakdown";
+import type { ChannelBreakdownRow } from "@/lib/dashboard/aggregate-sales";
 import { Card } from "@/components/ui/card";
 import { PriceText } from "@/components/ui/price-text";
-import { DASHBOARD_WINDOW_DAYS } from "@/lib/dashboard/config";
 
 const CHANNEL_LABEL: Record<ChannelBreakdownRow["channel"], string> = {
   DINE_IN: "Dine In",
@@ -9,13 +8,13 @@ const CHANNEL_LABEL: Record<ChannelBreakdownRow["channel"], string> = {
   ANTAR: "Antar",
 };
 
-// Section 5. PAID orders only, same rolling window as sections 3-4.
-export function ChannelBreakdownSection({ rows }: { rows: ChannelBreakdownRow[] }) {
+// Section 5. PAID orders only, same shared date-range filter as sections 3-4.
+export function ChannelBreakdownSection({ rows, rangeLabel }: { rows: ChannelBreakdownRow[]; rangeLabel: string }) {
   const total = rows.reduce((sum, r) => sum + r.omzet, 0);
 
   return (
     <section>
-      <h2 className="text-ink mb-2 text-base font-bold">Per Channel ({DASHBOARD_WINDOW_DAYS} hari)</h2>
+      <h2 className="text-ink mb-2 text-base font-bold">Per Channel ({rangeLabel})</h2>
       <Card>
         <div className="divide-border divide-y">
           {rows.map((row) => {
