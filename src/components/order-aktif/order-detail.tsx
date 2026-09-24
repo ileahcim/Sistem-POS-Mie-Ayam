@@ -27,6 +27,7 @@ import { SplitAndPayButton } from "./split-and-pay-sheet";
 import { CancelOrderButton } from "./cancel-order-sheet";
 import { VoidOrderButton } from "./void-order-sheet";
 import { ChangePaymentMethodButton } from "./change-payment-method-sheet";
+import { ChangeChannelButton } from "./change-channel-sheet";
 import { DepositCard } from "@/components/pesanan-terjadwal/deposit-card";
 import { CancelDepositOrderButton } from "@/components/pesanan-terjadwal/cancel-deposit-order-sheet";
 import { markServed, removeOrderItem, editOrderItem } from "@/app/order-aktif/actions";
@@ -369,6 +370,19 @@ export function OrderDetail({
         {order.status === "OPEN" && order.deposits.length === 0 && (
           <div className="mt-3 flex justify-center">
             <SplitAndPayButton order={order} />
+          </div>
+        )}
+
+        {order.status === "OPEN" && (
+          <div className="mt-3">
+            <ChangeChannelButton
+              orderId={order.id}
+              orderLabel={order.queueNumber != null ? formatQueueLabel(order.queueNumber, order.queueSuffix) : "pre-order ini"}
+              currentChannel={order.channel}
+              currentTableLabelRaw={order.tableLabel}
+              items={order.items}
+              onChanged={() => router.refresh()}
+            />
           </div>
         )}
 

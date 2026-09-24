@@ -1,4 +1,5 @@
 export type ChannelType = "DINE_IN" | "BUNGKUS" | "ANTAR";
+export const CHANNELS: readonly ChannelType[] = ["DINE_IN", "BUNGKUS", "ANTAR"];
 export const TABLE_LABELS = ["K1", "K2", "L1", "L2", "L3"] as const;
 export type TableLabel = (typeof TABLE_LABELS)[number];
 

@@ -6,6 +6,7 @@ import { buildOrderItemsCreateData, type OrderItemInput } from "@/lib/orders/bui
 import { buildKitchenTicketData } from "@/lib/orders/build-kitchen-ticket-data";
 import { buildComboKey } from "@/lib/orders/pricing";
 import { DELIVERY_CHARGEABLE_CATEGORY_NAME } from "@/lib/menu/get-active-menu";
+import { CHANNELS, TABLE_LABELS, type ChannelType, type TableLabel } from "@/lib/cart/types";
 import type { KitchenTicketData } from "@/lib/printing/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -23,6 +24,41 @@ export async function markServed(orderId: string): Promise<ActionResult> {
     where: { id: orderId, servedAt: null },
     data: { servedAt: new Date() },
   });
+  return { ok: true };
+}
+
+// "Ubah Channel" — the cashier tapped the wrong channel/table on an OPEN
+// (unpaid) order (CLAUDE.md "Order & status", 24 Sep 2026). Any logged-in
+// user may do this, same reasoning as cancelOrder: an input mistake, no
+// money has moved yet. No reason required. Nothing else on the order is
+// stored per channel — Ongkir is derived from `channel` on every read
+// (orderTotalFromLines), and payOrder decides "auto-served on payment" from
+// the channel it re-reads at pay time — so updating these two columns is
+// the whole change. Status lives in the WHERE, so a payment that lands at
+// the same moment can't have its channel rewritten underneath it.
+export async function changeOrderChannel(
+  orderId: string,
+  channel: ChannelType,
+  tableLabel: TableLabel | null,
+): Promise<ActionResult> {
+  await requireUser();
+
+  if (!CHANNELS.includes(channel)) return { ok: false, error: "Channel tidak valid." };
+  if (channel === "DINE_IN") {
+    if (!tableLabel) return { ok: false, error: "Pilih meja dulu." };
+    if (!TABLE_LABELS.includes(tableLabel)) return { ok: false, error: "Meja tidak valid." };
+  }
+
+  const result = await prisma.order.updateMany({
+    where: { id: orderId, status: "OPEN" },
+    data: { channel, tableLabel: channel === "DINE_IN" ? tableLabel : null },
+  });
+  if (result.count === 0) {
+    return {
+      ok: false,
+      error: "Order ini sudah dibayar atau tidak aktif lagi — channelnya tidak bisa diubah dari sini.",
+    };
+  }
   return { ok: true };
 }
 
