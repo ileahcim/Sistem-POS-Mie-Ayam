@@ -147,6 +147,14 @@ model Setting {
   // switches this on themselves.
   kitchenTicketEnabled Boolean @default(false)
 
+  // "Menu Populer" (Kasir shortcut row): how many times a product+add-on
+  // combination must have sold in the last 30 days before it earns a
+  // shortcut. Read by refreshComboCache at shift close (never live — the row
+  // must not reshuffle mid-service). Owner-tunable from /admin/settings, so
+  // it can start low while data is thin and go up once a month of sales
+  // exists. Default 10 = the value this used to be hardcoded to.
+  popularComboMinSales Int @default(10)
+
   updatedAt DateTime @updatedAt
 }
 

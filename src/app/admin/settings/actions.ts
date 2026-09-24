@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { isPreorderReminderChoice } from "@/lib/settings/preorder-reminder";
+import { isPopularComboMinSalesChoice } from "@/lib/settings/popular-combo";
 import type { PrinterDriver } from "@/lib/printing/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -59,6 +60,20 @@ export async function updatePreorderReminderMinutes(minutes: number): Promise<Ac
     return { ok: false, error: "Pilihan waktu pengingat tidak dikenal." };
   }
   await prisma.setting.update({ where: { id: "singleton" }, data: { preorderReminderMinutes: minutes } });
+  return { ok: true };
+}
+
+// "Menu Populer" threshold — how many sales in 30 days earn a combo a Kasir
+// shortcut. Takes effect at the NEXT shift close (refreshComboCache is a
+// once-a-day job, never triggered from a live screen so the shortcut row
+// can't reshuffle mid-service — CLAUDE.md "Menu populer"). Accepted values
+// are the whitelist shared with the settings card (lib/settings/popular-combo.ts).
+export async function updatePopularComboMinSales(minSales: number): Promise<ActionResult> {
+  await requireRole("OWNER");
+  if (!isPopularComboMinSalesChoice(minSales)) {
+    return { ok: false, error: "Pilihan ambang tidak dikenal." };
+  }
+  await prisma.setting.update({ where: { id: "singleton" }, data: { popularComboMinSales: minSales } });
   return { ok: true };
 }
 

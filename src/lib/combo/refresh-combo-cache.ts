@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { buildComboKey } from "@/lib/orders/pricing";
 import { formatAddonWithQty } from "@/lib/printing/format";
-import { NAMED_COMBOS, POPULAR_COMBO_MIN_SALES_30D, POPULAR_COMBO_WINDOW_DAYS } from "./named-combos";
+import { POPULAR_COMBO_DEFAULT_MIN_SALES } from "@/lib/settings/popular-combo";
+import { NAMED_COMBOS, POPULAR_COMBO_WINDOW_DAYS } from "./named-combos";
 import type { ComboShortcutItem } from "./types";
 
 // A qty-2 addon (e.g. Ceker x2) is stored as two OrderItemAddon rows with
@@ -90,9 +91,13 @@ function naturalLanguageLabel(productName: string, addonNames: string[]): string
 
 // Real-data aggregation: rolling 30-day window of PAID orders, grouped by
 // comboKey (product + exact add-on set — see buildComboKey), summed by qty.
+// A combo needs at least `minSales` (Setting.popularComboMinSales) to qualify.
 // Items with zero add-ons never qualify — a plain product is already one
 // tap on the grid, so a shortcut for it saves nothing (CLAUDE.md rule).
-async function aggregateRealCombos(namedByComboKey: Map<string, string>): Promise<ComboCacheRow[]> {
+async function aggregateRealCombos(
+  namedByComboKey: Map<string, string>,
+  minSales: number,
+): Promise<ComboCacheRow[]> {
   const windowStart = new Date(Date.now() - POPULAR_COMBO_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   const items = await prisma.orderItem.findMany({
@@ -123,7 +128,7 @@ async function aggregateRealCombos(namedByComboKey: Map<string, string>): Promis
     }
   }
 
-  const qualifying = [...grouped.entries()].filter(([, g]) => g.qty >= POPULAR_COMBO_MIN_SALES_30D);
+  const qualifying = [...grouped.entries()].filter(([, g]) => g.qty >= minSales);
   if (qualifying.length === 0) return [];
 
   // Price at current (not historical snapshot) rates — same "stale up to a
@@ -168,7 +173,15 @@ export async function refreshComboCache(): Promise<void> {
   const namedRows = await resolveNamedCombos();
   const namedByComboKey = new Map(namedRows.map((r) => [r.comboKey, r.displayName]));
 
-  const real = await aggregateRealCombos(namedByComboKey);
+  // Owner-tunable threshold (Pengaturan). A missing singleton row falls back
+  // to the historical default rather than failing the daily refresh.
+  const setting = await prisma.setting.findUnique({
+    where: { id: "singleton" },
+    select: { popularComboMinSales: true },
+  });
+  const minSales = setting?.popularComboMinSales ?? POPULAR_COMBO_DEFAULT_MIN_SALES;
+
+  const real = await aggregateRealCombos(namedByComboKey, minSales);
   const rows = real.length > 0 ? real : namedRows;
 
   await prisma.$transaction([

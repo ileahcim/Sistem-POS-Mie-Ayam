@@ -8,6 +8,7 @@ import type { PrinterDriver, PrintResult } from "@/lib/printing/types";
 import {
   updateAutoPrintReceipt,
   updateKitchenTicketEnabled,
+  updatePopularComboMinSales,
   updatePreorderReminderMinutes,
   updatePrinterDriver,
   updatePrintLogo,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/printing/printers/web-bluetooth-printer";
 import { printColumnTest, printTest } from "@/lib/printing/test-print";
 import { PREORDER_REMINDER_CHOICES } from "@/lib/settings/preorder-reminder";
+import { POPULAR_COMBO_MIN_SALES_CHOICES } from "@/lib/settings/popular-combo";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ListRow } from "@/components/ui/list-row";
@@ -270,6 +272,75 @@ function PreorderReminderCard({ settings }: { settings: StoreSettings }) {
   );
 }
 
+function PopularComboCard({ settings }: { settings: StoreSettings }) {
+  const router = useRouter();
+  const [minSales, setMinSales] = useState(settings.popularComboMinSales);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(next: number) {
+    if (next === minSales) return;
+    const previous = minSales;
+    setMinSales(next);
+    setSaving(true);
+    setSavedFlash(false);
+    setError(null);
+    try {
+      const result = await updatePopularComboMinSales(next);
+      if (!result.ok) {
+        setMinSales(previous); // roll back on failure
+        setError(result.error);
+        return;
+      }
+      setSavedFlash(true);
+      window.setTimeout(() => setSavedFlash(false), 1500);
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card padded className="flex flex-col gap-2">
+      <div>
+        <p className="text-ink text-base font-semibold">Ambang Menu Populer</p>
+        <p className="text-ink-muted text-sm">
+          Berapa kali sebuah kombinasi (produk + add-on) harus terjual dalam 30 hari terakhir supaya muncul sebagai
+          tombol cepat &ldquo;Menu Populer&rdquo; di Kasir. Angka kecil = lebih banyak tombol; naikkan setelah data
+          sebulan terkumpul. Berlaku mulai tutup shift berikutnya — daftarnya sengaja tidak berubah di tengah jam
+          kerja. Produk polos tanpa add-on tidak pernah masuk (sudah satu tap di kotak produk).
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div
+          role="group"
+          aria-label="Ambang Menu Populer"
+          className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold"
+        >
+          {POPULAR_COMBO_MIN_SALES_CHOICES.map((choice) => (
+            <button
+              key={choice}
+              type="button"
+              onClick={() => handleChange(choice)}
+              disabled={saving}
+              aria-pressed={minSales === choice}
+              className={cn(
+                "rounded-pill h-10 px-3",
+                minSales === choice ? "bg-surface text-ink shadow-card" : "text-ink-muted",
+              )}
+            >
+              {choice}x
+            </button>
+          ))}
+        </div>
+        {savedFlash && <p className="text-primary-strong text-sm font-medium">Tersimpan ✓</p>}
+      </div>
+      {error && <p className="text-danger text-sm">{error}</p>}
+    </Card>
+  );
+}
+
 // Print setup — which driver prints to the Blueprint ECO80D and where the
 // pairing/test entry points live. Driver choice is saved to the singleton
 // Setting row (server-side truth the client printer factory reads every
@@ -449,6 +520,8 @@ export function SettingsScreen({
           <StoreInfoCard settings={settings} />
 
           <PreorderReminderCard settings={settings} />
+
+          <PopularComboCard settings={settings} />
 
           <ToggleCard
             title="Cetak struk otomatis"

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { PrinterDriver } from "@/lib/printing/types";
+import { POPULAR_COMBO_DEFAULT_MIN_SALES } from "@/lib/settings/popular-combo";
 
 export type StoreSettings = {
   storeName: string;
@@ -14,6 +15,7 @@ export type StoreSettings = {
   printLogo: boolean;
   preorderReminderMinutes: number;
   kitchenTicketEnabled: boolean;
+  popularComboMinSales: number;
 };
 
 const FALLBACK: StoreSettings = {
@@ -29,6 +31,7 @@ const FALLBACK: StoreSettings = {
   printLogo: true,
   preorderReminderMinutes: 120,
   kitchenTicketEnabled: false,
+  popularComboMinSales: POPULAR_COMBO_DEFAULT_MIN_SALES,
 };
 
 // The singleton row is created by prisma/seed.ts, but fall back gracefully
@@ -51,6 +54,7 @@ export async function getSettings(): Promise<StoreSettings> {
     printLogo: setting.printLogo,
     preorderReminderMinutes: setting.preorderReminderMinutes,
     kitchenTicketEnabled: setting.kitchenTicketEnabled,
+    popularComboMinSales: setting.popularComboMinSales,
   };
 }
 

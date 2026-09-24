@@ -53,5 +53,6 @@ export const NAMED_COMBOS: NamedCombo[] = [
   },
 ];
 
-export const POPULAR_COMBO_MIN_SALES_30D = 10;
+// The minimum-sales threshold is NOT here: it is Setting.popularComboMinSales
+// (owner-tunable, lib/settings/popular-combo.ts).
 export const POPULAR_COMBO_WINDOW_DAYS = 30;
