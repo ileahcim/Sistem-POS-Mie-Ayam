@@ -16,7 +16,7 @@ import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty, formatRupiah } from "@/lib/printing/format";
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
-import { formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
+import { DEPOSIT_ORDER_CHANGE_REFUSAL, formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
 import { VoidOrderButton } from "@/components/order-aktif/void-order-sheet";
 import { ChangePaymentMethodButton } from "@/components/order-aktif/change-payment-method-sheet";
 
@@ -122,7 +122,9 @@ export function RiwayatDetail({
 
         {isOwner && order.status === "PAID" && (
           <div className="mb-3 flex flex-col gap-2">
-            {order.shiftStatus === "CLOSED" ? (
+            {order.deposits.length > 0 ? (
+              <p className="text-ink-faint text-xs">{DEPOSIT_ORDER_CHANGE_REFUSAL}</p>
+            ) : order.shiftStatus === "CLOSED" ? (
               <p className="text-ink-faint text-xs">
                 Shift order ini sudah ditutup — metode bayar tidak bisa diubah lagi (angka shift sudah beku).
               </p>

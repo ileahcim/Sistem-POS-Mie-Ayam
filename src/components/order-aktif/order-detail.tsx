@@ -17,7 +17,7 @@ import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
-import { formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
+import { DEPOSIT_ORDER_CHANGE_REFUSAL, formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
 import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
 import { expandAddonOptionIds, groupOrderItemAddons } from "@/lib/cart/types";
 import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list";
@@ -386,7 +386,9 @@ export function OrderDetail({
 
         {order.status === "PAID" && isOwner && (
           <div className="mt-6 flex flex-col gap-2">
-            {order.shiftStatus === "CLOSED" ? (
+            {order.deposits.length > 0 ? (
+              <p className="text-ink-faint text-center text-xs">{DEPOSIT_ORDER_CHANGE_REFUSAL}</p>
+            ) : order.shiftStatus === "CLOSED" ? (
               <p className="text-ink-faint text-center text-xs">
                 Shift order ini sudah ditutup — metode bayar tidak bisa diubah lagi (angka shift sudah beku).
               </p>

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { orderTotalFromLines } from "@/lib/orders/order-total";
 import { validateSplitCashAmount } from "@/lib/orders/validate-split-payment";
-import type { ChangeablePaymentMethod } from "@/lib/orders/payment-method-label";
+import { DEPOSIT_ORDER_CHANGE_REFUSAL, type ChangeablePaymentMethod } from "@/lib/orders/payment-method-label";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -67,12 +67,20 @@ export async function changePaymentMethod(
     include: {
       items: { select: { lineTotal: true, qty: true, isDeliveryChargeable: true } },
       shift: { select: { status: true } },
-      deposits: { where: { kind: "RECEIVED" }, select: { amount: true } },
+      deposits: { select: { id: true }, take: 1 },
     },
   });
   if (!order) return { ok: false, error: "Order tidak ditemukan." };
   if (order.status !== "PAID") {
     return { ok: false, error: "Hanya order yang sudah dibayar yang bisa diubah metode bayarnya." };
+  }
+  // closeShift decides whether an applied DP counts as drawer cash by reading
+  // the order's CURRENT paymentMethod (computeShiftClosing → isCashLike), not
+  // a value frozen when the DP was applied. Flipping the method on an order
+  // that used DP would therefore silently shift that shift's Uang Seharusnya
+  // by the DP amount. Refused, same as Void.
+  if (order.deposits.length > 0) {
+    return { ok: false, error: DEPOSIT_ORDER_CHANGE_REFUSAL };
   }
   // Shift numbers are frozen at close (CLAUDE.md "Shift & kas") — changing
   // the method after that would make the shift's Penjualan Cash/QRIS no
@@ -84,15 +92,10 @@ export async function changePaymentMethod(
     };
   }
 
-  // What THIS payment actually collected: the order's total minus any DP
-  // already applied before it — same math as OrderDetail.amountDue
-  // (depositPosition), recomputed fresh here rather than trusted from the
-  // client. Zero for an order fully covered by DP (nothing was collected at
-  // the till, so a SPLIT target is correctly refused below by
-  // validateSplitCashAmount having no room to fit into).
-  const total = orderTotalFromLines(order.items, order.channel);
-  const depositHeld = order.deposits.reduce((sum, d) => sum + d.amount, 0);
-  const amountCharged = Math.max(0, total - depositHeld);
+  // No DP is involved past the guard above, so what this payment collected
+  // is the whole order total — recomputed fresh here, never trusted from the
+  // client.
+  const amountCharged = orderTotalFromLines(order.items, order.channel);
 
   let toQrisAmount: number | null = null;
   if (toMethod === "SPLIT") {
@@ -113,7 +116,7 @@ export async function changePaymentMethod(
       // Re-checked in the WHERE, inside the transaction, so a void or another
       // change racing in at the same moment can't both win.
       const updated = await tx.order.updateMany({
-        where: { id: orderId, status: "PAID", shift: { status: "OPEN" } },
+        where: { id: orderId, status: "PAID", shift: { status: "OPEN" }, deposits: { none: {} } },
         data: {
           paymentMethod: toMethod,
           splitCashAmount: toMethod === "SPLIT" ? toCashAmount : null,
