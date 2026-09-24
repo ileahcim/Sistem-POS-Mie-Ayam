@@ -4,22 +4,13 @@ import { useRouter } from "next/navigation";
 import type { ActiveOrder, UnpaidServedOrder } from "@/lib/orders/get-active-orders";
 import { useNow } from "@/lib/use-now";
 import { computeEstimateMinutes, elapsedMinutes, isLateOrder } from "@/lib/orders/prep-timer";
-import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
-import { ListRow } from "@/components/ui/list-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoOrdersIcon } from "@/components/ui/empty-state-icons";
 import { AppHeader } from "@/components/ui/app-header";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import { OrderRow } from "./order-row";
-import { CancelOrderButton } from "./cancel-order-sheet";
-
-const CHANNEL_LABEL: Record<UnpaidServedOrder["channel"], string> = {
-  DINE_IN: "",
-  BUNGKUS: "Bungkus",
-  ANTAR: "Antar",
-};
+import { OrderRow, ServedOrderRow } from "./order-row";
 
 export function OrderAktifList({
   orders,
@@ -94,29 +85,7 @@ export function OrderAktifList({
             </h2>
             <Card>
               {unpaidServed.map((order) => (
-                <div key={order.id} className="border-border flex items-center border-b last:border-b-0">
-                  <ListRow onClick={() => router.push(`/order-aktif/${order.id}`)} dense noDivider className="min-w-0 flex-1">
-                    <span className="w-14 shrink-0 text-lg font-bold text-ink">
-                      {formatQueueLabel(order.queueNumber, order.queueSuffix)}
-                    </span>
-                    <span className="text-ink flex-1 truncate text-sm font-semibold">
-                      {order.channel === "DINE_IN" ? order.tableLabel : CHANNEL_LABEL[order.channel]}
-                      {order.customerName ? ` · ${order.customerName}` : ""}
-                    </span>
-                  </ListRow>
-                  {order.hasDeposit ? (
-                    // Same footprint as the Batal button. An order that holds DP is
-                    // cancelled from its detail screen (owner picks the DP's fate).
-                    <span className="mr-3 w-16 shrink-0" aria-hidden />
-                  ) : (
-                    <CancelOrderButton
-                      size="compact"
-                      orderId={order.id}
-                      orderLabel={formatQueueLabel(order.queueNumber, order.queueSuffix)}
-                      onCancelled={() => router.refresh()}
-                    />
-                  )}
-                </div>
+                <ServedOrderRow key={order.id} order={order} onCancelled={() => router.refresh()} />
               ))}
             </Card>
           </div>

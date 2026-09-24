@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DELIVERY_CHARGEABLE_CATEGORY_NAME } from "@/lib/menu/get-active-menu";
 
@@ -33,6 +34,43 @@ export type ActiveOrder = {
   hasDeposit: boolean;
 };
 
+// Item shape shared by both Order Aktif sections (main list and "Sudah
+// Disajikan · Menunggu Bayar"), so the always-visible summary and the
+// tap-to-expand panel read the exact same data in both — one query shape,
+// one mapper, not two that can drift apart.
+const itemsInclude = {
+  items: {
+    include: {
+      addons: { select: { name: true, price: true } },
+      product: { select: { sortOrder: true, category: { select: { sortOrder: true } } } },
+    },
+  },
+} as const;
+
+type OrderWithItems = Prisma.OrderGetPayload<{ include: typeof itemsInclude }>;
+
+// Only fetched when some order actually has a custom item (product relation
+// null) — a live lookup, never hardcoded, same as get-order-detail.ts /
+// build-order-items.ts.
+async function customItemCategorySortOrder(orders: OrderWithItems[]): Promise<number> {
+  if (!orders.some((o) => o.items.some((i) => !i.product))) return 0;
+  const makananCategory = await prisma.category.findUnique({ where: { name: DELIVERY_CHARGEABLE_CATEGORY_NAME } });
+  return makananCategory?.sortOrder ?? 0;
+}
+
+function toActiveOrderItems(items: OrderWithItems["items"], customSortOrder: number): ActiveOrderItem[] {
+  return items.map((i) => ({
+    id: i.id,
+    productName: i.productName,
+    qty: i.qty,
+    unitPrice: i.unitPrice,
+    addons: i.addons,
+    notes: i.notes,
+    categorySortOrder: i.product ? i.product.category.sortOrder : customSortOrder,
+    productSortOrder: i.product ? i.product.sortOrder : Number.MAX_SAFE_INTEGER,
+  }));
+}
+
 // "Order Aktif" = food not yet served, regardless of payment status (paid
 // and unpaid are independent axes). Void/receivable orders never need
 // serving. Pre-orders not yet due (scheduledFor in the future) belong on
@@ -45,24 +83,9 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
       OR: [{ scheduledFor: null }, { scheduledFor: { lte: new Date() } }],
     },
     orderBy: { createdAt: "asc" },
-    include: {
-      items: {
-        include: {
-          addons: { select: { name: true, price: true } },
-          product: { select: { sortOrder: true, category: { select: { sortOrder: true } } } },
-        },
-      },
-      deposits: { select: { id: true }, take: 1 },
-    },
+    include: { ...itemsInclude, deposits: { select: { id: true }, take: 1 } },
   });
-
-  // Only fetched when some active order actually has a custom item (product
-  // relation null) — a live lookup, never hardcoded, same as
-  // get-order-detail.ts / build-order-items.ts.
-  const hasCustomItem = orders.some((o) => o.items.some((i) => !i.product));
-  const makananCategory = hasCustomItem
-    ? await prisma.category.findUnique({ where: { name: DELIVERY_CHARGEABLE_CATEGORY_NAME } })
-    : null;
+  const customSortOrder = await customItemCategorySortOrder(orders);
 
   return orders.map((order) => ({
     id: order.id,
@@ -75,16 +98,7 @@ export async function getActiveOrders(): Promise<ActiveOrder[]> {
     status: order.status as "OPEN" | "PAID",
     totalQty: order.items.reduce((sum, i) => sum + i.qty, 0),
     portionsToCook: order.items.reduce((sum, i) => sum + (i.isKitchenItem ? i.qty : 0), 0),
-    items: order.items.map((i) => ({
-      id: i.id,
-      productName: i.productName,
-      qty: i.qty,
-      unitPrice: i.unitPrice,
-      addons: i.addons,
-      notes: i.notes,
-      categorySortOrder: i.product ? i.product.category.sortOrder : (makananCategory?.sortOrder ?? 0),
-      productSortOrder: i.product ? i.product.sortOrder : Number.MAX_SAFE_INTEGER,
-    })),
+    items: toActiveOrderItems(order.items, customSortOrder),
     hasDeposit: order.deposits.length > 0,
   }));
 }
@@ -97,6 +111,7 @@ export type UnpaidServedOrder = {
   tableLabel: string | null;
   customerName: string | null;
   servedAt: string;
+  items: ActiveOrderItem[];
   hasDeposit: boolean;
 };
 
@@ -108,8 +123,9 @@ export async function getUnpaidServedOrders(): Promise<UnpaidServedOrder[]> {
   const orders = await prisma.order.findMany({
     where: { servedAt: { not: null }, status: "OPEN" },
     orderBy: { servedAt: "asc" },
-    include: { deposits: { select: { id: true }, take: 1 } },
+    include: { ...itemsInclude, deposits: { select: { id: true }, take: 1 } },
   });
+  const customSortOrder = await customItemCategorySortOrder(orders);
 
   return orders.map((order) => ({
     id: order.id,
@@ -119,6 +135,7 @@ export async function getUnpaidServedOrders(): Promise<UnpaidServedOrder[]> {
     tableLabel: order.tableLabel,
     customerName: order.customerName,
     servedAt: order.servedAt!.toISOString(),
+    items: toActiveOrderItems(order.items, customSortOrder),
     hasDeposit: order.deposits.length > 0,
   }));
 }
