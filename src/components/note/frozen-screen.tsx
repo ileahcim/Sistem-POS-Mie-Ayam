@@ -1,3 +1,4 @@
+import type { TodayActivityRow } from "@/lib/note/today-activity";
 import Link from "next/link";
 import type { FrozenCustomerRow } from "@/lib/frozen/get-frozen-customers";
 import type { FrozenSummary } from "@/lib/frozen/get-frozen-summary";
@@ -24,10 +25,12 @@ function SummaryCard({ label, value, detail }: { label: string; value: string; d
 // Sep 2026). Mirrors note-screen.tsx's shape exactly.
 export function FrozenScreen({
   customers,
+  todayActivity,
   summary,
   nav,
 }: {
   customers: FrozenCustomerRow[];
+  todayActivity: TodayActivityRow[];
   summary: FrozenSummary;
   nav: HeaderNav;
 }) {
@@ -89,7 +92,7 @@ export function FrozenScreen({
             </a>
           </div>
 
-          <FrozenCustomerList customers={customers} />
+          <FrozenCustomerList customers={customers} todayActivity={todayActivity} />
         </div>
       </div>
     </div>

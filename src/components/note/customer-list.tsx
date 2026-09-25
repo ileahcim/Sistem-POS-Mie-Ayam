@@ -9,10 +9,15 @@ import { PriceText } from "@/components/ui/price-text";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoMieCustomerIcon } from "@/components/ui/empty-state-icons";
 import { cn } from "@/components/ui/cn";
+import type { TodayActivityRow } from "@/lib/note/today-activity";
+import { TodayActivityList } from "./today-activity-list";
 
-type SortMode = "debt" | "name";
+// "today" isn't a sort — it swaps the customer list for every transaction
+// recorded today (TodayActivityList), sitting in the same toggle so it's one
+// tap from the list the owner already has open.
+type SortMode = "debt" | "name" | "today";
 
-const SORT_LABEL: Record<SortMode, string> = { debt: "Utang terbesar", name: "Nama A-Z" };
+const SORT_LABEL: Record<SortMode, string> = { debt: "Utang terbesar", name: "Nama A-Z", today: "Aktivitas Hari Ini" };
 
 function sortRows(rows: MieCustomerRow[], mode: SortMode): MieCustomerRow[] {
   const copy = [...rows];
@@ -56,7 +61,13 @@ function CustomerRows({ rows }: { rows: MieCustomerRow[] }) {
 // sort toggle is purely client-side over the list the page already loaded.
 // Nonaktif customers never mix into the main list — they sit in their own
 // collapsed section so their history stays one tap away.
-export function CustomerList({ customers }: { customers: MieCustomerRow[] }) {
+export function CustomerList({
+  customers,
+  todayActivity,
+}: {
+  customers: MieCustomerRow[];
+  todayActivity: TodayActivityRow[];
+}) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("debt");
   const [showInactive, setShowInactive] = useState(false);
@@ -86,7 +97,13 @@ export function CustomerList({ customers }: { customers: MieCustomerRow[] }) {
           placeholder="Cari nama pelanggan"
           className="rounded-input border-border bg-surface h-12 min-w-48 flex-1 border px-3 text-base"
         />
-        <div className="rounded-pill bg-muted flex h-12 items-center p-1" role="group" aria-label="Urutan">
+        {/* Three pills don't fit beside the search box on a phone: there the
+            group takes its own full-width row, pills sharing it equally. */}
+        <div
+          className="rounded-pill bg-muted grid min-h-12 w-full grid-cols-3 items-center p-1 sm:flex sm:w-auto"
+          role="group"
+          aria-label="Urutan"
+        >
           {(Object.keys(SORT_LABEL) as SortMode[]).map((mode) => (
             <button
               key={mode}
@@ -94,7 +111,7 @@ export function CustomerList({ customers }: { customers: MieCustomerRow[] }) {
               aria-pressed={sort === mode}
               onClick={() => setSort(mode)}
               className={cn(
-                "rounded-pill h-10 px-4 text-sm font-semibold",
+                "rounded-pill min-h-10 px-2 text-sm leading-tight font-semibold sm:px-4",
                 sort === mode ? "bg-surface text-ink shadow-card" : "text-ink-muted",
               )}
             >
@@ -104,23 +121,29 @@ export function CustomerList({ customers }: { customers: MieCustomerRow[] }) {
         </div>
       </div>
 
-      <Card>
-        {!hasAnyActive ? (
-          <EmptyState
-            icon={<NoMieCustomerIcon />}
-            title="Belum ada pelanggan"
-            description="Tambahkan pelanggan mi mentah pertama untuk mulai mencatat pesanan dan pembayaran."
-            actionHref="/note/pelanggan/baru"
-            actionLabel="+ Pelanggan"
-          />
-        ) : active.length === 0 ? (
-          <p className="text-ink-faint p-6 text-center text-sm">Tidak ada pelanggan yang cocok dengan “{query}”.</p>
-        ) : (
-          <CustomerRows rows={active} />
-        )}
-      </Card>
+      {sort === "today" ? (
+        <Card>
+          <TodayActivityList rows={todayActivity} customerHref={(id) => `/note/pelanggan/${id}`} query={query} />
+        </Card>
+      ) : (
+        <Card>
+          {!hasAnyActive ? (
+            <EmptyState
+              icon={<NoMieCustomerIcon />}
+              title="Belum ada pelanggan"
+              description="Tambahkan pelanggan mi mentah pertama untuk mulai mencatat pesanan dan pembayaran."
+              actionHref="/note/pelanggan/baru"
+              actionLabel="+ Pelanggan"
+            />
+          ) : active.length === 0 ? (
+            <p className="text-ink-faint p-6 text-center text-sm">Tidak ada pelanggan yang cocok dengan “{query}”.</p>
+          ) : (
+            <CustomerRows rows={active} />
+          )}
+        </Card>
+      )}
 
-      {inactive.length > 0 && (
+      {sort !== "today" && inactive.length > 0 && (
         <div className="flex flex-col gap-2">
           <button
             type="button"

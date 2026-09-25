@@ -1,3 +1,4 @@
+import type { TodayActivityRow } from "@/lib/note/today-activity";
 import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { MieSummary } from "@/lib/mie/get-mie-summary";
@@ -26,10 +27,12 @@ function SummaryCard({ label, value, detail }: { label: string; value: string; d
 // order or a payment.
 export function NoteScreen({
   customers,
+  todayActivity,
   summary,
   nav,
 }: {
   customers: MieCustomerRow[];
+  todayActivity: TodayActivityRow[];
   summary: MieSummary;
   nav: HeaderNav;
 }) {
@@ -95,7 +98,7 @@ export function NoteScreen({
             </a>
           </div>
 
-          <CustomerList customers={customers} />
+          <CustomerList customers={customers} todayActivity={todayActivity} />
         </div>
       </div>
     </div>
