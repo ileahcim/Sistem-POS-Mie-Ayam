@@ -1,5 +1,7 @@
 "use client";
 
+import type { PosReceivableRow } from "@/lib/orders/get-pos-receivables-by-name";
+import { PosReceivablesCard } from "./pos-receivables-card";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
@@ -32,8 +34,10 @@ type Entry = MieCustomerDetail["entries"][number];
 // after the edited row updates on its own.
 export function CustomerDetailScreen({
   customer,
+  posReceivables,
   nav,
 }: {
+  posReceivables: PosReceivableRow[];
   customer: MieCustomerDetail;
   nav: HeaderNav;
 }) {
@@ -91,6 +95,8 @@ export function CustomerDetailScreen({
               Edit
             </Button>
           </Card>
+
+          <PosReceivablesCard rows={posReceivables} />
 
           {customer.isActive ? (
             <div className="flex flex-wrap gap-2">

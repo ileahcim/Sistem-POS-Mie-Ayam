@@ -1,5 +1,7 @@
 "use client";
 
+import type { PosReceivableRow } from "@/lib/orders/get-pos-receivables-by-name";
+import { PosReceivablesCard } from "./pos-receivables-card";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
@@ -32,10 +34,12 @@ type Entry = FrozenCustomerDetail["entries"][number];
 // convention as the struk reprint in Riwayat Pesanan).
 export function FrozenCustomerDetailScreen({
   customer,
+  posReceivables,
   printerDriver,
   store,
   nav,
 }: {
+  posReceivables: PosReceivableRow[];
   customer: FrozenCustomerDetail;
   printerDriver: PrinterDriver;
   store: { storeName: string; address: string | null; phone: string | null; printLogo: boolean };
@@ -123,6 +127,8 @@ export function FrozenCustomerDetailScreen({
               Edit
             </Button>
           </Card>
+
+          <PosReceivablesCard rows={posReceivables} />
 
           {customer.isActive ? (
             <div className="flex flex-wrap gap-2">
