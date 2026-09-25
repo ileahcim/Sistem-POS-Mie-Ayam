@@ -11,7 +11,7 @@
 //
 // Pure data + formatting: no React, no ESC/POS, safe to import anywhere.
 
-import type { DepositReceiptData, FrozenReceiptData, KitchenTicketData, PackingListData, ReceiptData } from "./types";
+import type { DepositReceiptData, FrozenReceiptData, KitchenTicketData, PackingListData, ReceiptData, ReceiptPaymentMethod } from "./types";
 import { formatRupiah, mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
 import { centeredRule, paperRule, wrapHeading, wrapWords, RECEIPT_CHARS_PER_LINE } from "./paper";
 import { formatId } from "@/lib/timezone";
@@ -57,7 +57,7 @@ const CHANNEL_LABEL: Record<ReceiptData["channel"], string> = {
   ANTAR: "Antar",
 };
 
-const PAYMENT_LABEL: Record<ReceiptData["paymentMethod"], string> = {
+const PAYMENT_LABEL: Record<ReceiptPaymentMethod, string> = {
   CASH: "Cash",
   QRIS: "QRIS",
   TRANSFER: "Transfer",
@@ -138,8 +138,9 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
 
   // No queue number on a struk: the order is paid, the queue only matters
   // before payment (it is on the daftar packing).
+  const unpaid = data.paymentMethod === null;
   const lines: LayoutLine[] = [
-    ...headerLines(data),
+    ...headerLines(data, unpaid ? RECEIPT_UNPAID_HEADING : undefined),
     meta("No. Order", String(data.orderNumber)),
     // Long names continue on the next line under the value, same as the
     // Bukti Uang Muka's "Pemesan" — never past the paper's edge.
@@ -163,7 +164,11 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
   if (data.deliveryFee > 0) lines.push(rule("-"), pair("plain", "Ongkir", formatRupiah(data.deliveryFee)));
   lines.push(rule("-"), pair("total", "Total", formatRupiah(data.total)), rule("-"));
   const deposits = data.deposits ?? [];
-  if (deposits.length === 0) {
+  if (data.paymentMethod === null) {
+    // Piutang: nothing was collected. Bold, right where "Bayar (...)" would
+    // be, so the paper can't be read as settled.
+    lines.push(pair("total", "Belum dibayar", formatRupiah(data.total)));
+  } else if (deposits.length === 0) {
     if (data.paymentMethod === "SPLIT") {
       // Split payment (CLAUDE.md-worthy brief, 22 Sep 2026): two lines, one
       // per method actually collected — never the single "Bayar (...)" line.
@@ -189,10 +194,13 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
 // The DP block of a struk lunas: each DP with the day and method it was paid,
 // then what was actually collected now — or, when the order shrank below the DP,
 // what has to go back to the customer. Never a silent Rp0.
+// Heading of a piutang's struk (see ReceiptData.paymentMethod).
+export const RECEIPT_UNPAID_HEADING = "BELUM LUNAS";
+
 function depositLines(
   deposits: NonNullable<ReceiptData["deposits"]>,
   total: number,
-  paymentMethod: ReceiptData["paymentMethod"],
+  paymentMethod: ReceiptPaymentMethod,
   splitCashAmount: number | null | undefined,
   splitQrisAmount: number | null | undefined,
 ): LayoutLine[] {

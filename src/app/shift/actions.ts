@@ -55,6 +55,11 @@ export async function deleteExpense(expenseId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+// THE one way an order becomes a piutang — used by Tutup Shift ("Tandai
+// Piutang") and by the Pembayaran screen's "Belum Bayar" (25 Sep 2026), so
+// there is no second piutang path. A piutang is not a sale: closeShift only
+// sums PAID, so it stays out of the drawer and omzet until it is settled —
+// and then it counts in the shift open at settlement (payOrder).
 export async function markOrderReceivable(orderId: string, customerName: string): Promise<ActionResult> {
   await requireUser();
 
@@ -68,12 +73,52 @@ export async function markOrderReceivable(orderId: string, customerName: string)
     return { ok: false, error: "Order ini punya DP — tidak bisa dijadikan piutang." };
   }
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { status: "RECEIVABLE", customerName: customerName.trim() },
+  // The order leaves the till now, exactly like a paid one: its food is
+  // considered handed over (no longer on Order Aktif either way — RECEIVABLE
+  // is not an active status), an earlier servedAt is never overwritten.
+  const servedAt = order.servedAt ?? new Date();
+  // Guarded by status and "still no DP", so a payment or DP on another
+  // device a moment ago makes this match nothing instead of overwriting it.
+  const guard = { id: orderId, status: "OPEN" as const, deposits: { none: {} } };
+  const raced = { ok: false as const, error: "Order ini baru saja berubah. Muat ulang layar lalu coba lagi." };
+
+  if (order.shiftId == null) {
+    // A pre-order (Pesanan Terjadwal) has no shift/queue number until it is
+    // settled at the till — attach them now, atomically, to the shift open
+    // at this moment, same as payOrder does when a pre-order is paid. That
+    // shift is the one whose Tutup Shift lists it under "Piutang dari shift
+    // ini".
+    const openShift = await prisma.shift.findFirst({ where: { status: "OPEN" } });
+    if (!openShift) return { ok: false, error: "Belum ada shift terbuka. Buka shift dulu." };
+    const done = await prisma.$transaction(async (tx) => {
+      const shift = await tx.shift.update({ where: { id: openShift.id }, data: { lastQueueNumber: { increment: 1 } } });
+      const claimed = await tx.order.updateMany({
+        where: guard,
+        data: {
+          status: "RECEIVABLE",
+          customerName: customerName.trim(),
+          shiftId: shift.id,
+          queueNumber: shift.lastQueueNumber,
+          servedAt,
+        },
+      });
+      if (claimed.count !== 1) throw new ReceivableRaced();
+      return true;
+    }).catch((e) => {
+      if (e instanceof ReceivableRaced) return false;
+      throw e;
+    });
+    return done ? { ok: true } : raced;
+  }
+
+  const claimed = await prisma.order.updateMany({
+    where: guard,
+    data: { status: "RECEIVABLE", customerName: customerName.trim(), servedAt },
   });
-  return { ok: true };
+  return claimed.count === 1 ? { ok: true } : raced;
 }
+
+class ReceivableRaced extends Error {}
 
 export type CloseShiftResult =
   | {
@@ -93,10 +138,17 @@ export type CloseShiftResult =
       depositRefundsCash: number;
       depositRefundsNonCash: number;
       forfeitedDeposits: number;
+      receivableSettledCash: number;
+      receivableSettledNonCash: number;
+      receivablePocketCash: number;
     }
   | { ok: false; error: string };
 
-export async function closeShift(countedCash: number): Promise<CloseShiftResult> {
+// `acknowledgedReceivableIds`: the piutang of this shift the cashier ticked
+// "sudah dicatat" on the Tutup Shift checklist. A piutang doesn't block the
+// close (it may be paid days later) but it must never be forgotten, so every
+// one of them has to be acknowledged — checked here, not just on screen.
+export async function closeShift(countedCash: number, acknowledgedReceivableIds: string[] = []): Promise<CloseShiftResult> {
   const user = await requireUser();
 
   if (!Number.isFinite(countedCash) || countedCash < 0) {
@@ -111,8 +163,20 @@ export async function closeShift(countedCash: number): Promise<CloseShiftResult>
     return { ok: false, error: "Masih ada order belum selesai — batalkan atau tandai piutang dulu." };
   }
 
+  const receivables = await prisma.order.findMany({ where: { shiftId: shift.id, status: "RECEIVABLE" }, select: { id: true } });
+  const acknowledged = new Set(acknowledgedReceivableIds);
+  if (receivables.some((r) => !acknowledged.has(r.id))) {
+    return { ok: false, error: "Ada piutang shift ini yang belum dicentang. Muat ulang layar lalu cek daftar piutangnya." };
+  }
+
+  // Sales of this shift: orders paid in it — except a piutang settled in some
+  // OTHER shift, whose sale belongs to that shift — plus every piutang settled
+  // in it, whichever shift it was created in (settledShiftId).
   const paidOrders = await prisma.order.findMany({
-    where: { shiftId: shift.id, status: "PAID" },
+    where: {
+      status: "PAID",
+      OR: [{ shiftId: shift.id, settledShiftId: null }, { settledShiftId: shift.id }],
+    },
     include: { items: true, deposits: { where: { kind: "APPLIED" } } },
   });
   // Every DP movement stamped with THIS shift: cash DP taken, refunds paid out,
@@ -132,6 +196,9 @@ export async function closeShift(countedCash: number): Promise<CloseShiftResult>
       method: o.paymentMethod,
       depositsApplied: o.deposits.reduce((sum, d) => sum + d.amount, 0),
       splitQrisAmount: o.splitQrisAmount,
+      // Only a QRIS settlement leaves settlementCashToDrawer null; its cash
+      // slice is 0 then, so the default doesn't matter.
+      settledReceivable: o.settledShiftId ? { cashToDrawer: o.settlementCashToDrawer ?? true } : null,
     })),
     expenseTotal,
     // DP itself is never SPLIT — only the sale that settles it can be
@@ -163,6 +230,9 @@ export async function closeShift(countedCash: number): Promise<CloseShiftResult>
       depositRefundsCash: closing.depositRefundsCash,
       depositRefundsNonCash: closing.depositRefundsNonCash,
       forfeitedDeposits: closing.forfeitedDeposits,
+      receivableSettledCash: closing.receivableSettledCash,
+      receivableSettledNonCash: closing.receivableSettledNonCash,
+      receivablePocketCash: closing.receivablePocketCash,
     },
   });
 
@@ -191,5 +261,8 @@ export async function closeShift(countedCash: number): Promise<CloseShiftResult>
     depositRefundsCash: closing.depositRefundsCash,
     depositRefundsNonCash: closing.depositRefundsNonCash,
     forfeitedDeposits: closing.forfeitedDeposits,
+    receivableSettledCash: closing.receivableSettledCash,
+    receivableSettledNonCash: closing.receivableSettledNonCash,
+    receivablePocketCash: closing.receivablePocketCash,
   };
 }

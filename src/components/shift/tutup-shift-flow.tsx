@@ -14,7 +14,7 @@ import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { AppHeader } from "@/components/ui/app-header";
 import { ShiftSummary } from "./shift-summary";
 
-type Step = "warning" | "unpaid" | "expenses" | "count" | "result";
+type Step = "warning" | "unpaid" | "receivables" | "expenses" | "count" | "result";
 
 const CHANNEL_LABEL: Record<UnpaidOrderForClose["channel"], string> = {
   DINE_IN: "Dine In",
@@ -30,7 +30,7 @@ function UnpaidOrderRow({
   onResolved,
 }: {
   order: UnpaidOrderForClose;
-  onResolved: (orderId: string) => void;
+  onResolved: (orderId: string, receivableName?: string) => void;
 }) {
   const [mode, setMode] = useState<"idle" | "receivable">("idle");
   const [text, setText] = useState(order.customerName ?? "");
@@ -43,7 +43,7 @@ function UnpaidOrderRow({
     const result = await markOrderReceivable(order.id, text);
     setSaving(false);
     if (!result.ok) return setError(result.error);
-    onResolved(order.id);
+    onResolved(order.id, text.trim());
   }
 
   return (
@@ -107,15 +107,22 @@ function UnpaidOrderRow({
 
 export function TutupShiftFlow({
   initialUnpaidOrders,
+  initialReceivables,
   initialExpenses,
   nav,
 }: {
   initialUnpaidOrders: UnpaidOrderForClose[];
+  initialReceivables: UnpaidOrderForClose[];
   initialExpenses: ShiftExpense[];
   nav: HeaderNav;
 }) {
   const [unpaidOrders, setUnpaidOrders] = useState(initialUnpaidOrders);
-  const [step, setStep] = useState<Step>(initialUnpaidOrders.length > 0 ? "warning" : "expenses");
+  // Piutang of this shift: those from "Belum Bayar" plus any marked in the
+  // step above. Each must be ticked before the close can go on.
+  const [receivables, setReceivables] = useState(initialReceivables);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const afterUnpaid: Step = initialReceivables.length > 0 ? "receivables" : "expenses";
+  const [step, setStep] = useState<Step>(initialUnpaidOrders.length > 0 ? "warning" : afterUnpaid);
 
   const [expenses, setExpenses] = useState(initialExpenses);
   const [expenseDesc, setExpenseDesc] = useState("");
@@ -129,8 +136,21 @@ export function TutupShiftFlow({
   const [closeError, setCloseError] = useState<string | null>(null);
   const [result, setResult] = useState<Extract<CloseShiftResult, { ok: true }> | null>(null);
 
-  function handleOrderResolved(orderId: string) {
+  function handleOrderResolved(orderId: string, receivableName?: string) {
+    const resolved = unpaidOrders.find((o) => o.id === orderId);
     setUnpaidOrders((list) => list.filter((o) => o.id !== orderId));
+    if (resolved && receivableName) {
+      setReceivables((list) => [...list, { ...resolved, customerName: receivableName }]);
+    }
+  }
+
+  function toggleTicked(orderId: string) {
+    setTicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
   }
 
   async function handleAddExpense() {
@@ -157,7 +177,7 @@ export function TutupShiftFlow({
   async function handleClose() {
     setClosing(true);
     setCloseError(null);
-    const res = await closeShift(Number(countedCash));
+    const res = await closeShift(Number(countedCash), [...ticked]);
     setClosing(false);
     if (!res.ok) return setCloseError(res.error);
     setResult(res);
@@ -201,10 +221,60 @@ export function TutupShiftFlow({
             />
           ))}
           {unpaidOrders.length === 0 && (
-            <Button variant="primary" size="large" fullWidth onClick={() => setStep("expenses")}>
-              Lanjut ke Pengeluaran
+            <Button
+              variant="primary"
+              size="large"
+              fullWidth
+              onClick={() => setStep(receivables.length > 0 ? "receivables" : "expenses")}
+            >
+              {receivables.length > 0 ? "Lanjut ke Daftar Piutang" : "Lanjut ke Pengeluaran"}
             </Button>
           )}
+        </div>
+      )}
+
+      {step === "receivables" && (
+        <div className="flex flex-col gap-3">
+          <Card padded className="bg-warning-soft flex flex-col gap-1.5">
+            <p className="text-warning text-base font-bold">Piutang dari shift ini: {receivables.length}</p>
+            <p className="text-ink-muted text-sm">
+              Belum dibayar dan tidak dihitung di laci maupun penjualan hari ini. Centang tiap baris kalau sudah
+              dicatat/diingat siapa yang berutang. Pelunasannya nanti lewat halaman Piutang.
+            </p>
+          </Card>
+          <Card>
+            <div className="divide-border flex flex-col divide-y">
+              {receivables.map((r) => (
+                <label key={r.id} className="flex min-h-14 cursor-pointer items-center gap-3 px-4 py-2">
+                  <input
+                    type="checkbox"
+                    checked={ticked.has(r.id)}
+                    onChange={() => toggleTicked(r.id)}
+                    className="h-6 w-6 shrink-0"
+                    aria-label={`Sudah dicatat: ${r.customerName ?? ""}`}
+                  />
+                  <span className="text-ink flex-1 text-sm">
+                    <span className="font-semibold">{r.customerName ?? "—"}</span>
+                    <span className="text-ink-muted">
+                      {" "}
+                      · {formatQueueLabel(r.queueNumber, r.queueSuffix)} ·{" "}
+                      {r.channel === "DINE_IN" ? r.tableLabel : CHANNEL_LABEL[r.channel]}
+                    </span>
+                  </span>
+                  <PriceText amount={r.total} weight="secondary" />
+                </label>
+              ))}
+            </div>
+          </Card>
+          <Button
+            variant="primary"
+            size="large"
+            fullWidth
+            disabled={receivables.some((r) => !ticked.has(r.id))}
+            onClick={() => setStep("expenses")}
+          >
+            Semua sudah dicatat — Lanjut ke Pengeluaran
+          </Button>
         </div>
       )}
 

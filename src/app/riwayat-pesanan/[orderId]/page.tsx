@@ -30,7 +30,9 @@ export default async function RiwayatDetailPage({ params }: { params: Promise<{ 
   // CASHIER guessing/pasting an old order's URL still gets nothing.
   if (!isOwner && localDateStr(new Date(order.createdAt)) !== localDateStr(new Date())) notFound();
 
-  const receipt = order.status === "PAID" ? buildReceiptData(order, settings) : null;
+  // A piutang reprints as "BELUM LUNAS" (buildReceiptData); VOID/CANCELLED
+  // never had a struk.
+  const receipt = order.status === "PAID" || order.status === "RECEIVABLE" ? buildReceiptData(order, settings) : null;
 
   return (
     <RiwayatDetail order={order} receipt={receipt} printerDriver={settings.printerDriver} nav={nav} isOwner={isOwner} />

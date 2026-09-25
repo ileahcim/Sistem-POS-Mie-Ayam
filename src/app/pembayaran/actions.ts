@@ -9,6 +9,7 @@ import { allocateDeposits, methodWhenFullyPrepaid, type DepositMethod } from "@/
 import { validateSplitCashAmount } from "@/lib/orders/validate-split-payment";
 import { getSettings } from "@/lib/settings/get-settings";
 import type { ReceiptData } from "@/lib/printing/types";
+import { markOrderReceivable } from "@/app/shift/actions";
 
 export type PaymentMethod = "CASH" | "QRIS" | "TRANSFER" | "SPLIT";
 
@@ -19,7 +20,11 @@ export type PayOrderResult =
 // Thrown inside a transaction to roll it back with a message the cashier can read.
 class PaymentRefused extends Error {}
 
-const PAYABLE = ["OPEN", "RECEIVABLE"] as const;
+// The ordinary and DP payment paths only ever claim an OPEN order; a
+// RECEIVABLE one is settled by settleReceivable, which stamps the settling
+// shift — an order that turned into a piutang a moment ago must not slip
+// through here without it.
+const PAYABLE = ["OPEN"] as const;
 const RACED =
   "Order ini baru saja berubah (sudah dibayar, atau baru dicatat DP di perangkat lain). Muat ulang layar lalu coba lagi.";
 
@@ -36,14 +41,20 @@ export async function payOrder(
   // typed. QRIS slice is always derived server-side (order.total - this),
   // never trusted from the client.
   splitCashAmount: number | null = null,
+  // Settling a piutang only: where the cash slice of a Cash / Cash+QRIS
+  // settlement went — true "masuk laci", false "masuk kantong". Required
+  // then, ignored otherwise.
+  cashToDrawer: boolean | null = null,
 ): Promise<PayOrderResult> {
   const user = await requireUser();
 
   const order = await getOrderDetail(orderId);
   if (!order) return { ok: false, error: "Order tidak ditemukan." };
   // RECEIVABLE is payable too — that's a piutang being settled later, not a
-  // dead end. Only PAID (already done) and VOID (cancelled) block payment.
-  if (order.status !== "OPEN" && order.status !== "RECEIVABLE") {
+  // dead end, and it has its own path (settleReceivable). Only PAID (already
+  // done), VOID and CANCELLED block payment.
+  if (order.status === "RECEIVABLE") return settleReceivable(order, method, splitCashAmount, cashToDrawer);
+  if (order.status !== "OPEN") {
     return { ok: false, error: "Order ini sudah tidak bisa dibayar (sudah lunas/void)." };
   }
 
@@ -135,6 +146,64 @@ export async function payOrder(
   const receipt = buildReceiptData(paidOrder!, settings);
 
   return { ok: true, receipt };
+}
+
+// Settling a piutang (RECEIVABLE). Its sale is counted in the shift open NOW
+// (settledShiftId), not the one it was created in — that one may have closed
+// days ago with the piutang correctly left out. The order keeps its own
+// shiftId/queue number. A piutang never holds DP (markOrderReceivable refuses
+// one), so this never meets payWithDeposits.
+async function settleReceivable(
+  order: OrderDetail,
+  method: PaymentMethod,
+  splitCashAmount: number | null,
+  cashToDrawer: boolean | null,
+): Promise<PayOrderResult> {
+  if (method !== "CASH" && method !== "QRIS" && method !== "SPLIT") return { ok: false, error: "Metode bayar tidak valid." };
+  const cashLike = method === "CASH" || method === "SPLIT";
+  if (cashLike && typeof cashToDrawer !== "boolean") {
+    return { ok: false, error: "Pilih uang tunainya masuk laci atau masuk kantong." };
+  }
+  let splitQrisAmount: number | null = null;
+  if (method === "SPLIT") {
+    const error = validateSplitCashAmount(splitCashAmount ?? NaN, order.total);
+    if (error) return { ok: false, error };
+    splitQrisAmount = order.total - (splitCashAmount as number);
+  }
+
+  const openShift = await prisma.shift.findFirst({ where: { status: "OPEN" } });
+  if (!openShift) return { ok: false, error: "Belum ada shift terbuka. Buka shift dulu sebelum melunasi piutang." };
+
+  const claimed = await prisma.order.updateMany({
+    where: { id: order.id, status: "RECEIVABLE" },
+    data: {
+      status: "PAID",
+      paymentMethod: method,
+      paidAt: new Date(),
+      cashTendered: null,
+      changeGiven: null,
+      splitCashAmount: method === "SPLIT" ? splitCashAmount : null,
+      splitQrisAmount,
+      settledShiftId: openShift.id,
+      settlementCashToDrawer: cashLike ? cashToDrawer : null,
+    },
+  });
+  if (claimed.count !== 1) return { ok: false, error: RACED };
+
+  const [paidOrder, settings] = await Promise.all([getOrderDetail(order.id), getSettings()]);
+  return { ok: true, receipt: buildReceiptData(paidOrder!, settings) };
+}
+
+// "Belum Bayar" on the Pembayaran screen: the customer will pay later, and
+// the cashier knows it now. Goes through markOrderReceivable — the very same
+// piutang path Tutup Shift uses, no second one — then hands back a
+// "BELUM LUNAS" struk (buildReceiptData on a RECEIVABLE order).
+export async function payLater(orderId: string, customerName: string): Promise<PayOrderResult> {
+  await requireUser();
+  const marked = await markOrderReceivable(orderId, customerName);
+  if (!marked.ok) return marked;
+  const [order, settings] = await Promise.all([getOrderDetail(orderId), getSettings()]);
+  return { ok: true, receipt: buildReceiptData(order!, settings) };
 }
 
 // Paying a pre-order that holds DP. Only the REMAINDER is collected now; the DP

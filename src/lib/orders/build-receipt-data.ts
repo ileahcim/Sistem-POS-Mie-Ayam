@@ -2,10 +2,11 @@ import type { OrderDetail } from "./get-order-detail";
 import type { StoreSettings } from "@/lib/settings/get-settings";
 import type { ReceiptData } from "@/lib/printing/types";
 
-// Order must already be paid (paymentMethod set) — this is only ever called
-// right after a successful payOrder().
+// Order must be paid (paymentMethod set) — or a piutang (RECEIVABLE), which
+// prints as "BELUM LUNAS" with paymentMethod null (see ReceiptData).
 export function buildReceiptData(order: OrderDetail, settings: StoreSettings): ReceiptData {
-  if (!order.paymentMethod) throw new Error("Order belum dibayar, tidak bisa cetak struk.");
+  const unpaid = order.status === "RECEIVABLE";
+  if (!unpaid && !order.paymentMethod) throw new Error("Order belum dibayar, tidak bisa cetak struk.");
   // payOrder() always attaches shiftId + queueNumber together at payment
   // time (including for a pre-order, whose queueNumber is null until then —
   // see CLAUDE.md "Pre-order"), so by the time paymentMethod is set this is
@@ -38,7 +39,7 @@ export function buildReceiptData(order: OrderDetail, settings: StoreSettings): R
     subtotal: order.subtotal,
     deliveryFee: order.deliveryFee,
     total: order.total,
-    paymentMethod: order.paymentMethod,
+    paymentMethod: unpaid ? null : order.paymentMethod,
     cashTendered: order.cashTendered,
     changeGiven: order.changeGiven,
     splitCashAmount: order.splitCashAmount,

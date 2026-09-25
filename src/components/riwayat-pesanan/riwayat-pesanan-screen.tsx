@@ -12,7 +12,7 @@ import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoHistoryIcon } from "@/components/ui/empty-state-icons";
 import { AppHeader } from "@/components/ui/app-header";
-import { formatId } from "@/lib/timezone";
+import { orderTimesLabel } from "@/lib/orders/order-times";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import { DateRangePresets } from "@/components/ui/date-range-presets";
@@ -36,22 +36,6 @@ const STATUS_VARIANT: Record<OrderHistoryRow["status"], BadgeVariant> = {
   RECEIVABLE: "warning",
   CANCELLED: "neutral",
 };
-
-function formatDateTime(iso: string): string {
-  return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
-}
-
-function formatJamOnly(iso: string): string {
-  return formatId(new Date(iso), { timeStyle: "short" });
-}
-
-// "Dipesan HH.MM" always; second time depends on how the order concluded —
-// there's no single "Dibayar" for an order that was never paid.
-function secondTimeLabel(order: OrderHistoryRow): string | null {
-  if (order.paidAt) return `Dibayar ${formatJamOnly(order.paidAt)}`;
-  if (order.cancelledAt) return `Dibatalkan ${formatJamOnly(order.cancelledAt)}`;
-  return null;
-}
 
 // CASHIER's date inputs and quick-range chips never render at all (not just
 // disabled) — the server (get-order-history.ts's clampHistoryFilterForRole)
@@ -168,10 +152,15 @@ export function RiwayatPesananScreen({
                       {CHANNEL_LABEL[order.channel]}
                       {order.tableLabel ? ` · ${order.tableLabel}` : ""}
                     </span>
+                    {/* Came from Pesanan Terjadwal — a different path (taken
+                        the night before, delivered later), so it must be
+                        traceable at a glance. */}
+                    {order.scheduledFor && <Badge variant="info">Pre-order</Badge>}
                   </div>
-                  <span className="text-ink-faint truncate text-xs">
-                    No. Order {order.orderNumber} · Dipesan {formatDateTime(order.createdAt)}
-                    {secondTimeLabel(order) ? ` · ${secondTimeLabel(order)}` : ""}
+                  {/* Wraps instead of truncating: the "Dibayar" half is the
+                      part that matters when tracing an order, and it's last. */}
+                  <span className="text-ink-faint text-xs">
+                    No. Order {order.orderNumber} · {orderTimesLabel(order)}
                     {order.customerName ? ` · ${order.customerName}` : ""}
                   </span>
                 </div>

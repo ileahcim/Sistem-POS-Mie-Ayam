@@ -67,7 +67,10 @@ export type ReceiptData = {
   subtotal: number;
   deliveryFee: number; // 0 when not applicable — still fine to compute a total from
   total: number;
-  paymentMethod: ReceiptPaymentMethod;
+  // null = a piutang ("Belum Bayar" / Tandai Piutang, 25 Sep 2026): the
+  // struk is headed "BELUM LUNAS" and ends in a bold "Belum dibayar" line
+  // instead of any "Bayar (...)" line, so it can never pass for a paid one.
+  paymentMethod: ReceiptPaymentMethod | null;
   cashTendered?: number | null;
   changeGiven?: number | null;
   // Only set when paymentMethod === "SPLIT" — the struk then prints two

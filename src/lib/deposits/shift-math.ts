@@ -12,6 +12,12 @@
 //
 // With no DP anywhere every DP term is 0, cashCollected === cashSales and the
 // result is exactly the old  openingCash + cashSales - expenseTotal.
+//
+// Piutang settled this shift (25 Sep 2026) follows the same split: its sale is
+// in cashSales/nonCashSales (recognised the day it is actually paid), and the
+// only drawer term is the cash the owner took into the pocket instead of the
+// drawer (receivablePocketCash). With no settled piutang those terms are 0 and
+// every number is exactly what it was before.
 
 export type ClosingOrder = {
   total: number;
@@ -22,6 +28,10 @@ export type ClosingOrder = {
   // actually collected THIS payment (order.splitQrisAmount). The cash slice
   // is derived, never stored separately here (see qrisPortionOf below).
   splitQrisAmount?: number | null;
+  // Present only for a piutang (RECEIVABLE) order settled in this shift.
+  // cashToDrawer: where its cash slice went — the drawer (true) or the
+  // owner's pocket (false, recorded as a sale but never in the drawer).
+  settledReceivable?: { cashToDrawer: boolean } | null;
 };
 
 export type ClosingDepositEntry = {
@@ -48,6 +58,9 @@ export type ClosingNumbers = {
   depositRefundsCash: number;
   depositRefundsNonCash: number;
   forfeitedDeposits: number;
+  receivableSettledCash: number;
+  receivableSettledNonCash: number;
+  receivablePocketCash: number;
   // Cash that actually came in at the till for sales paid today.
   cashCollected: number;
   expectedCash: number;
@@ -100,7 +113,15 @@ export function computeShiftClosing(input: ClosingInput): ClosingNumbers {
   const depositsAppliedCash = sum(
     input.paidOrders.filter((o) => isCashLike(o.method)).map((o) => o.depositsApplied),
   );
-  const cashCollected = cashSales - depositsAppliedCash;
+  // Piutang settled this shift. A piutang never holds DP (markOrderReceivable
+  // refuses one), so these never overlap with the DP terms above.
+  const settled = input.paidOrders.filter((o) => o.settledReceivable != null);
+  const receivableSettledCash = sum(settled.map((o) => o.total - qrisPortionOf(o)));
+  const receivableSettledNonCash = sum(settled.map(qrisPortionOf));
+  const receivablePocketCash = sum(
+    settled.filter((o) => !o.settledReceivable!.cashToDrawer).map((o) => o.total - qrisPortionOf(o)),
+  );
+  const cashCollected = cashSales - depositsAppliedCash - receivablePocketCash;
 
   const entries = (kind: ClosingDepositEntry["kind"], cash: boolean) =>
     sum(
@@ -128,6 +149,9 @@ export function computeShiftClosing(input: ClosingInput): ClosingNumbers {
     depositRefundsCash,
     depositRefundsNonCash,
     forfeitedDeposits,
+    receivableSettledCash,
+    receivableSettledNonCash,
+    receivablePocketCash,
     cashCollected,
     expectedCash,
   };

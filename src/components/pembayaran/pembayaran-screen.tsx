@@ -24,7 +24,7 @@ import { formatId } from "@/lib/timezone";
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
 import { validateSplitCashAmount } from "@/lib/orders/validate-split-payment";
 import { RupiahInput } from "@/components/ui/rupiah-input";
-import { payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
+import { payLater, payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
 
 // Cash, QRIS, or both at once ("Cash + QRIS" — CLAUDE.md-worthy brief, 22
 // Sep 2026, for a customer whose cash falls short). Payment is otherwise
@@ -35,6 +35,12 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "QRIS", label: "QRIS" },
   { value: "SPLIT", label: "Cash + QRIS" },
 ];
+
+// "Belum Bayar" (25 Sep 2026): the fourth choice beside the three methods,
+// for a customer the cashier KNOWS will pay later — the order becomes a
+// piutang right away (the same markOrderReceivable path Tutup Shift uses),
+// instead of being pushed through as QRIS to keep it out of the drawer.
+type Choice = PaymentMethod | "LATER";
 
 const SPLIT_CASH_PRESETS = [10000, 20000, 50000];
 
@@ -54,7 +60,13 @@ export function PembayaranScreen({
   kitchenTicketEnabled: boolean;
 }) {
   const router = useRouter();
-  const [method, setMethod] = useState<PaymentMethod | null>(null);
+  const [choice, setChoice] = useState<Choice | null>(null);
+  const method: PaymentMethod | null = choice === "LATER" ? null : choice;
+  // "Belum Bayar": who owes it — prefilled with the guest name when there is one.
+  const [debtorName, setDebtorName] = useState(order.customerName ?? "");
+  // Settling a piutang with cash: did the money go into the drawer or into
+  // the owner's pocket? No default — a wrong guess silently skews the drawer.
+  const [cashToDrawer, setCashToDrawer] = useState<boolean | null>(null);
   // Cash slice of a split payment — the only number the cashier ever types
   // here; the QRIS slice is always derived (amountDue - this), never typed.
   const [splitCash, setSplitCash] = useState<number | "">("");
@@ -72,6 +84,11 @@ export function PembayaranScreen({
   // RECEIVABLE (piutang) is still payable — settling it later is the whole
   // point. Only PAID/VOID actually block the payment UI.
   const alreadyPaid = order.status !== "OPEN" && order.status !== "RECEIVABLE";
+  const settlingReceivable = order.status === "RECEIVABLE";
+  // Offered only for an ordinary unpaid order: not when settling a piutang
+  // (it already is one), and not with DP (the server refuses — DP money must
+  // be settled, never parked as a piutang).
+  const canPayLater = order.status === "OPEN" && order.deposits.length === 0;
 
   // A pre-order that took DP: only the remainder is collected here. When the DP
   // already covers everything (or the order shrank below it) there is nothing to
@@ -85,8 +102,19 @@ export function PembayaranScreen({
   const splitCashError =
     method === "SPLIT" ? validateSplitCashAmount(typeof splitCash === "number" ? splitCash : NaN, amountDue) : null;
   const splitQris = method === "SPLIT" && typeof splitCash === "number" ? Math.max(0, amountDue - splitCash) : 0;
-  const canPay = (nothingToCollect || !!method) && (method !== "SPLIT" || splitCashError === null);
-  const payLabel = !hasDeposit
+  const cashLike = method === "CASH" || method === "SPLIT";
+  const needsDrawerChoice = settlingReceivable && cashLike;
+  const canPay =
+    choice === "LATER"
+      ? debtorName.trim() !== ""
+      : (nothingToCollect || !!method) &&
+        (method !== "SPLIT" || splitCashError === null) &&
+        (!needsDrawerChoice || cashToDrawer !== null);
+  const payLabel = choice === "LATER"
+    ? `Simpan sebagai Piutang - ${formatRupiah(order.total)}`
+    : settlingReceivable
+      ? `Lunasi Piutang - ${formatRupiah(order.total)}`
+      : !hasDeposit
     ? `Bayar - ${formatRupiah(order.total)}`
     : nothingToCollect
       ? order.refundDue > 0
@@ -116,12 +144,16 @@ export function PembayaranScreen({
     try {
       // With nothing to collect the server labels the order after the DP that
       // covered it; the value sent here is then ignored.
-      const result = await payOrder(
-        order.id,
-        method ?? "CASH",
-        null,
-        method === "SPLIT" ? (splitCash as number) : null,
-      );
+      const result =
+        choice === "LATER"
+          ? await payLater(order.id, debtorName)
+          : await payOrder(
+              order.id,
+              method ?? "CASH",
+              null,
+              method === "SPLIT" ? (splitCash as number) : null,
+              needsDrawerChoice ? cashToDrawer : null,
+            );
       if (!result.ok) {
         setError(result.error);
         return;
@@ -129,7 +161,7 @@ export function PembayaranScreen({
       if (autoPrintReceipt) {
         const failure = await tryPrint(result.receipt);
         if (failure === null) {
-          router.push("/order-aktif");
+          router.push(doneHref);
           return;
         }
         // The payment is saved; only the paper failed. Stay here with the
@@ -154,8 +186,11 @@ export function PembayaranScreen({
         return; // stay: show why, let the cashier retry or skip
       }
     }
-    router.push("/order-aktif");
+    router.push(doneHref);
   }
+
+  // Settling a piutang starts from the Piutang page — go back there.
+  const doneHref = settlingReceivable ? "/piutang" : "/order-aktif";
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
@@ -173,7 +208,11 @@ export function PembayaranScreen({
       <div className="flex-1 overflow-y-auto p-4">
         {pendingReceipt ? (
           <div className="flex flex-col items-center gap-4 py-8 text-center">
-            <Badge variant="success">Pembayaran berhasil</Badge>
+            {choice === "LATER" ? (
+              <Badge variant="warning">Tersimpan sebagai piutang — belum lunas</Badge>
+            ) : (
+              <Badge variant="success">Pembayaran berhasil</Badge>
+            )}
             {printError ? (
               <div className="flex flex-col gap-1">
                 <p className="text-danger text-lg font-bold">Struk belum tercetak</p>
@@ -305,6 +344,13 @@ export function PembayaranScreen({
               </div>
             )}
 
+            {settlingReceivable && (
+              <p className="text-warning mt-4 text-sm font-semibold">
+                Pelunasan piutang{order.customerName ? ` atas nama ${order.customerName}` : ""} — dihitung ke shift
+                yang sedang buka.
+              </p>
+            )}
+
             {nothingToCollect ? (
               <p className="text-ink-muted mt-4 text-center text-sm">
                 {order.refundDue > 0
@@ -312,21 +358,91 @@ export function PembayaranScreen({
                   : "DP sudah menutup seluruh pesanan — tidak ada yang perlu dibayar lagi."}
               </p>
             ) : (
-            <div className="mt-4 flex gap-2">
+            <div
+              className={cn("mt-4 grid gap-2", canPayLater ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}
+              role="group"
+              aria-label="Metode bayar"
+            >
               {METHODS.map((m) => (
                 <button
                   key={m.value}
                   type="button"
-                  onClick={() => setMethod(m.value)}
+                  aria-pressed={choice === m.value}
+                  onClick={() => setChoice(m.value)}
                   className={cn(
-                    "rounded-pill h-12 flex-1 text-base font-semibold",
-                    method === m.value ? "bg-primary text-white" : "bg-muted text-ink",
+                    "rounded-pill h-12 text-base font-semibold",
+                    choice === m.value ? "bg-primary text-white" : "bg-muted text-ink",
                   )}
                 >
                   {m.label}
                 </button>
               ))}
+              {canPayLater && (
+                <button
+                  type="button"
+                  aria-pressed={choice === "LATER"}
+                  onClick={() => setChoice("LATER")}
+                  className={cn(
+                    "rounded-pill h-12 text-base font-semibold",
+                    choice === "LATER" ? "bg-warning text-white" : "bg-warning-soft text-warning",
+                  )}
+                >
+                  Belum Bayar
+                </button>
+              )}
             </div>
+            )}
+
+            {choice === "LATER" && (
+              <div className="mt-3 flex flex-col gap-2">
+                <label htmlFor="debtor-name" className="text-ink-muted text-sm font-medium">
+                  Nama yang berutang (wajib)
+                </label>
+                <input
+                  id="debtor-name"
+                  type="text"
+                  value={debtorName}
+                  onChange={(e) => setDebtorName(e.target.value)}
+                  placeholder="Mis. Rose KMK"
+                  className="rounded-input border-border h-12 border px-3 text-base"
+                />
+                <p className="text-ink-muted text-sm">
+                  Pelanggan bayar nanti. Order jadi <strong>Piutang</strong> sekarang juga — tidak masuk laci maupun
+                  omzet hari ini sampai dilunasi dari halaman Piutang. Struknya tertulis &ldquo;BELUM LUNAS&rdquo;.
+                </p>
+              </div>
+            )}
+
+            {needsDrawerChoice && (
+              <div className="mt-3 flex flex-col gap-2">
+                <span className="text-ink-muted text-sm font-medium">Uang tunainya masuk ke mana?</span>
+                <div className="grid grid-cols-2 gap-2" role="group" aria-label="Uang tunai masuk ke">
+                  <button
+                    type="button"
+                    aria-pressed={cashToDrawer === true}
+                    onClick={() => setCashToDrawer(true)}
+                    className={cn(
+                      "rounded-card flex min-h-14 flex-col items-start justify-center border px-3 py-2 text-left",
+                      cashToDrawer === true ? "border-primary bg-primary-soft" : "border-border",
+                    )}
+                  >
+                    <span className="text-ink text-sm font-bold">Masuk laci</span>
+                    <span className="text-ink-muted text-xs">Ikut dihitung di hitung kas shift ini</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={cashToDrawer === false}
+                    onClick={() => setCashToDrawer(false)}
+                    className={cn(
+                      "rounded-card flex min-h-14 flex-col items-start justify-center border px-3 py-2 text-left",
+                      cashToDrawer === false ? "border-primary bg-primary-soft" : "border-border",
+                    )}
+                  >
+                    <span className="text-ink text-sm font-bold">Masuk kantong</span>
+                    <span className="text-ink-muted text-xs">Dicatat saja, tidak dihitung di laci</span>
+                  </button>
+                </div>
+              </div>
             )}
 
             {method === "SPLIT" && (

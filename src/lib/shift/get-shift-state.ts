@@ -36,8 +36,20 @@ export type UnpaidOrderForClose = {
 // CANCELLED, or RECEIVABLE. Total is recomputed the same way get-order-detail does
 // (subtotal + Antar delivery fee) so the close screen shows real amounts.
 export async function getUnpaidOrdersForShift(shiftId: string): Promise<UnpaidOrderForClose[]> {
+  return ordersForClose(shiftId, "OPEN");
+}
+
+// Piutang created in this shift and still unpaid — "Belum Bayar" at the till,
+// or ones just marked in this same Tutup Shift. They don't block the close
+// (payment may come days later), but each must be ticked "sudah dicatat" on
+// the checklist (closeShift re-checks the ids).
+export async function getReceivablesForShift(shiftId: string): Promise<UnpaidOrderForClose[]> {
+  return ordersForClose(shiftId, "RECEIVABLE");
+}
+
+async function ordersForClose(shiftId: string, status: "OPEN" | "RECEIVABLE"): Promise<UnpaidOrderForClose[]> {
   const orders = await prisma.order.findMany({
-    where: { shiftId, status: "OPEN" },
+    where: { shiftId, status },
     include: { items: true },
     orderBy: { createdAt: "asc" },
   });

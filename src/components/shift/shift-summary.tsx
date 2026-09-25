@@ -20,6 +20,9 @@ export type ShiftFigures = {
   depositRefundsCash: number;
   depositRefundsNonCash: number;
   forfeitedDeposits: number;
+  receivableSettledCash: number;
+  receivableSettledNonCash: number;
+  receivablePocketCash: number;
 };
 
 // Did any pre-order DP move that day? Decides whether the DP rows show at all.
@@ -79,6 +82,12 @@ export function ShiftSummary({ figures: f, salesTitle }: { figures: ShiftFigures
         <Row label="Total penjualan" className="border-border text-ink mt-1 border-t pt-2 font-semibold">
           <PriceText amount={f.cashSales + f.nonCashSales} weight="primary" />
         </Row>
+        {f.receivableSettledCash + f.receivableSettledNonCash > 0 && (
+          <p className="text-ink-faint text-xs">
+            Termasuk pelunasan piutang {formatRupiah(f.receivableSettledCash + f.receivableSettledNonCash)} (dari order
+            yang dibuat di shift sebelumnya atau ditandai Belum Bayar).
+          </p>
+        )}
       </section>
 
       <section>
@@ -133,6 +142,28 @@ export function ShiftSummary({ figures: f, salesTitle }: { figures: ShiftFigures
                     <span>{formatRupiah(f.forfeitedDeposits)}</span>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Piutang settled this shift: its cash is inside "Penjualan cash"
+            above; only what the owner pocketed never reached the drawer.
+            Shown only on a day that had a settlement. */}
+        {f.receivableSettledCash + f.receivableSettledNonCash > 0 && (
+          <div className="bg-canvas rounded-card my-1 flex flex-col gap-0.5 px-3 py-2">
+            <p className="text-ink text-xs font-bold">Pelunasan piutang</p>
+            <div className="text-ink-faint flex justify-between gap-3 text-xs">
+              <span>Tunai (sudah termasuk penjualan cash)</span>
+              <span>{formatRupiah(f.receivableSettledCash)}</span>
+            </div>
+            <div className="text-ink-muted flex justify-between gap-3 text-sm">
+              <span>Masuk kantong (tidak di laci)</span>
+              <span>−{formatRupiah(f.receivablePocketCash)}</span>
+            </div>
+            {f.receivableSettledNonCash > 0 && (
+              <div className="text-ink-faint flex justify-between gap-3 text-xs">
+                <span>QRIS (tidak memengaruhi laci)</span>
+                <span>{formatRupiah(f.receivableSettledNonCash)}</span>
               </div>
             )}
           </div>

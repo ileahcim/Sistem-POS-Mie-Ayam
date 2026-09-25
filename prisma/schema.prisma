@@ -316,7 +316,25 @@ model Shift {
   depositRefundsNonCash   Int?
   forfeitedDeposits       Int?
 
-  orders   Order[]
+  // Piutang (RECEIVABLE) settled THIS shift — 25 Sep 2026. A piutang's sale
+  // is recognised on the day it is actually paid, in the shift open at that
+  // moment (Order.settledShiftId), never in the shift it was created in. Its
+  // cash/QRIS portions are INSIDE cashSales/nonCashSales above (so omzet reads
+  // them with no formula change); these only explain the drawer. NULL on every
+  // shift closed before this existed = 0.
+  //   receivableSettledCash     cash portion of piutang settled this shift
+  //                             (laci AND kantong). Informational.
+  //   receivableSettledNonCash  QRIS portion. Informational.
+  //   receivablePocketCash      the cash the owner took straight into the
+  //                             pocket ("masuk kantong") — recorded as a sale,
+  //                             but never in the drawer, so subtracted from
+  //                             expectedCash like depositsAppliedCash.
+  receivableSettledCash    Int?
+  receivableSettledNonCash Int?
+  receivablePocketCash     Int?
+
+  orders             Order[]
+  settledReceivables Order[] @relation("OrderSettledShift")
   expenses Expense[]
   deposits PreorderDeposit[]
 }
@@ -377,6 +395,17 @@ model Order {
   // set immediately at creation, same as before.
   shiftId String?
   shift   Shift?  @relation(fields: [shiftId], references: [id])
+
+  // Set only when a RECEIVABLE (piutang) order is settled — the shift open at
+  // that moment, which is where its sale and drawer effect are counted
+  // (closeShift / shift-math.ts), not `shiftId` (the shift it was created in,
+  // which keeps its queue number). settlementCashToDrawer: for a cash-like
+  // settlement, true = the cash went into the drawer ("masuk laci"), false =
+  // straight into the owner's pocket ("masuk kantong", recorded only). Null
+  // for a QRIS settlement and for every ordinary order.
+  settledShiftId         String?
+  settledShift           Shift?   @relation("OrderSettledShift", fields: [settledShiftId], references: [id])
+  settlementCashToDrawer Boolean?
 
   // Persistent, never resets — the receipt's own reference number.
   // Distinct from queueNumber below (Postgres autoincrement already gives

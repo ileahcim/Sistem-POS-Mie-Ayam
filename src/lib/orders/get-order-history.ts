@@ -14,6 +14,7 @@ export type OrderHistoryRow = {
   paidAt: string | null; // "Dibayar" — PAID and VOID orders (void keeps its original payment time)
   voidedAt: string | null;
   cancelledAt: string | null;
+  scheduledFor: string | null; // set = came from Pesanan Terjadwal (pre-order)
   channel: "DINE_IN" | "BUNGKUS" | "ANTAR";
   tableLabel: string | null;
   customerName: string | null;
@@ -92,6 +93,7 @@ export async function getOrderHistory(filter: OrderHistoryFilter): Promise<Order
         paidAt: order.paidAt?.toISOString() ?? null,
         voidedAt: order.voidedAt?.toISOString() ?? null,
         cancelledAt: order.cancelledAt?.toISOString() ?? null,
+        scheduledFor: order.scheduledFor?.toISOString() ?? null,
         channel: order.channel,
         tableLabel: order.tableLabel,
         customerName: order.customerName,

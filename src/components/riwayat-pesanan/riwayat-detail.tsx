@@ -13,6 +13,7 @@ import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { AppHeader } from "@/components/ui/app-header";
 import { LinkButton } from "@/components/ui/link-button";
 import { formatId } from "@/lib/timezone";
+import { orderTimesLabel, scheduledForLabel } from "@/lib/orders/order-times";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty, formatRupiah } from "@/lib/printing/format";
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
@@ -38,23 +39,12 @@ function formatDateTime(iso: string): string {
   return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
 }
 
-function formatJamOnly(iso: string): string {
-  return formatId(new Date(iso), { timeStyle: "short" });
-}
-
-// Same "Dipesan" + status-appropriate second time as the list (Riwayat
-// Pesanan screen) — see get-order-history.ts's settledAtOf for the reasoning.
-function secondTimeLabel(order: OrderDetailData): string | null {
-  if (order.paidAt) return `Dibayar ${formatJamOnly(order.paidAt)}`;
-  if (order.cancelledAt) return `Dibatalkan ${formatJamOnly(order.cancelledAt)}`;
-  return null;
-}
-
 // Read-only — unlike OrderDetail (order-aktif), this order has already
 // concluded (see riwayat-pesanan/[orderId]/page.tsx's settled-status guard),
 // so there's no Serve/Pay/Add-item action here — only the record, a
-// reprint, and (OWNER, PAID only) Void. `receipt` is null for a VOID/RECEIVABLE/CANCELLED order — nothing was ever
-// printed for those (CLAUDE.md "Print hanya sekali, saat pembayaran").
+// reprint, and (OWNER, PAID only) Void. `receipt` is null for a VOID/CANCELLED order — nothing was ever
+// printed for those (CLAUDE.md "Print hanya sekali, saat pembayaran"). A
+// RECEIVABLE (piutang) order reprints as its "BELUM LUNAS" struk.
 export function RiwayatDetail({
   order,
   receipt,
@@ -97,9 +87,7 @@ export function RiwayatDetail({
             {order.tableLabel ? ` · ${order.tableLabel}` : ""}
           </>
         }
-        subtitle={`No. Order ${order.orderNumber} · Dipesan ${formatDateTime(order.createdAt)}${
-          secondTimeLabel(order) ? ` · ${secondTimeLabel(order)}` : ""
-        }`}
+        subtitle={`No. Order ${order.orderNumber} · ${orderTimesLabel(order)}`}
         actions={
           <LinkButton href="/riwayat-pesanan" variant="secondary" size="compact">
             Kembali
@@ -112,6 +100,7 @@ export function RiwayatDetail({
           <Badge variant={STATUS_VARIANT[order.status] ?? "neutral"}>
             {STATUS_LABEL[order.status] ?? order.status}
           </Badge>
+          {order.scheduledFor && <Badge variant="info">Pre-order</Badge>}
           {order.paymentMethod && (
             <span className="text-ink-muted text-sm">
               via {formatPaymentMethodDetail(order.paymentMethod, order.splitCashAmount, order.splitQrisAmount)}
@@ -119,6 +108,11 @@ export function RiwayatDetail({
           )}
           {order.customerName && <span className="text-ink-muted text-sm">· {order.customerName}</span>}
         </div>
+        {order.scheduledFor && (
+          <p className="text-ink-muted -mt-1 mb-3 text-sm">
+            Dari Pesanan Terjadwal · {orderTimesLabel(order)} · {scheduledForLabel(order.scheduledFor)}
+          </p>
+        )}
 
         {isOwner && order.status === "PAID" && (
           <div className="mb-3 flex flex-col gap-2">

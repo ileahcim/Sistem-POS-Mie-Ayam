@@ -25,6 +25,10 @@ export type ShiftHistoryRow = {
   depositRefundsCash: number;
   depositRefundsNonCash: number;
   forfeitedDeposits: number;
+  // Piutang settled in this shift, frozen too (0 before 25 Sep 2026).
+  receivableSettledCash: number;
+  receivableSettledNonCash: number;
+  receivablePocketCash: number;
 };
 
 export async function getShiftHistory(limit = 30): Promise<ShiftHistoryRow[]> {
@@ -53,5 +57,8 @@ export async function getShiftHistory(limit = 30): Promise<ShiftHistoryRow[]> {
     depositRefundsCash: s.depositRefundsCash ?? 0,
     depositRefundsNonCash: s.depositRefundsNonCash ?? 0,
     forfeitedDeposits: s.forfeitedDeposits ?? 0,
+    receivableSettledCash: s.receivableSettledCash ?? 0,
+    receivableSettledNonCash: s.receivableSettledNonCash ?? 0,
+    receivablePocketCash: s.receivablePocketCash ?? 0,
   }));
 }
