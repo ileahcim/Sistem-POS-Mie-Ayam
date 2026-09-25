@@ -1,6 +1,6 @@
-// Shared "dari–sampai" range + quick presets for the two report screens that
-// have one (Riwayat Pesanan and Ringkasan Mi Mentah). Identical buttons in
-// both places so the owner learns them once.
+// Shared "dari–sampai" range + quick presets for every report screen that
+// has one (Riwayat Pesanan, Ringkasan Mi Mentah/Frozen, Dashboard's sales
+// sections). Identical buttons everywhere so the owner learns them once.
 //
 // Everything here is pure calendar math on "YYYY-MM-DD" strings, and `today`
 // is ALWAYS passed in from the server (localDateStr, Asia/Jakarta — see
@@ -59,6 +59,7 @@ export type DateRangePreset = {
 
 export const DATE_RANGE_PRESETS: DateRangePreset[] = [
   { key: "hari-ini", label: "Hari ini", range: (t) => ({ from: t, to: t }) },
+  { key: "kemarin", label: "Kemarin", range: (t) => ({ from: addDays(t, -1), to: addDays(t, -1) }) },
   { key: "7-hari", label: "7 hari", range: (t) => ({ from: addDays(t, -6), to: t }) },
   { key: "30-hari", label: "30 hari", range: (t) => ({ from: addDays(t, -29), to: t }) },
   { key: "bulan-ini", label: "Bulan ini", range: (t) => ({ from: monthStart(t), to: t }) },
