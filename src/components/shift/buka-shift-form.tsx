@@ -53,8 +53,8 @@ export function BukaShiftForm({ isOwner }: { isOwner: boolean }) {
       {/* Pre-order tidak butuh shift terbuka (order borongan lewat WhatsApp
           malam hari saat warung tutup) — jadi harus tetap bisa dijangkau
           dari sini, satu-satunya layar yang pasti kebuka sebelum shift ada.
-          Catatan Mi Mentah juga tidak butuh shift (uangnya terpisah total
-          dari kasir — lihat CLAUDE.md "Catatan Mi Mentah") dan sering
+          Note (Mi Mentah & Frozen) juga tidak butuh shift (uangnya terpisah
+          total dari kasir — lihat CLAUDE.md "Catatan Mi Mentah") dan sering
           dicatat pagi hari sebelum warung buka, jadi butuh jalan masuk yang
           sama — tapi OWNER only, sama seperti /note sendiri. */}
       <div className="flex flex-wrap items-center justify-center gap-2">
@@ -63,7 +63,7 @@ export function BukaShiftForm({ isOwner }: { isOwner: boolean }) {
         </Link>
         {isOwner && (
           <Link href="/note" className="rounded-pill bg-muted flex h-12 items-center px-4 text-sm font-semibold text-ink">
-            Note (Mi Mentah)
+            Note
           </Link>
         )}
         <SignOutButton />

@@ -24,7 +24,7 @@ const MENU_ENTRIES: MenuEntry[] = [
   { href: "/order-aktif", label: "Order Aktif" },
   { href: "/riwayat-pesanan", label: "Riwayat Pesanan" },
   { href: "/dashboard", label: "Dashboard", ownerOnly: true },
-  { href: "/note", label: "Note (Mi Mentah)", ownerOnly: true },
+  { href: "/note", label: "Note", ownerOnly: true },
   { href: "/admin/settings", label: "Pengaturan", ownerOnly: true },
   { href: "/pesanan-terjadwal", label: "Pesanan Terjadwal" },
   { href: "/piutang", label: "Piutang" },

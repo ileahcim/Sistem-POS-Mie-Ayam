@@ -12,7 +12,7 @@ export async function buildMieReportWorkbook(): Promise<ExcelJS.Workbook> {
   const { customers, entries } = await getMieExportData();
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "POS Mi Ayam — Catatan Mi Mentah";
+  workbook.creator = "POS Mi Ayam — Note (Mi Mentah)";
   workbook.created = new Date();
 
   const customerSheet = workbook.addWorksheet("Pelanggan");

@@ -11,7 +11,7 @@ const BASE: Record<NoteBook, string> = { mie: "/note", frozen: "/note/frozen" };
 
 export const NOTE_BOOK = {
   mie: {
-    title: "Catatan Mi Mentah",
+    title: "Note",
     orderLabel: "+ Pesanan",
     orderHref: "/note/pesanan/baru",
     paymentHref: "/note/pembayaran/baru",
@@ -19,7 +19,9 @@ export const NOTE_BOOK = {
     exportHref: "/note/export",
   },
   frozen: {
-    title: "Buku Frozen",
+    // Same "Note" as Mi Mentah — the book switcher under the header says
+    // which book this is; Frozen has no name of its own up here.
+    title: "Note",
     // The Frozen book's own word for an order, used on every screen of it.
     orderLabel: "+ Pengambilan",
     orderHref: "/note/frozen/pengambilan/baru",

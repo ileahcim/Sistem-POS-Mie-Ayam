@@ -11,7 +11,7 @@ export async function GET() {
 
   const workbook = await buildMieReportWorkbook();
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `catatan-mi-mentah-${localDateStr(new Date())}.xlsx`;
+  const filename = `note-mi-mentah-${localDateStr(new Date())}.xlsx`;
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
