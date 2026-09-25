@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoHistoryIcon } from "@/components/ui/empty-state-icons";
 import { AppHeader } from "@/components/ui/app-header";
+import { noteSectionHref } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
 import { EditFrozenCustomerSheet, FrozenAdjustmentSheet, FrozenEntrySheet } from "./frozen-sheets";
 
@@ -37,12 +38,14 @@ export function FrozenCustomerDetailScreen({
   posReceivables,
   printerDriver,
   store,
+  backHref,
   nav,
 }: {
   posReceivables: PosReceivableRow[];
   customer: FrozenCustomerDetail;
   printerDriver: PrinterDriver;
   store: { storeName: string; address: string | null; phone: string | null; printLogo: boolean };
+  backHref: string;
   nav: HeaderNav;
 }) {
   const router = useRouter();
@@ -99,7 +102,7 @@ export function FrozenCustomerDetailScreen({
     const result = await deleteFrozenCustomer(customer.id);
     setBusy(false);
     if (!result.ok) return setError(result.error);
-    router.push("/note/frozen");
+    router.push(noteSectionHref("frozen", "utang"));
   }
 
   return (
@@ -109,7 +112,7 @@ export function FrozenCustomerDetailScreen({
         title={customer.name}
         subtitle={customer.isActive ? undefined : <Badge variant="neutral">Nonaktif</Badge>}
         actions={
-          <LinkButton href="/note/frozen" variant="secondary" size="compact">
+          <LinkButton href={backHref} variant="secondary" size="compact">
             Kembali
           </LinkButton>
         }
@@ -132,10 +135,10 @@ export function FrozenCustomerDetailScreen({
 
           {customer.isActive ? (
             <div className="flex flex-wrap gap-2">
-              <LinkButton href={`/note/frozen/pengambilan/baru?customerId=${customer.id}`} variant="primary">
+              <LinkButton href={`/note/frozen/pengambilan/baru?customerId=${customer.id}&dari=pelanggan`} variant="primary">
                 + Pengambilan
               </LinkButton>
-              <LinkButton href={`/note/frozen/pembayaran/baru?customerId=${customer.id}`} variant="secondary">
+              <LinkButton href={`/note/frozen/pembayaran/baru?customerId=${customer.id}&dari=pelanggan`} variant="secondary">
                 + Pembayaran
               </LinkButton>
               <Button variant="secondary" onClick={() => setSheet("adjust")}>

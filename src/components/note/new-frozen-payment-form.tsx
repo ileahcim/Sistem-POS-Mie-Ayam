@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { AppHeader } from "@/components/ui/app-header";
+import { noteAfterSaveHref, noteFormCancelHref, type NoteOrigin } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
 import { FROZEN_PAYMENT_PRESETS } from "@/lib/frozen/types";
 import { useFrozenReceiptPrompt } from "@/components/printing/use-frozen-receipt-prompt";
@@ -22,12 +23,15 @@ import { PaymentMethodPicker } from "./payment-method-picker";
 export function NewFrozenPaymentForm({
   customers,
   initialCustomerId,
+  origin,
   printerDriver,
   store,
   nav,
 }: {
   customers: FrozenCustomerRow[];
   initialCustomerId?: string;
+  // Where the form was opened from — decides Batal and where a save lands.
+  origin: NoteOrigin;
   printerDriver: PrinterDriver;
   store: { storeName: string; address: string | null; phone: string | null; printLogo: boolean };
   nav: HeaderNav;
@@ -98,7 +102,7 @@ export function NewFrozenPaymentForm({
         amountPaid: result.amountPaid,
         debtAfter: result.debtAfter,
       },
-      () => router.push(`/note/frozen/pelanggan/${customerId}`),
+      () => router.push(noteAfterSaveHref("frozen", origin, customerId, result.entryId)),
     );
   }
 
@@ -108,7 +112,7 @@ export function NewFrozenPaymentForm({
         nav={nav}
         title="Pembayaran Frozen Baru"
         actions={
-          <LinkButton href="/note/frozen" variant="secondary" size="compact">
+          <LinkButton href={noteFormCancelHref("frozen", origin, initialCustomerId ?? "")} variant="secondary" size="compact">
             Batal
           </LinkButton>
         }

@@ -5,16 +5,23 @@ import { getSettings } from "@/lib/settings/get-settings";
 import { getPosReceivablesByName } from "@/lib/orders/get-pos-receivables-by-name";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { FrozenCustomerDetailScreen } from "@/components/note/frozen-customer-detail-screen";
+import { noteSectionHref } from "@/lib/note/books";
 
 export default async function FrozenCustomerDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ customerId: string }>;
+  searchParams: Promise<{ dari?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
   const { customerId } = await params;
+  // Opened from a Hari Ini row → Kembali returns there; otherwise to Utang,
+  // where the customer list lives.
+  const { dari } = await searchParams;
+  const backHref = noteSectionHref("frozen", dari === "hari-ini" ? "hari-ini" : "utang");
   const [customer, settings, nav] = await Promise.all([
     getFrozenCustomerDetail(customerId),
     getSettings(),
@@ -30,6 +37,7 @@ export default async function FrozenCustomerDetailPage({
       posReceivables={posReceivables}
       printerDriver={settings.printerDriver}
       store={{ storeName: settings.storeName, address: settings.address, phone: settings.phone, printLogo: settings.printLogo }}
+      backHref={backHref}
       nav={nav}
     />
   );

@@ -1,5 +1,3 @@
-import type { TodayActivityRow } from "@/lib/note/today-activity";
-import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { MieSummary } from "@/lib/mie/get-mie-summary";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
@@ -8,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { AppHeader } from "@/components/ui/app-header";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { CustomerList } from "./customer-list";
-import { NoteBookTabs } from "./note-book-tabs";
+import { NoteNav } from "./note-nav";
+import { NOTE_BOOK } from "@/lib/note/books";
 
 function SummaryCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
@@ -20,42 +19,26 @@ function SummaryCard({ label, value, detail }: { label: string; value: string; d
   );
 }
 
-// Dashboard for the raw-noodle ledger module — fully separate from the
-// cashier system (see CLAUDE.md-worthy brief: money here never touches
-// Shift/Order/omzet). Quick actions up top since the owner records these
-// standing in the production area — no digging through a nav to place an
-// order or a payment.
+// Utang tab of the raw-noodle ledger — fully separate from the cashier
+// system (money here never touches Shift/Order/omzet): who owes what, plus
+// "+ Pesanan"/"+ Bayar" per customer. Recording from scratch lives on the
+// Hari Ini tab (note-today-screen.tsx).
 export function NoteScreen({
   customers,
-  todayActivity,
   summary,
   nav,
 }: {
   customers: MieCustomerRow[];
-  todayActivity: TodayActivityRow[];
   summary: MieSummary;
   nav: HeaderNav;
 }) {
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <AppHeader nav={nav} title="Catatan Mi Mentah" />
+      <AppHeader nav={nav} title={NOTE_BOOK.mie.title} />
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="mx-auto flex max-w-2xl flex-col gap-4">
-          <NoteBookTabs active="mie" />
-          {/* The door to the monitoring screen — first thing on the page and
-              visually lifted, since as a plain ghost button in the row of
-              actions below it read as just another small link. */}
-          <Link
-            href="/note/ringkasan"
-            className="rounded-card border-primary bg-primary-soft flex min-h-16 items-center gap-3 border-2 px-4 py-3"
-          >
-            <span className="flex flex-1 flex-col">
-              <span className="text-ink text-base font-bold">Ringkasan</span>
-              <span className="text-ink-muted text-sm">Omzet, pembayaran, dan rincian per jenis mi</span>
-            </span>
-            <span className="text-primary-strong text-xl font-bold">›</span>
-          </Link>
+        <div className="mx-auto flex max-w-3xl flex-col gap-4">
+          <NoteNav book="mie" section="utang" />
 
           <div className="flex flex-wrap gap-3">
             <SummaryCard
@@ -78,27 +61,21 @@ export function NoteScreen({
             />
           </div>
 
+          {/* Setup and export sit here with the customers they concern — the
+              Hari Ini tab stays clean for recording. */}
           <div className="flex flex-wrap gap-2">
-            {/* The grey buttons blended into the page background, so every
-                non-primary one here carries a visible border now. */}
-            <LinkButton href="/note/pesanan/baru" variant="primary">
-              + Pesanan
-            </LinkButton>
-            <LinkButton href="/note/pembayaran/baru" variant="secondary" className="border-border border">
-              + Pembayaran
-            </LinkButton>
-            <LinkButton href="/note/pelanggan/baru" variant="secondary" className="border-border border">
+            <LinkButton href={NOTE_BOOK.mie.newCustomerHref} variant="secondary" className="border-border border">
               + Pelanggan
             </LinkButton>
             <LinkButton href="/note/produk" variant="ghost">
               Harga Produk
             </LinkButton>
-            <a href="/note/export" className={buttonClassName("ghost", "default", false)}>
+            <a href={NOTE_BOOK.mie.exportHref} className={buttonClassName("ghost", "default", false)}>
               Export Excel
             </a>
           </div>
 
-          <CustomerList customers={customers} todayActivity={todayActivity} />
+          <CustomerList customers={customers} />
         </div>
       </div>
     </div>

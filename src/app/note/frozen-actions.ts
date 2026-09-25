@@ -70,6 +70,7 @@ export type CreateFrozenOrderInput = {
 export type CreateFrozenOrderResult =
   | {
       ok: true;
+      entryId: string; // lets the Hari Ini tab highlight the new row
       customerName: string;
       pcs: number;
       pricePerPcs: number;
@@ -99,7 +100,7 @@ export async function createFrozenOrder(input: CreateFrozenOrderInput): Promise<
   if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
 
   const amount = Math.round(input.pcs * input.pricePerPcs);
-  await prisma.frozenLedgerEntry.create({
+  const entry = await prisma.frozenLedgerEntry.create({
     data: {
       customerId: input.customerId,
       kind: "ORDER",
@@ -115,6 +116,7 @@ export async function createFrozenOrder(input: CreateFrozenOrderInput): Promise<
   const debtAfter = await currentBalance(input.customerId);
   return {
     ok: true,
+    entryId: entry.id,
     customerName: customer.name,
     pcs: input.pcs,
     pricePerPcs: Math.round(input.pricePerPcs),
@@ -133,7 +135,7 @@ export type CreateFrozenPaymentInput = {
 };
 
 export type CreateFrozenPaymentResult =
-  | { ok: true; customerName: string; amountPaid: number; debtAfter: number; recordedAt: string }
+  | { ok: true; entryId: string; customerName: string; amountPaid: number; debtAfter: number; recordedAt: string }
   | { ok: false; error: string };
 
 export async function createFrozenPayment(input: CreateFrozenPaymentInput): Promise<CreateFrozenPaymentResult> {
@@ -151,7 +153,7 @@ export async function createFrozenPayment(input: CreateFrozenPaymentInput): Prom
   if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
 
   const amountPaid = Math.round(input.amount);
-  await prisma.frozenLedgerEntry.create({
+  const entry = await prisma.frozenLedgerEntry.create({
     data: {
       customerId: input.customerId,
       kind: "PAYMENT",
@@ -164,7 +166,7 @@ export async function createFrozenPayment(input: CreateFrozenPaymentInput): Prom
   });
 
   const debtAfter = await currentBalance(input.customerId);
-  return { ok: true, customerName: customer.name, amountPaid, debtAfter, recordedAt: new Date().toISOString() };
+  return { ok: true, entryId: entry.id, customerName: customer.name, amountPaid, debtAfter, recordedAt: new Date().toISOString() };
 }
 
 // ---------------------------------------------------------------------------

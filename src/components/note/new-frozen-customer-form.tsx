@@ -33,7 +33,7 @@ export function NewFrozenCustomerForm({ nav }: { nav: HeaderNav }) {
         nav={nav}
         title="Pelanggan Frozen Baru"
         actions={
-          <LinkButton href="/note/frozen" variant="secondary" size="compact">
+          <LinkButton href="/note/frozen/utang" variant="secondary" size="compact">
             Batal
           </LinkButton>
         }

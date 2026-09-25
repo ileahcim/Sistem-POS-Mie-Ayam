@@ -9,15 +9,10 @@ import { PriceText } from "@/components/ui/price-text";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoMieCustomerIcon } from "@/components/ui/empty-state-icons";
 import { cn } from "@/components/ui/cn";
-import type { TodayActivityRow } from "@/lib/note/today-activity";
-import { TodayActivityList } from "./today-activity-list";
 
-// "today" isn't a sort — it swaps the customer list for every transaction
-// recorded today (TodayActivityList), sitting in the same toggle so it's one
-// tap from the list the owner already has open.
-type SortMode = "debt" | "name" | "today";
+type SortMode = "debt" | "name";
 
-const SORT_LABEL: Record<SortMode, string> = { debt: "Utang terbesar", name: "Nama A-Z", today: "Aktivitas Hari Ini" };
+const SORT_LABEL: Record<SortMode, string> = { debt: "Utang terbesar", name: "Nama A-Z" };
 
 function sortRows(rows: FrozenCustomerRow[], mode: SortMode): FrozenCustomerRow[] {
   const copy = [...rows];
@@ -42,10 +37,10 @@ function CustomerRows({ rows }: { rows: FrozenCustomerRow[] }) {
       </Link>
       {c.isActive && (
         <div className="flex shrink-0 gap-2">
-          <LinkButton href={`/note/frozen/pengambilan/baru?customerId=${c.id}`} variant="ghost">
+          <LinkButton href={`/note/frozen/pengambilan/baru?customerId=${c.id}&dari=utang`} variant="ghost">
             + Pengambilan
           </LinkButton>
-          <LinkButton href={`/note/frozen/pembayaran/baru?customerId=${c.id}`} variant="secondary">
+          <LinkButton href={`/note/frozen/pembayaran/baru?customerId=${c.id}&dari=utang`} variant="secondary">
             + Bayar
           </LinkButton>
         </div>
@@ -54,13 +49,7 @@ function CustomerRows({ rows }: { rows: FrozenCustomerRow[] }) {
   ));
 }
 
-export function FrozenCustomerList({
-  customers,
-  todayActivity,
-}: {
-  customers: FrozenCustomerRow[];
-  todayActivity: TodayActivityRow[];
-}) {
+export function FrozenCustomerList({ customers }: { customers: FrozenCustomerRow[] }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("debt");
   const [showInactive, setShowInactive] = useState(false);
@@ -90,13 +79,7 @@ export function FrozenCustomerList({
           placeholder="Cari nama pelanggan"
           className="rounded-input border-border bg-surface h-12 min-w-48 flex-1 border px-3 text-base"
         />
-        {/* Three pills don't fit beside the search box on a phone: there the
-            group takes its own full-width row, pills sharing it equally. */}
-        <div
-          className="rounded-pill bg-muted grid min-h-12 w-full grid-cols-3 items-center p-1 sm:flex sm:w-auto"
-          role="group"
-          aria-label="Urutan"
-        >
+        <div className="rounded-pill bg-muted flex h-12 items-center p-1" role="group" aria-label="Urutan">
           {(Object.keys(SORT_LABEL) as SortMode[]).map((mode) => (
             <button
               key={mode}
@@ -104,7 +87,7 @@ export function FrozenCustomerList({
               aria-pressed={sort === mode}
               onClick={() => setSort(mode)}
               className={cn(
-                "rounded-pill min-h-10 px-2 text-sm leading-tight font-semibold sm:px-4",
+                "rounded-pill h-10 px-4 text-sm font-semibold",
                 sort === mode ? "bg-surface text-ink shadow-card" : "text-ink-muted",
               )}
             >
@@ -114,29 +97,23 @@ export function FrozenCustomerList({
         </div>
       </div>
 
-      {sort === "today" ? (
-        <Card>
-          <TodayActivityList rows={todayActivity} customerHref={(id) => `/note/frozen/pelanggan/${id}`} query={query} />
-        </Card>
-      ) : (
-        <Card>
-          {!hasAnyActive ? (
-            <EmptyState
-              icon={<NoMieCustomerIcon />}
-              title="Belum ada pelanggan"
-              description="Tambahkan pelanggan Frozen pertama untuk mulai mencatat pengambilan dan pembayaran."
-              actionHref="/note/frozen/pelanggan/baru"
-              actionLabel="+ Pelanggan"
-            />
-          ) : active.length === 0 ? (
-            <p className="text-ink-faint p-6 text-center text-sm">Tidak ada pelanggan yang cocok dengan “{query}”.</p>
-          ) : (
-            <CustomerRows rows={active} />
-          )}
-        </Card>
-      )}
+      <Card>
+        {!hasAnyActive ? (
+          <EmptyState
+            icon={<NoMieCustomerIcon />}
+            title="Belum ada pelanggan"
+            description="Tambahkan pelanggan Frozen pertama untuk mulai mencatat pengambilan dan pembayaran."
+            actionHref="/note/frozen/pelanggan/baru"
+            actionLabel="+ Pelanggan"
+          />
+        ) : active.length === 0 ? (
+          <p className="text-ink-faint p-6 text-center text-sm">Tidak ada pelanggan yang cocok dengan “{query}”.</p>
+        ) : (
+          <CustomerRows rows={active} />
+        )}
+      </Card>
 
-      {sort !== "today" && inactive.length > 0 && (
+      {inactive.length > 0 && (
         <div className="flex flex-col gap-2">
           <button
             type="button"

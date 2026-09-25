@@ -7,9 +7,14 @@ import { getMieCosts } from "@/lib/mie/get-mie-costs";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { ProductDefaultsScreen } from "@/components/note/product-defaults-screen";
 
-export default async function MieProductDefaultsPage() {
+// Shared by both books; Kembali returns to whichever screen linked here.
+const BACK_HREF: Record<string, string> = { frozen: "/note/frozen/utang", ringkasan: "/note/ringkasan" };
+
+export default async function MieProductDefaultsPage({ searchParams }: { searchParams: Promise<{ dari?: string }> }) {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
+
+  const { dari } = await searchParams;
 
   const [defaults, pasarPricePerKg, frozenPricePerPcs, costs, nav] = await Promise.all([
     getMieProductDefaults(),
@@ -24,6 +29,7 @@ export default async function MieProductDefaultsPage() {
       pasarPricePerKg={pasarPricePerKg}
       frozenPricePerPcs={frozenPricePerPcs}
       costs={costs}
+      backHref={BACK_HREF[dari ?? ""] ?? "/note/utang"}
       nav={nav}
     />
   );

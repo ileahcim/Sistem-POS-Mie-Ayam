@@ -14,12 +14,14 @@ export function ProductDefaultsScreen({
   pasarPricePerKg,
   frozenPricePerPcs,
   costs,
+  backHref,
   nav,
 }: {
   costs: MieCosts;
   defaults: MieProductDefaults;
   pasarPricePerKg: number | null;
   frozenPricePerPcs: number | null;
+  backHref: string;
   nav: HeaderNav;
 }) {
   const missingCosts = MIE_COST_ROWS.filter((r) => costs[r.key] == null).length;
@@ -30,7 +32,7 @@ export function ProductDefaultsScreen({
         nav={nav}
         title="Harga Mi Mentah"
         actions={
-          <LinkButton href="/note" variant="secondary" size="compact">
+          <LinkButton href={backHref} variant="secondary" size="compact">
             Kembali
           </LinkButton>
         }

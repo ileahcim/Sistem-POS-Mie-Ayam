@@ -33,7 +33,7 @@ export function NewCustomerForm({ nav }: { nav: HeaderNav }) {
         nav={nav}
         title="Pelanggan Baru"
         actions={
-          <LinkButton href="/note" variant="secondary" size="compact">
+          <LinkButton href="/note/utang" variant="secondary" size="compact">
             Batal
           </LinkButton>
         }

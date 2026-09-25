@@ -4,16 +4,23 @@ import { getMieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
 import { getPosReceivablesByName } from "@/lib/orders/get-pos-receivables-by-name";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { CustomerDetailScreen } from "@/components/note/customer-detail-screen";
+import { noteSectionHref } from "@/lib/note/books";
 
 export default async function MieCustomerDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ customerId: string }>;
+  searchParams: Promise<{ dari?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
   const { customerId } = await params;
+  // Opened from a Hari Ini row → Kembali returns there; otherwise to Utang,
+  // where the customer list lives.
+  const { dari } = await searchParams;
+  const backHref = noteSectionHref("mie", dari === "hari-ini" ? "hari-ini" : "utang");
   const [customer, nav] = await Promise.all([
     getMieCustomerDetail(customerId),
     getHeaderNav(),
@@ -22,5 +29,5 @@ export default async function MieCustomerDetailPage({
   // Same name also owing for POS menu orders (piutang) — display only.
   const posReceivables = await getPosReceivablesByName(customer.name);
 
-  return <CustomerDetailScreen customer={customer} posReceivables={posReceivables} nav={nav} />;
+  return <CustomerDetailScreen customer={customer} posReceivables={posReceivables} backHref={backHref} nav={nav} />;
 }

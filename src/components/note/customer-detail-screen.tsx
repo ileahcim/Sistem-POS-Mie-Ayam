@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NoHistoryIcon } from "@/components/ui/empty-state-icons";
 import { AppHeader } from "@/components/ui/app-header";
+import { noteSectionHref } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
 import { AdjustmentSheet, EditCustomerSheet, EntrySheet } from "./mie-sheets";
 
@@ -35,10 +36,12 @@ type Entry = MieCustomerDetail["entries"][number];
 export function CustomerDetailScreen({
   customer,
   posReceivables,
+  backHref,
   nav,
 }: {
   posReceivables: PosReceivableRow[];
   customer: MieCustomerDetail;
+  backHref: string;
   nav: HeaderNav;
 }) {
   const router = useRouter();
@@ -67,7 +70,7 @@ export function CustomerDetailScreen({
     const result = await deleteMieCustomer(customer.id);
     setBusy(false);
     if (!result.ok) return setError(result.error);
-    router.push("/note");
+    router.push(noteSectionHref("mie", "utang"));
   }
 
   return (
@@ -77,7 +80,7 @@ export function CustomerDetailScreen({
         title={customer.name}
         subtitle={customer.isActive ? undefined : <Badge variant="neutral">Nonaktif</Badge>}
         actions={
-          <LinkButton href="/note" variant="secondary" size="compact">
+          <LinkButton href={backHref} variant="secondary" size="compact">
             Kembali
           </LinkButton>
         }
@@ -100,10 +103,10 @@ export function CustomerDetailScreen({
 
           {customer.isActive ? (
             <div className="flex flex-wrap gap-2">
-              <LinkButton href={`/note/pesanan/baru?customerId=${customer.id}`} variant="primary">
+              <LinkButton href={`/note/pesanan/baru?customerId=${customer.id}&dari=pelanggan`} variant="primary">
                 + Pesanan
               </LinkButton>
-              <LinkButton href={`/note/pembayaran/baru?customerId=${customer.id}`} variant="secondary">
+              <LinkButton href={`/note/pembayaran/baru?customerId=${customer.id}&dari=pelanggan`} variant="secondary">
                 + Pembayaran
               </LinkButton>
               <Button variant="secondary" onClick={() => setSheet("adjust")}>

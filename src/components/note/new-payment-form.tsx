@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { AppHeader } from "@/components/ui/app-header";
+import { noteAfterSaveHref, noteFormCancelHref, type NoteOrigin } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
 import { MIE_PAYMENT_PRESETS } from "@/lib/mie/types";
 
@@ -24,10 +25,13 @@ import { MIE_PAYMENT_PRESETS } from "@/lib/mie/types";
 export function NewPaymentForm({
   customers,
   initialCustomerId,
+  origin,
   nav,
 }: {
   customers: MieCustomerRow[];
   initialCustomerId?: string;
+  // Where the form was opened from — decides Batal and where a save lands.
+  origin: NoteOrigin;
   nav: HeaderNav;
 }) {
   const router = useRouter();
@@ -86,7 +90,7 @@ export function NewPaymentForm({
     });
     setSaving(false);
     if (!result.ok) return setError(result.error);
-    router.push(`/note/pelanggan/${customerId}`);
+    router.push(noteAfterSaveHref("mie", origin, customerId, result.entryId));
   }
 
   return (
@@ -95,7 +99,7 @@ export function NewPaymentForm({
         nav={nav}
         title="Pembayaran Baru"
         actions={
-          <LinkButton href="/note" variant="secondary" size="compact">
+          <LinkButton href={noteFormCancelHref("mie", origin, initialCustomerId ?? "")} variant="secondary" size="compact">
             Batal
           </LinkButton>
         }

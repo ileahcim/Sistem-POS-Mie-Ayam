@@ -11,6 +11,8 @@ import {
 } from "@/lib/note/payment-method";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+// A new order/payment row: its id lets the Hari Ini tab highlight it.
+export type CreateMieEntryResult = { ok: true; entryId: string } | { ok: false; error: string };
 
 export async function createMieCustomer(
   name: string,
@@ -93,7 +95,7 @@ function validateJenis(
   };
 }
 
-export async function createMieOrder(input: CreateMieOrderInput): Promise<ActionResult> {
+export async function createMieOrder(input: CreateMieOrderInput): Promise<CreateMieEntryResult> {
   const user = await requireRole("OWNER");
 
   const customer = await prisma.mieCustomer.findUnique({ where: { id: input.customerId } });
@@ -108,7 +110,7 @@ export async function createMieOrder(input: CreateMieOrderInput): Promise<Action
   const date = new Date(input.date);
   if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
 
-  await prisma.mieLedgerEntry.create({
+  const entry = await prisma.mieLedgerEntry.create({
     data: {
       customerId: input.customerId,
       kind: "ORDER",
@@ -122,7 +124,7 @@ export async function createMieOrder(input: CreateMieOrderInput): Promise<Action
     },
   });
 
-  return { ok: true };
+  return { ok: true, entryId: entry.id };
 }
 
 export type CreateMiePaymentInput = {
@@ -133,7 +135,7 @@ export type CreateMiePaymentInput = {
   note: string;
 };
 
-export async function createMiePayment(input: CreateMiePaymentInput): Promise<ActionResult> {
+export async function createMiePayment(input: CreateMiePaymentInput): Promise<CreateMieEntryResult> {
   const user = await requireRole("OWNER");
 
   const customer = await prisma.mieCustomer.findUnique({ where: { id: input.customerId } });
@@ -148,7 +150,7 @@ export async function createMiePayment(input: CreateMiePaymentInput): Promise<Ac
   const date = new Date(input.date);
   if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
 
-  await prisma.mieLedgerEntry.create({
+  const entry = await prisma.mieLedgerEntry.create({
     data: {
       customerId: input.customerId,
       kind: "PAYMENT",
@@ -160,7 +162,7 @@ export async function createMiePayment(input: CreateMiePaymentInput): Promise<Ac
     },
   });
 
-  return { ok: true };
+  return { ok: true, entryId: entry.id };
 }
 
 // ---------------------------------------------------------------------------

@@ -4,19 +4,23 @@ import Link from "next/link";
 import type { TodayActivityRow } from "@/lib/note/today-activity";
 import { formatRupiah } from "@/lib/printing/format";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/components/ui/cn";
 
-// "Aktivitas Hari Ini" — the third view of the /note and /note/frozen lists
-// (shared by both books). Every row opens the customer's page, exactly like
-// a row of the customer list. Money totals on top are plain sums of the rows
-// shown — a quick check of "what came in today", not a report (Ringkasan is).
+// Every order and payment recorded today — the list on Note's Hari Ini tab
+// (shared by both books). Every row opens the customer's page. Money totals
+// on top are plain sums of the rows shown — a quick check of "what came in
+// today", not a report (Ringkasan is). `highlightId` tints the row just
+// saved (NoteTodayPanel clears it after a moment; the colour fades out).
 export function TodayActivityList({
   rows,
   customerHref,
   query,
+  highlightId = null,
 }: {
   rows: TodayActivityRow[];
   customerHref: (customerId: string) => string;
   query: string;
+  highlightId?: string | null;
 }) {
   const q = query.trim().toLowerCase();
   const shown = q ? rows.filter((r) => r.customerName.toLowerCase().includes(q)) : rows;
@@ -45,7 +49,12 @@ export function TodayActivityList({
         <Link
           key={r.id}
           href={customerHref(r.customerId)}
-          className="border-border hover:bg-muted flex min-h-14 items-center gap-3 border-b px-4 py-2 last:border-b-0"
+          data-entry-id={r.id}
+          aria-current={r.id === highlightId ? "true" : undefined}
+          className={cn(
+            "border-border flex min-h-14 items-center gap-3 border-b px-4 py-2 transition-colors duration-1000 last:border-b-0",
+            r.id === highlightId ? "bg-primary-soft" : "hover:bg-muted",
+          )}
         >
           <span className="text-ink-muted w-12 shrink-0 text-sm tabular-nums">{r.time}</span>
           <span className="flex min-w-0 flex-1 flex-col">

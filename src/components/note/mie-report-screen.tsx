@@ -26,11 +26,12 @@ import {
 } from "@/lib/mie/types";
 import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatRupiah } from "@/lib/printing/format";
-import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { AppHeader } from "@/components/ui/app-header";
+import { NOTE_BOOK } from "@/lib/note/books";
+import { NoteNav } from "./note-nav";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
 import { DrilldownStat, LedgerDrilldown, type DrilldownRow } from "./ledger-drilldown";
@@ -217,18 +218,11 @@ export function MieReportScreen({
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
-      <AppHeader
-        nav={nav}
-        title="Ringkasan Mi Mentah"
-        actions={
-          <LinkButton href="/note" variant="secondary" size="compact">
-            Kembali
-          </LinkButton>
-        }
-      />
+      <AppHeader nav={nav} title={NOTE_BOOK.mie.title} />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
+          <NoteNav book="mie" section="ringkasan" />
           <Card padded className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-3">
               <div
@@ -342,7 +336,7 @@ export function MieReportScreen({
                 );
               })}
               {noCostJenis.some((k) => k !== "CUSTOM") && (
-                <Link href="/note/produk" className="underline">
+                <Link href="/note/produk?dari=ringkasan" className="underline">
                   Isi modal per kg di Harga Produk
                 </Link>
               )}
