@@ -141,6 +141,9 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
   const lines: LayoutLine[] = [
     ...headerLines(data),
     meta("No. Order", String(data.orderNumber)),
+    // Long names continue on the next line under the value, same as the
+    // Bukti Uang Muka's "Pemesan" — never past the paper's edge.
+    ...(data.customerName?.trim() ? metaWrapped("Nama", data.customerName.trim()) : []),
     meta("Tanggal", formatTanggal(data.printedAt)),
     meta("Jam", formatJam(data.printedAt)),
     meta("Kasir", data.kasirName),

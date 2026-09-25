@@ -53,6 +53,11 @@ export type ReceiptData = {
   printedAt: Date;
   channel: ReceiptChannel;
   tableLabel?: string | null;
+  // Order.customerName (nama tamu / pemesan pre-order). Absent or empty =
+  // no "Nama" line at all, so a struk without a name is byte for byte what
+  // it always was. Missing from this type until 25 Sep 2026 — the name was
+  // stored on the order but never reached the paper.
+  customerName?: string | null;
   logoRaster?: LogoRaster | null;
   // Owner-toggle: false menghapus logo dari struk (setelan "Cetak logo di
   // struk" di Pengaturan). Undefined/true = logo ikut dicetak. Dinolongkan

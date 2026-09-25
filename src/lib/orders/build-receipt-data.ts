@@ -24,6 +24,7 @@ export function buildReceiptData(order: OrderDetail, settings: StoreSettings): R
     printedAt: order.paidAt ? new Date(order.paidAt) : new Date(),
     channel: order.channel,
     tableLabel: order.tableLabel,
+    customerName: order.customerName,
     items: order.items.map((item) => ({
       productName: item.productName,
       addons: item.addons,
