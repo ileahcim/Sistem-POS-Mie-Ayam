@@ -16,6 +16,7 @@ export type StoreSettings = {
   preorderReminderMinutes: number;
   kitchenTicketEnabled: boolean;
   popularComboMinSales: number;
+  cashChangeEnabled: boolean;
 };
 
 const FALLBACK: StoreSettings = {
@@ -32,6 +33,7 @@ const FALLBACK: StoreSettings = {
   preorderReminderMinutes: 120,
   kitchenTicketEnabled: false,
   popularComboMinSales: POPULAR_COMBO_DEFAULT_MIN_SALES,
+  cashChangeEnabled: true,
 };
 
 // The singleton row is created by prisma/seed.ts, but fall back gracefully
@@ -55,6 +57,7 @@ export async function getSettings(): Promise<StoreSettings> {
     preorderReminderMinutes: setting.preorderReminderMinutes,
     kitchenTicketEnabled: setting.kitchenTicketEnabled,
     popularComboMinSales: setting.popularComboMinSales,
+    cashChangeEnabled: setting.cashChangeEnabled,
   };
 }
 

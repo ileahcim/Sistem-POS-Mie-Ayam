@@ -20,6 +20,16 @@ export async function updateSheetBlurEnabled(sheetBlurEnabled: boolean): Promise
   return { ok: true };
 }
 
+// "Hitung kembalian": on (default) = full-Cash payments, cash piutang
+// settlements and cash DP ask for "Uang diterima" and show the change. Off =
+// payment is exactly the old tap-method-tap-Bayar. Notes only either way —
+// the drawer math never reads them (lib/orders/cash-change.ts).
+export async function updateCashChangeEnabled(cashChangeEnabled: boolean): Promise<ActionResult> {
+  await requireRole("OWNER");
+  await prisma.setting.update({ where: { id: "singleton" }, data: { cashChangeEnabled } });
+  return { ok: true };
+}
+
 // Off (default): the kitchen ticket feature is entirely invisible — no print
 // prompt on save/tambah item, no "Cetak Tiket Dapur" button anywhere. See
 // CLAUDE.md "Kertas dapur".

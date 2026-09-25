@@ -15,13 +15,14 @@ import { getPrinter } from "./get-printer";
 // like a real struk (see buildReceiptData / buildPackingListData) — a test
 // must never print a made-up shop name on real paper. Only the order lines
 // below are sample data.
-type TestPrintSettings = Pick<StoreSettings, "storeName" | "address" | "phone" | "receiptFooter" | "printLogo">;
+type TestPrintSettings = Pick<StoreSettings, "storeName" | "address" | "phone" | "receiptFooter" | "printLogo"> &
+  Partial<Pick<StoreSettings, "cashChangeEnabled">>;
 
 // printedAt is a raw instant (new Date()), which is always timezone-safe:
 // escpos.ts and ReceiptView render it through formatId (explicit
 // Asia/Jakarta), so the test prints the current WIB time whatever the
-// tablet's OS timezone is set to. No cashTendered/changeGiven: the real
-// struk never has a "Kembali" line (CLAUDE.md "Pembayaran").
+// tablet's OS timezone is set to. "Tunai"/"Kembali" appear exactly when a
+// real Cash struk would have them: with "Hitung kembalian" on.
 export function buildTestReceipt(settings: TestPrintSettings): ReceiptData {
   return {
     storeName: settings.storeName,
@@ -55,6 +56,7 @@ export function buildTestReceipt(settings: TestPrintSettings): ReceiptData {
     deliveryFee: 0,
     total: 39000,
     paymentMethod: "CASH",
+    ...(settings.cashChangeEnabled ? { cashTendered: 50000, changeGiven: 11000 } : {}),
     footerNote: settings.receiptFooter,
     printLogo: settings.printLogo,
   };

@@ -71,6 +71,10 @@ export type ReceiptData = {
   // struk is headed "BELUM LUNAS" and ends in a bold "Belum dibayar" line
   // instead of any "Bayar (...)" line, so it can never pass for a paid one.
   paymentMethod: ReceiptPaymentMethod | null;
+  // "Uang diterima" and the change of a full-Cash payment ("Hitung
+  // kembalian", 26 Sep 2026) — printed as "Tunai"/"Kembali" under the
+  // payment. Absent/null = not entered: the struk is byte for byte what it
+  // was before. Notes only; the drawer counts the total.
   cashTendered?: number | null;
   changeGiven?: number | null;
   // Only set when paymentMethod === "SPLIT" — the struk then prints two
@@ -108,6 +112,10 @@ export type DepositReceiptData = {
   deliveryFee: number;
   total: number;
   deposits: ReceiptDeposit[];
+  // "Uang diterima"/change of THIS proof's DP (the last of `deposits`) when
+  // it was cash and entered — printed right under that DP's line.
+  cashTendered?: number | null;
+  changeGiven?: number | null;
   footerNote?: string;
 };
 

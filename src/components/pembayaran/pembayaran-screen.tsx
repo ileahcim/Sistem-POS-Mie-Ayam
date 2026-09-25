@@ -24,12 +24,16 @@ import { formatId } from "@/lib/timezone";
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
 import { validateSplitCashAmount } from "@/lib/orders/validate-split-payment";
 import { RupiahInput } from "@/components/ui/rupiah-input";
+import { validateCashTendered } from "@/lib/orders/cash-change";
+import { CashTenderedField } from "./cash-tendered-field";
 import { payLater, payOrder, type PaymentMethod } from "@/app/pembayaran/actions";
 
 // Cash, QRIS, or both at once ("Cash + QRIS" — CLAUDE.md-worthy brief, 22
-// Sep 2026, for a customer whose cash falls short). Payment is otherwise
-// still "tap method, tap Bayar": no denomination input or change calc for
-// plain Cash/QRIS — only Cash + QRIS asks for one number (the cash slice).
+// Sep 2026, for a customer whose cash falls short). With "Hitung kembalian"
+// on (Setting.cashChangeEnabled, 26 Sep 2026) full Cash also asks "Uang
+// diterima" and shows the change — a note only, the drawer still counts the
+// total. Off: "tap method, tap Bayar" exactly as before. QRIS never asks;
+// Cash + QRIS asks for its cash slice (that IS what goes into the drawer).
 const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: "CASH", label: "Cash" },
   { value: "QRIS", label: "QRIS" },
@@ -51,6 +55,7 @@ export function PembayaranScreen({
   printerDriver,
   nav,
   kitchenTicketEnabled,
+  cashChangeEnabled,
 }: {
   order: OrderDetail;
   menu: MenuCategory[];
@@ -58,6 +63,7 @@ export function PembayaranScreen({
   printerDriver: PrinterDriver;
   nav: HeaderNav;
   kitchenTicketEnabled: boolean;
+  cashChangeEnabled: boolean;
 }) {
   const router = useRouter();
   const [choice, setChoice] = useState<Choice | null>(null);
@@ -70,6 +76,8 @@ export function PembayaranScreen({
   // Cash slice of a split payment — the only number the cashier ever types
   // here; the QRIS slice is always derived (amountDue - this), never typed.
   const [splitCash, setSplitCash] = useState<number | "">("");
+  // "Uang diterima" for full Cash — see CashTenderedField.
+  const [tendered, setTendered] = useState<number | "">("");
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
@@ -104,12 +112,15 @@ export function PembayaranScreen({
   const splitQris = method === "SPLIT" && typeof splitCash === "number" ? Math.max(0, amountDue - splitCash) : 0;
   const cashLike = method === "CASH" || method === "SPLIT";
   const needsDrawerChoice = settlingReceivable && cashLike;
+  const asksTendered = cashChangeEnabled && method === "CASH" && !nothingToCollect;
+  const tenderedOk = typeof tendered === "number" && validateCashTendered(tendered, amountDue) === null;
   const canPay =
     choice === "LATER"
       ? debtorName.trim() !== ""
       : (nothingToCollect || !!method) &&
         (method !== "SPLIT" || splitCashError === null) &&
-        (!needsDrawerChoice || cashToDrawer !== null);
+        (!needsDrawerChoice || cashToDrawer !== null) &&
+        (!asksTendered || tenderedOk);
   const payLabel = choice === "LATER"
     ? `Simpan sebagai Piutang - ${formatRupiah(order.total)}`
     : settlingReceivable
@@ -150,7 +161,7 @@ export function PembayaranScreen({
           : await payOrder(
               order.id,
               method ?? "CASH",
-              null,
+              asksTendered ? (tendered as number) : null,
               method === "SPLIT" ? (splitCash as number) : null,
               needsDrawerChoice ? cashToDrawer : null,
             );
@@ -442,6 +453,12 @@ export function PembayaranScreen({
                     <span className="text-ink-muted text-xs">Dicatat saja, tidak dihitung di laci</span>
                   </button>
                 </div>
+              </div>
+            )}
+
+            {asksTendered && (
+              <div className="mt-3">
+                <CashTenderedField due={amountDue} value={tendered} onChange={setTendered} />
               </div>
             )}
 

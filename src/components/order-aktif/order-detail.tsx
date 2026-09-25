@@ -18,6 +18,7 @@ import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { DEPOSIT_ORDER_CHANGE_REFUSAL, formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
+import { formatTenderedNote } from "@/lib/orders/cash-change";
 import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
 import { expandAddonOptionIds, groupOrderItemAddons } from "@/lib/cart/types";
 import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list";
@@ -157,6 +158,7 @@ export function OrderDetail({
   cashDepositAvailable,
   autoPrintReceipt,
   kitchenTicketEnabled,
+  cashChangeEnabled,
 }: {
   order: OrderDetailData;
   menu: MenuCategory[];
@@ -173,6 +175,8 @@ export function OrderDetail({
   // component IS the pre-order detail screen — pesanan-terjadwal-list.tsx
   // links here too).
   kitchenTicketEnabled: boolean;
+  // "Hitung kembalian" — Catat DP asks "Uang diterima" for a cash DP.
+  cashChangeEnabled: boolean;
 }) {
   const router = useRouter();
   const [markingServed, setMarkingServed] = useState(false);
@@ -337,6 +341,7 @@ export function OrderDetail({
             cashAvailable={cashDepositAvailable}
             autoPrint={autoPrintReceipt}
             printerDriver={printerDriver}
+            cashChangeEnabled={cashChangeEnabled}
           />
         )}
 
@@ -476,6 +481,9 @@ export function OrderDetail({
               Sudah dibayar ({formatPaymentMethodDetail(order.paymentMethod, order.splitCashAmount, order.splitQrisAmount)})
             </Badge>
           </div>
+        )}
+        {order.status === "PAID" && order.cashTendered != null && (
+          <p className="text-ink-muted mt-1 text-center text-sm">{formatTenderedNote(order.cashTendered, order.changeGiven)}</p>
         )}
       </div>
 

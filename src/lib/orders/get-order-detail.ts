@@ -38,6 +38,9 @@ export type OrderDetailDeposit = {
   amount: number;
   receivedAt: string; // ISO
   receivedByName: string;
+  // "Hitung kembalian" notes for a cash DP; null when not entered.
+  cashTendered: number | null;
+  changeGiven: number | null;
 };
 
 // How a cancelled pre-order's DP ended: handed back, or kept ("DP hangus").
@@ -181,6 +184,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       amount: d.amount,
       receivedAt: d.createdAt.toISOString(),
       receivedByName: d.createdBy.name,
+      cashTendered: d.cashTendered,
+      changeGiven: d.changeGiven,
     }));
   const position = depositPosition(total, deposits.map((d) => d.amount));
 

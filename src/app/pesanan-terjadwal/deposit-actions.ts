@@ -8,6 +8,7 @@ import { orderTotalFromLines } from "@/lib/orders/order-total";
 import { validateDeposit } from "@/lib/deposits/validate";
 import { isDepositMethod, type DepositMethod } from "@/lib/deposits/settle";
 import { getSettings } from "@/lib/settings/get-settings";
+import { changeFor, validateCashTendered } from "@/lib/orders/cash-change";
 import type { DepositReceiptData } from "@/lib/printing/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -34,11 +35,19 @@ export async function recordDeposit(
   orderId: string,
   amount: number,
   method: DepositMethod,
+  // "Uang diterima" for a cash DP ("Hitung kembalian", 26 Sep 2026): a note
+  // with its change on the DP row — the drawer counts `amount`, never this.
+  cashTendered: number | null = null,
 ): Promise<DepositReceiptResult> {
   const user = await requireUser();
 
   if (!Number.isInteger(amount) || amount <= 0) return { ok: false, error: "Nominal DP tidak valid." };
   if (!isDepositMethod(method)) return { ok: false, error: "Metode DP harus Cash atau QRIS." };
+  if (cashTendered != null) {
+    if (method !== "CASH") return { ok: false, error: "Uang diterima hanya dicatat untuk DP tunai." };
+    const tenderedError = validateCashTendered(cashTendered, amount);
+    if (tenderedError) return { ok: false, error: tenderedError };
+  }
 
   let depositId: string;
   try {
@@ -77,6 +86,8 @@ export async function recordDeposit(
           kind: "RECEIVED",
           method,
           amount,
+          cashTendered,
+          changeGiven: cashTendered != null ? changeFor(cashTendered, amount) : null,
           shiftId: openShift?.id ?? null,
           createdById: user.id,
         },

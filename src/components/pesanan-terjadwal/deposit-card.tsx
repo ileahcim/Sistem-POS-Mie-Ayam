@@ -16,6 +16,8 @@ import { PriceText } from "@/components/ui/price-text";
 import { Sheet } from "@/components/ui/sheet";
 import { DepositPicker, initialDepositDraft, type DepositDraft } from "./deposit-picker";
 import { useDepositReceiptPrompt } from "./use-deposit-receipt-prompt";
+import { formatTenderedNote, validateCashTendered } from "@/lib/orders/cash-change";
+import { CashTenderedField } from "@/components/pembayaran/cash-tendered-field";
 
 // The DP of one pre-order on its detail screen: each DP taken (with a reprint of
 // its "BUKTI UANG MUKA"), what is still owed — or, when the order shrank below
@@ -25,15 +27,19 @@ export function DepositCard({
   cashAvailable,
   autoPrint,
   printerDriver,
+  cashChangeEnabled,
 }: {
   order: OrderDetail;
   cashAvailable: boolean;
   autoPrint: boolean;
   printerDriver: PrinterDriver;
+  cashChangeEnabled: boolean;
 }) {
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [draft, setDraft] = useState<DepositDraft>(() => initialDepositDraft(cashAvailable));
+  // "Uang diterima" for a cash DP (see CashTenderedField) — measured against the DP amount.
+  const [tendered, setTendered] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reprintingId, setReprintingId] = useState<string | null>(null);
@@ -52,13 +58,17 @@ export function DepositCard({
     setSheetOpen(false);
     setError(null);
     setDraft(initialDepositDraft(cashAvailable));
+    setTendered("");
   }
+
+  const asksTendered = cashChangeEnabled && draft.method === "CASH" && draft.amount > 0;
+  const tenderedOk = typeof tendered === "number" && validateCashTendered(tendered, draft.amount) === null;
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      const result = await recordDeposit(order.id, draft.amount, draft.method);
+      const result = await recordDeposit(order.id, draft.amount, draft.method, asksTendered ? (tendered as number) : null);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -113,6 +123,9 @@ export function DepositCard({
                   <div className="text-ink-faint text-xs">
                     {formatId(when, { hour: "2-digit", minute: "2-digit", hour12: false })} · {d.receivedByName}
                   </div>
+                  {d.cashTendered != null && (
+                    <div className="text-ink-faint text-xs">{formatTenderedNote(d.cashTendered, d.changeGiven)}</div>
+                  )}
                 </div>
                 <PriceText amount={d.amount} weight="secondary" />
                 {order.status === "OPEN" && (
@@ -159,7 +172,7 @@ export function DepositCard({
                 variant="primary"
                 size="large"
                 fullWidth
-                disabled={saving || draft.amount <= 0 || draft.amount > room}
+                disabled={saving || draft.amount <= 0 || draft.amount > room || (asksTendered && !tenderedOk)}
                 onClick={handleSave}
               >
                 {saving
@@ -182,6 +195,11 @@ export function DepositCard({
               cashAvailable={cashAvailable}
               allowNone={false}
             />
+            {asksTendered && (
+              <div className="mt-3">
+                <CashTenderedField id="dp-cash-tendered" due={draft.amount} value={tendered} onChange={setTendered} />
+              </div>
+            )}
             {error && <p className="text-danger mt-3 text-sm">{error}</p>}
           </Sheet>
         )}

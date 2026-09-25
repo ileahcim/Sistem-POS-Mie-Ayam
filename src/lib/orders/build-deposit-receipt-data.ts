@@ -46,6 +46,8 @@ export function buildDepositReceiptData(
       method: d.method,
       amount: d.amount,
     })),
+    cashTendered: thisDeposit.cashTendered,
+    changeGiven: thisDeposit.changeGiven,
     footerNote: settings.receiptFooter,
     printLogo: settings.printLogo,
   };

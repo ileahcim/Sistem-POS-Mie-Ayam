@@ -7,6 +7,7 @@ import { buildReceiptData } from "@/lib/orders/build-receipt-data";
 import { orderTotalFromLines } from "@/lib/orders/order-total";
 import { allocateDeposits, methodWhenFullyPrepaid, type DepositMethod } from "@/lib/deposits/settle";
 import { validateSplitCashAmount } from "@/lib/orders/validate-split-payment";
+import { changeFor, validateCashTendered } from "@/lib/orders/cash-change";
 import { getSettings } from "@/lib/settings/get-settings";
 import type { ReceiptData } from "@/lib/printing/types";
 import { markOrderReceivable } from "@/app/shift/actions";
@@ -36,6 +37,10 @@ const RACED =
 export async function payOrder(
   orderId: string,
   method: PaymentMethod,
+  // "Uang diterima" ("Hitung kembalian", 26 Sep 2026): full Cash only, at
+  // least what this payment charges. Stored with the change as a note on the
+  // order — the drawer counts the charge, never this (see cash-change.ts).
+  // null = not entered (switch off, or not Cash).
   cashTendered: number | null,
   // Only meaningful when method === "SPLIT": the cash slice the cashier
   // typed. QRIS slice is always derived server-side (order.total - this),
@@ -48,12 +53,16 @@ export async function payOrder(
 ): Promise<PayOrderResult> {
   const user = await requireUser();
 
+  if (cashTendered != null && method !== "CASH") {
+    return { ok: false, error: "Uang diterima hanya dicatat untuk pembayaran Cash." };
+  }
+
   const order = await getOrderDetail(orderId);
   if (!order) return { ok: false, error: "Order tidak ditemukan." };
   // RECEIVABLE is payable too — that's a piutang being settled later, not a
   // dead end, and it has its own path (settleReceivable). Only PAID (already
   // done), VOID and CANCELLED block payment.
-  if (order.status === "RECEIVABLE") return settleReceivable(order, method, splitCashAmount, cashToDrawer);
+  if (order.status === "RECEIVABLE") return settleReceivable(order, method, cashTendered, splitCashAmount, cashToDrawer);
   if (order.status !== "OPEN") {
     return { ok: false, error: "Order ini sudah tidak bisa dibayar (sudah lunas/void)." };
   }
@@ -65,8 +74,9 @@ export async function payOrder(
     return payWithDeposits(order, user.id, method, cashTendered, splitCashAmount);
   }
 
-  if (cashTendered != null && cashTendered < order.total) {
-    return { ok: false, error: "Uang tendered kurang dari total." };
+  if (cashTendered != null) {
+    const tenderedError = validateCashTendered(cashTendered, order.total);
+    if (tenderedError) return { ok: false, error: tenderedError };
   }
   let splitQrisAmount: number | null = null;
   if (method === "SPLIT") {
@@ -75,7 +85,7 @@ export async function payOrder(
     splitQrisAmount = order.total - (splitCashAmount as number);
   }
 
-  const changeGiven = cashTendered != null ? cashTendered - order.total : null;
+  const changeGiven = cashTendered != null ? changeFor(cashTendered, order.total) : null;
 
   // Bungkus/Antar: the customer usually pays first and then waits, so once
   // it's paid the cashier's part is done — it's marked served right here
@@ -156,6 +166,7 @@ export async function payOrder(
 async function settleReceivable(
   order: OrderDetail,
   method: PaymentMethod,
+  cashTendered: number | null,
   splitCashAmount: number | null,
   cashToDrawer: boolean | null,
 ): Promise<PayOrderResult> {
@@ -170,6 +181,12 @@ async function settleReceivable(
     if (error) return { ok: false, error };
     splitQrisAmount = order.total - (splitCashAmount as number);
   }
+  // Same note as an ordinary Cash payment — laci or kantong, the change came
+  // out of the same hand; neither the drawer nor the pocket counts it.
+  if (cashTendered != null) {
+    const tenderedError = validateCashTendered(cashTendered, order.total);
+    if (tenderedError) return { ok: false, error: tenderedError };
+  }
 
   const openShift = await prisma.shift.findFirst({ where: { status: "OPEN" } });
   if (!openShift) return { ok: false, error: "Belum ada shift terbuka. Buka shift dulu sebelum melunasi piutang." };
@@ -180,8 +197,8 @@ async function settleReceivable(
       status: "PAID",
       paymentMethod: method,
       paidAt: new Date(),
-      cashTendered: null,
-      changeGiven: null,
+      cashTendered,
+      changeGiven: cashTendered != null ? changeFor(cashTendered, order.total) : null,
       splitCashAmount: method === "SPLIT" ? splitCashAmount : null,
       splitQrisAmount,
       settledShiftId: openShift.id,
@@ -245,10 +262,14 @@ async function payWithDeposits(
         .map((d) => ({ id: d.id, method: d.method as DepositMethod, amount: d.amount }));
       const allocation = allocateDeposits(total, received);
 
-      if (cashTendered != null && cashTendered < allocation.remainder) {
-        throw new PaymentRefused("Uang tendered kurang dari sisa yang harus dibayar.");
+      // Only the sisa is charged now, so that's what the money handed over is
+      // measured against. Nothing to collect → nothing was handed over.
+      if (cashTendered != null) {
+        if (allocation.remainder === 0) throw new PaymentRefused("Tidak ada yang perlu dibayar — kosongkan uang diterima.");
+        const tenderedError = validateCashTendered(cashTendered, allocation.remainder);
+        if (tenderedError) throw new PaymentRefused(tenderedError);
       }
-      const changeGiven = cashTendered != null ? cashTendered - allocation.remainder : null;
+      const changeGiven = cashTendered != null ? changeFor(cashTendered, allocation.remainder) : null;
       // Nothing left to collect: the DP paid for it all, so there is no method
       // to choose at the till — label the order after the DP that covered it.
       const paymentMethod = allocation.remainder === 0 ? methodWhenFullyPrepaid(allocation.applied) : method;

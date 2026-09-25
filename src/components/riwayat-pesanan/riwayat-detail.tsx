@@ -18,6 +18,7 @@ import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { groupAddonsForPrint, formatAddonWithQty, formatRupiah } from "@/lib/printing/format";
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
 import { DEPOSIT_ORDER_CHANGE_REFUSAL, formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
+import { formatTenderedNote } from "@/lib/orders/cash-change";
 import { VoidOrderButton } from "@/components/order-aktif/void-order-sheet";
 import { ChangePaymentMethodButton } from "@/components/order-aktif/change-payment-method-sheet";
 
@@ -224,11 +225,14 @@ export function RiwayatDetail({
               <PriceText amount={order.total} weight="total" />
             </div>
             {order.deposits.map((d) => (
-              <div key={d.id} className="flex justify-between text-sm text-ink-muted">
-                <span>
-                  DP {formatId(new Date(d.receivedAt), { day: "numeric", month: "short" })}, {DEPOSIT_METHOD_LABEL[d.method]}
-                </span>
-                <PriceText amount={d.amount} weight="secondary" />
+              <div key={d.id} className="flex flex-col text-sm text-ink-muted">
+                <div className="flex justify-between">
+                  <span>
+                    DP {formatId(new Date(d.receivedAt), { day: "numeric", month: "short" })}, {DEPOSIT_METHOD_LABEL[d.method]}
+                  </span>
+                  <PriceText amount={d.amount} weight="secondary" />
+                </div>
+                {d.cashTendered != null && <span className="text-ink-faint text-xs">{formatTenderedNote(d.cashTendered, d.changeGiven)}</span>}
               </div>
             ))}
             {order.deposits.length > 0 && order.status === "PAID" && (
@@ -238,6 +242,19 @@ export function RiwayatDetail({
                 </span>
                 <PriceText amount={order.refundDue > 0 ? order.refundDue : order.amountDue} weight="total" />
               </div>
+            )}
+            {/* "Hitung kembalian" notes — what was handed over, what went back. */}
+            {order.cashTendered != null && (
+              <>
+                <div className="flex justify-between text-sm text-ink-muted">
+                  <span>Uang diterima</span>
+                  <PriceText amount={order.cashTendered} weight="secondary" />
+                </div>
+                <div className="flex justify-between text-sm text-ink-muted">
+                  <span>Kembalian</span>
+                  <PriceText amount={order.changeGiven ?? 0} weight="secondary" />
+                </div>
+              </>
             )}
           </div>
         </Card>

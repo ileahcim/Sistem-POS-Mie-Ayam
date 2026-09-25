@@ -155,6 +155,12 @@ model Setting {
   // exists. Default 10 = the value this used to be hardcoded to.
   popularComboMinSales Int @default(10)
 
+  // "Hitung kembalian" (26 Sep 2026): on = a full-Cash payment (and a cash
+  // piutang settlement / cash DP) asks for "Uang diterima" and shows the
+  // change. Record-keeping only — the drawer always counts the order total
+  // (or its cash slice), never the money handed over.
+  cashChangeEnabled Boolean @default(true)
+
   updatedAt DateTime @updatedAt
 }
 
@@ -541,6 +547,11 @@ model PreorderDeposit {
   kind   DepositKind
   method PaymentMethod // CASH or QRIS only — enforced in app code, TRANSFER is legacy
   amount Int // Rupiah, > 0
+  // A RECEIVED cash DP taken with "Hitung kembalian" on: what the customer
+  // handed over and the change given back. Notes only — the drawer counts
+  // `amount`. Null otherwise (and on every row from before 26 Sep 2026).
+  cashTendered Int?
+  changeGiven  Int?
 
   // The shift that was open when this happened. Always set for anything that
   // moves cash (a cash DP or refund needs an open shift). Null only for a

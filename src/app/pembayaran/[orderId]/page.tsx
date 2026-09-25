@@ -29,6 +29,7 @@ export default async function PembayaranPage({
       printerDriver={settings.printerDriver}
       nav={nav}
       kitchenTicketEnabled={settings.kitchenTicketEnabled}
+      cashChangeEnabled={settings.cashChangeEnabled}
     />
   );
 }

@@ -176,16 +176,17 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
         pair("plain", "Bayar (Cash)", formatRupiah(data.splitCashAmount ?? 0)),
         pair("plain", "Bayar (QRIS)", formatRupiah(data.splitQrisAmount ?? 0)),
       );
+    } else if (data.cashTendered != null) {
+      // "Hitung kembalian" (26 Sep 2026): what was handed over and what went
+      // back, in place of "Bayar (Cash)".
+      lines.push(...tenderedLines(data.cashTendered, data.changeGiven));
     } else {
       // An ordinary order: byte for byte what it printed before DP existed.
-      lines.push(pair("plain", `Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.cashTendered ?? data.total)));
-      // Only ever set on an old order — payOrder no longer computes change.
-      if (data.changeGiven != null && data.changeGiven > 0) {
-        lines.push(pair("plain", "Kembali", formatRupiah(data.changeGiven)));
-      }
+      lines.push(pair("plain", `Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.total)));
     }
   } else {
     lines.push(...depositLines(deposits, data.total, data.paymentMethod, data.splitCashAmount, data.splitQrisAmount));
+    if (data.cashTendered != null) lines.push(...tenderedLines(data.cashTendered, data.changeGiven));
   }
   lines.push(rule("="), { kind: "rule", text: centeredRule(data.footerNote ?? "Terima kasih!") });
   return lines;
@@ -194,6 +195,12 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
 // The DP block of a struk lunas: each DP with the day and method it was paid,
 // then what was actually collected now — or, when the order shrank below the DP,
 // what has to go back to the customer. Never a silent Rp0.
+// "Tunai" / "Kembali" of a cash payment taken with "Hitung kembalian" — the
+// struk, the sisa after DP, and the Bukti Uang Muka all print the same pair.
+function tenderedLines(cashTendered: number, changeGiven: number | null | undefined): LayoutLine[] {
+  return [pair("plain", "Tunai", formatRupiah(cashTendered)), pair("plain", "Kembali", formatRupiah(changeGiven ?? 0))];
+}
+
 // Heading of a piutang's struk (see ReceiptData.paymentMethod).
 export const RECEIPT_UNPAID_HEADING = "BELUM LUNAS";
 
@@ -277,6 +284,8 @@ export function buildDepositReceiptLayout(data: DepositReceiptData): LayoutLine[
   for (const d of data.deposits) {
     lines.push(pair("plain", `DP ${formatTanggalPendek(d.receivedAt)}, ${PAYMENT_LABEL[d.method]}`, formatRupiah(d.amount)));
   }
+  // This proof's own DP is the last row above; its Tunai/Kembali sit under it.
+  if (data.cashTendered != null) lines.push(...tenderedLines(data.cashTendered, data.changeGiven));
   if (data.deposits.length > 1) lines.push(rule("-"), pair("plain", "Total DP", formatRupiah(position.held)));
   lines.push(rule("-"));
   if (position.excess > 0) lines.push(pair("total", "Dikembalikan saat diambil", formatRupiah(position.excess)));

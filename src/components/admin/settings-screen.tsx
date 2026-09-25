@@ -7,6 +7,7 @@ import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver, PrintResult } from "@/lib/printing/types";
 import {
   updateAutoPrintReceipt,
+  updateCashChangeEnabled,
   updateKitchenTicketEnabled,
   updatePopularComboMinSales,
   updatePreorderReminderMinutes,
@@ -533,6 +534,20 @@ export function SettingsScreen({
             }
             initialValue={settings.autoPrintReceipt}
             onSave={updateAutoPrintReceipt}
+          />
+
+          <ToggleCard
+            title="Hitung kembalian"
+            description={
+              <>
+                Nyala: bayar Cash menampilkan kolom &ldquo;Uang diterima&rdquo; (Uang pas / 20rb / 50rb / 100rb) dan
+                kembaliannya — juga saat melunasi piutang tunai dan mencatat DP tunai. Mati: bayar Cash cukup pilih
+                metode lalu Bayar, seperti dulu. Hitungan laci tidak berubah: yang dihitung tetap total pesanan, bukan
+                uang yang diterima.
+              </>
+            }
+            initialValue={settings.cashChangeEnabled}
+            onSave={updateCashChangeEnabled}
           />
 
           <PrinterCard settings={settings} />
