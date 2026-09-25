@@ -3,8 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
-import type { MieAdjustmentKind, MieLedgerEntryDTO } from "@/lib/mie/types";
-import { MIE_ADJUSTMENT_LABEL, formatMieEntryLabel } from "@/lib/mie/types";
+import type { MieAdjustmentKind, MieLedgerEntryDTO, MieProductType } from "@/lib/mie/types";
+import {
+  MIE_ADJUSTMENT_LABEL,
+  MIE_FIXED_PRODUCT_TYPES,
+  MIE_PASAR_LABEL,
+  MIE_PRODUCT_LABEL,
+  formatMieEntryLabel,
+} from "@/lib/mie/types";
 import { todayDateStr, isoToDateInput, dateInputToIso } from "@/lib/mie/date-input";
 import {
   createMieAdjustment,
@@ -175,6 +181,28 @@ export function AdjustmentSheet({ customerId, onClose }: { customerId: string; o
 // Edit / hapus satu baris riwayat
 // ---------------------------------------------------------------------------
 
+// The jenis buttons of an ORDER row, in the same order as the new-order
+// form: the three fixed jenis, "Mi Pasar" (= Mi Keriting on the pasar
+// modal), then Custom.
+type JenisChoice = MieProductType | "PASAR";
+
+const JENIS_CHOICES: { value: JenisChoice; label: string }[] = [
+  ...MIE_FIXED_PRODUCT_TYPES.map((t) => ({ value: t as JenisChoice, label: MIE_PRODUCT_LABEL[t] })),
+  { value: "PASAR", label: MIE_PASAR_LABEL },
+  { value: "CUSTOM", label: "Custom" },
+];
+
+// null for a legacy row still on the retired FROZEN value — no button is lit
+// and the jenis is left alone unless the owner picks one.
+function initialJenis(entry: MieLedgerEntryDTO): JenisChoice | null {
+  if (entry.productType === "MIE_KERITING" && entry.isPasar) return "PASAR";
+  if (entry.productType && JENIS_CHOICES.some((c) => c.value === entry.productType)) return entry.productType;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+
 // Takes a plain MieLedgerEntryDTO, not the customer page's row type — the
 // customer ledger and Ringkasan's drill-down list both hand it one of these,
 // so edit and delete stay a single code path with a single set of rules
@@ -193,6 +221,8 @@ export function EntrySheet({
   const router = useRouter();
   const isOrder = entry.kind === "ORDER";
   const isCorrection = entry.kind === "CORRECTION_ADD" || entry.kind === "CORRECTION_SUBTRACT";
+  const [jenis, setJenis] = useState<JenisChoice | null>(initialJenis(entry));
+  const [customLabel, setCustomLabel] = useState(entry.customLabel ?? "");
   const [kg, setKg] = useState(entry.kg != null ? String(entry.kg).replace(".", ",") : "");
   const [pricePerKg, setPricePerKg] = useState<number | "">(entry.pricePerKg ?? "");
   const [amount, setAmount] = useState<number | "">(entry.amount);
@@ -209,14 +239,28 @@ export function EntrySheet({
   const kgNumber = Number(kg.replace(",", "."));
   const kgValid = kg.trim() !== "" && Number.isFinite(kgNumber) && kgNumber > 0;
   const canSave = isOrder
-    ? kgValid && pricePerKg !== "" && Number(pricePerKg) > 0
+    ? kgValid && pricePerKg !== "" && Number(pricePerKg) > 0 && (jenis !== "CUSTOM" || customLabel.trim() !== "")
     : amount !== "" && Number(amount) > 0 && (!isCorrection || note.trim() !== "");
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     const result = await updateMieEntry(entry.id, {
-      ...(isOrder ? { kg: kgNumber, pricePerKg: Number(pricePerKg) } : { amount: Number(amount) }),
+      ...(isOrder
+        ? {
+            kg: kgNumber,
+            pricePerKg: Number(pricePerKg),
+            ...(jenis
+              ? {
+                  jenis: {
+                    productType: jenis === "PASAR" ? ("MIE_KERITING" as const) : jenis,
+                    isPasar: jenis === "PASAR",
+                    customLabel,
+                  },
+                }
+              : {}),
+          }
+        : { amount: Number(amount) }),
       ...(isPayment ? { paymentMethod } : {}),
       date: dateInputToIso(date),
       note,
@@ -271,6 +315,38 @@ export function EntrySheet({
       <div className="flex flex-col gap-3">
         {isOrder ? (
           <>
+            <div className="flex flex-col gap-1">
+              <span className="text-ink-muted text-sm font-medium">Jenis mi</span>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Jenis mi">
+                {JENIS_CHOICES.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    aria-pressed={jenis === c.value}
+                    onClick={() => setJenis(c.value)}
+                    className={cn(
+                      "rounded-pill h-12 px-4 text-sm font-semibold",
+                      jenis === c.value ? "bg-primary text-white" : "bg-muted text-ink-muted",
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-ink-faint text-xs">
+                Mengganti jenis tidak mengubah harga/kg — ubah harganya sendiri kalau perlu.
+              </span>
+            </div>
+            {jenis === "CUSTOM" && (
+              <Field label="Nama jenis mi (request khusus)" htmlFor="entry-custom-label">
+                <input
+                  id="entry-custom-label"
+                  className={INPUT}
+                  value={customLabel}
+                  onChange={(e) => setCustomLabel(e.target.value)}
+                />
+              </Field>
+            )}
             <div className="flex gap-3">
               <div className="flex-1">
                 <Field label="Jumlah (kg)" htmlFor="entry-kg">

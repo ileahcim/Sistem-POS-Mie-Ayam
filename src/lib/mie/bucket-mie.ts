@@ -1,11 +1,46 @@
 import { formatId } from "@/lib/timezone";
 import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import type { MieReportPoint } from "./get-mie-report";
-import type { MieProductType } from "./types";
+import { mieCostKeyOf, mieOrderMargin, type MieCostKey, type MieCosts } from "./types";
 
 export type MieGranularity = "harian" | "mingguan" | "bulanan";
 
-export type MieTypeTotals = { kg: number; amount: number };
+// One row of Ringkasan's "Per jenis mi" table. Mi Pasar is its own row
+// (separate from Reguler Mi Keriting) because it has its own modal per kg.
+export type MieJenisKey = MieCostKey | "CUSTOM";
+export const MIE_JENIS_KEYS: MieJenisKey[] = ["MIE_KERITING", "MIE_PASAR", "MIE_LURUS", "PANGSIT", "CUSTOM"];
+
+export type MieTypeTotals = {
+  kg: number;
+  amount: number;
+  margin: number; // summed over rows that HAVE a modal per kg only
+  // Rows left out of `margin` because their jenis has no modal (not filled
+  // in yet, or CUSTOM) — never folded in as cost 0, which would overstate
+  // the profit. Drives the "belum diisi" warning.
+  noCost: { count: number; kg: number; amount: number };
+};
+
+export function emptyTypeTotals(): Record<MieJenisKey, MieTypeTotals> {
+  const totals = {} as Record<MieJenisKey, MieTypeTotals>;
+  for (const key of MIE_JENIS_KEYS) totals[key] = { kg: 0, amount: 0, margin: 0, noCost: { count: 0, kg: 0, amount: 0 } };
+  return totals;
+}
+
+export function addTypeTotals(into: MieTypeTotals, from: MieTypeTotals): void {
+  into.kg += from.kg;
+  into.amount += from.amount;
+  into.margin += from.margin;
+  into.noCost.count += from.noCost.count;
+  into.noCost.kg += from.noCost.kg;
+  into.noCost.amount += from.noCost.amount;
+}
+
+// Which "Per jenis mi" row an ORDER point belongs to. null = a legacy row on
+// the retired FROZEN value, which isn't mi mentah at all (see types.ts).
+export function mieJenisKeyOf(p: Pick<MieReportPoint, "productType" | "isPasar">): MieJenisKey | null {
+  if (p.productType == null || p.productType === "CUSTOM") return "CUSTOM";
+  return mieCostKeyOf(p);
+}
 
 export type MieBucket = {
   key: string;
@@ -14,7 +49,8 @@ export type MieBucket = {
   omzet: number; // sum of ORDER amounts
   payments: number; // sum of PAYMENT amounts
   kg: number;
-  byType: Record<MieProductType, MieTypeTotals>;
+  margin: number; // sum of byType[*].margin
+  byType: Record<MieJenisKey, MieTypeTotals>;
   // The exact rows each total above was summed from, kept so the drill-down
   // list under the stat cards can never show a different set than the number
   // it opened from — a row is pushed here in the same branch that adds it to
@@ -92,15 +128,6 @@ function labels(start: Date, g: MieGranularity): { label: string; longLabel: str
   };
 }
 
-function emptyByType(): Record<MieProductType, MieTypeTotals> {
-  return {
-    MIE_KERITING: { kg: 0, amount: 0 },
-    MIE_LURUS: { kg: 0, amount: 0 },
-    PANGSIT: { kg: 0, amount: 0 },
-    CUSTOM: { kg: 0, amount: 0 },
-  };
-}
-
 // The window each granularity button opens on, ending today.
 export function defaultRangeFor(g: MieGranularity, today: string): DateRange {
   const start = step(bucketStart(today, g), g, -(DEFAULT_BUCKET_COUNT[g] - 1));
@@ -117,7 +144,12 @@ export function isDefaultRange(range: DateRange, g: MieGranularity, today: strin
 // Every number on the Ringkasan page comes out of this: points outside the
 // range simply never land in a bucket, so omzet, pembayaran, kg, the per-type
 // breakdown and the chart all follow the selected range together.
-export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: DateRange): MieBucket[] {
+export function bucketMie(
+  points: MieReportPoint[],
+  g: MieGranularity,
+  range: DateRange,
+  costs: MieCosts,
+): MieBucket[] {
   const { from, to } = normalizeRange(range);
   const first = bucketStart(from, g);
   const last = bucketStart(to, g);
@@ -132,7 +164,8 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
       omzet: 0,
       payments: 0,
       kg: 0,
-      byType: emptyByType(),
+      margin: 0,
+      byType: emptyTypeTotals(),
       orderRows: [],
       paymentRows: [],
     };
@@ -157,13 +190,23 @@ export function bucketMie(points: MieReportPoint[], g: MieGranularity, range: Da
     // production data pending the owner's approval to move it into the
     // Frozen buku — see types.ts's doc comment) — skip it here entirely
     // rather than crash on an unknown byType key; it's not mi mentah.
-    const t = bucket.byType[(p.productType ?? "CUSTOM") as MieProductType];
-    if (!t) continue;
+    const key = mieJenisKeyOf(p);
+    if (!key) continue;
+    const t = bucket.byType[key];
     const kg = p.kg ?? 0;
     bucket.omzet += p.amount;
     bucket.kg += kg;
     t.kg += kg;
     t.amount += p.amount;
+    const margin = mieOrderMargin(p, costs);
+    if (margin == null) {
+      t.noCost.count += 1;
+      t.noCost.kg += kg;
+      t.noCost.amount += p.amount;
+    } else {
+      t.margin += margin;
+      bucket.margin += margin;
+    }
     bucket.orderRows.push(p);
   }
   return buckets;

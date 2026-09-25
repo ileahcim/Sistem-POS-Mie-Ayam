@@ -32,6 +32,7 @@ export async function getMieCustomerDetail(customerId: string): Promise<MieCusto
       // DB enum still has the retired FROZEN value — formatMieEntryLabel
       // renders any such legacy row with its own label (see types.ts).
       productType: e.productType as MieProductType | null,
+      isPasar: e.isPasar,
       customLabel: e.customLabel,
       kg: e.kg,
       pricePerKg: e.pricePerKg,

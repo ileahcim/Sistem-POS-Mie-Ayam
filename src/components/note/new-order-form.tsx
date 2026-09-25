@@ -90,6 +90,9 @@ export function NewOrderForm({
     const result = await createMieOrder({
       customerId,
       productType,
+      // Recorded on the row so Ringkasan's margin uses the Mi Pasar modal
+      // (different recipe), not the Reguler one.
+      isPasar: pasarPreset,
       customLabel,
       kg: kgNumber,
       pricePerKg: Number(pricePerKg),

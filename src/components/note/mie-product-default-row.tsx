@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { MieProductType } from "@/lib/mie/types";
-import { updateMiePasarPrice, updateMieProductDefault } from "@/app/note/actions";
+import type { MieCostKey, MieProductType } from "@/lib/mie/types";
+import { updateMieCostPerKg, updateMiePasarPrice, updateMieProductDefault } from "@/app/note/actions";
 import { updateFrozenPrice } from "@/app/note/frozen-actions";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,9 @@ import { Badge } from "@/components/ui/badge";
 // so a null defaultPricePerKg shows the same "belum diisi" badge as an
 // unfilled Product.costPrice elsewhere in the app.
 // `target` picks what the row saves: a product's default price, or the
-// "Mie Pasar" shortcut price (MieSetting) — same editor for both.
+// "Mie Pasar" shortcut price (MieSetting), or a "Modal per kg" (cost, not a
+// sale price — the badge says "Modal belum diisi", same pattern as the POS
+// "HPP belum diisi") — same editor for all.
 export function MieProductDefaultRow({
   target,
   label,
@@ -24,7 +26,8 @@ export function MieProductDefaultRow({
   target:
     | { kind: "default"; productType: Exclude<MieProductType, "CUSTOM"> }
     | { kind: "pasar" }
-    | { kind: "frozenPrice" };
+    | { kind: "frozenPrice" }
+    | { kind: "cost"; key: MieCostKey };
   label: string;
   hint?: string;
   defaultPricePerKg: number | null;
@@ -50,7 +53,9 @@ export function MieProductDefaultRow({
           ? await updateMiePasarPrice(Number(value))
           : target.kind === "frozenPrice"
             ? await updateFrozenPrice(Number(value))
-            : await updateMieProductDefault(target.productType, Number(value));
+            : target.kind === "cost"
+              ? await updateMieCostPerKg(target.key, Number(value))
+              : await updateMieProductDefault(target.productType, Number(value));
       if (!result.ok) {
         setError(result.error);
         return;
@@ -67,7 +72,9 @@ export function MieProductDefaultRow({
     <div className="flex flex-col gap-2 border-border border-b p-3 last:border-b-0">
       <div className="flex items-center gap-1.5">
         <span className="text-ink text-sm font-semibold">{label}</span>
-        {defaultPricePerKg == null && <Badge variant="warning">Belum diisi</Badge>}
+        {defaultPricePerKg == null && (
+          <Badge variant="warning">{target.kind === "cost" ? "Modal belum diisi" : "Belum diisi"}</Badge>
+        )}
       </div>
       {hint && <p className="text-ink-muted -mt-1 text-xs">{hint}</p>}
       <div className="flex flex-wrap items-center gap-3">

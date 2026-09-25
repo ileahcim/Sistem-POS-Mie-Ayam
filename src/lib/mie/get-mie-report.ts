@@ -43,6 +43,7 @@ export async function getMieReportPoints(): Promise<{ points: MieReportPoint[]; 
       // yet migrated — see types.ts) — bucket-mie.ts skips anything its
       // byType map doesn't recognize, so this cast is safe.
       productType: e.productType as MieProductType | null,
+      isPasar: e.isPasar,
       customLabel: e.customLabel,
       kg: e.kg,
       pricePerKg: e.pricePerKg,

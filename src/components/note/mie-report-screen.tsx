@@ -4,20 +4,32 @@ import { useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import type { MieReportPoint } from "@/lib/mie/get-mie-report";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import { bucketMie, defaultRangeFor, isDefaultRange, type MieGranularity } from "@/lib/mie/bucket-mie";
+import {
+  MIE_JENIS_KEYS,
+  addTypeTotals,
+  bucketMie,
+  defaultRangeFor,
+  emptyTypeTotals,
+  isDefaultRange,
+  type MieGranularity,
+  type MieJenisKey,
+} from "@/lib/mie/bucket-mie";
 import { normalizeRange, type DateRange } from "@/lib/date-range/presets";
 import { DateRangePresets } from "@/components/ui/date-range-presets";
 import { formatId } from "@/lib/timezone";
 import {
-  MIE_FIXED_PRODUCT_TYPES,
-  MIE_PRODUCT_LABEL,
+  MIE_COST_KEY_LABEL,
   formatMieEntryLabel,
-  type MieProductType,
+  mieCostKeyOf,
+  mieOrderMargin,
+  type MieCosts,
 } from "@/lib/mie/types";
 import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatRupiah } from "@/lib/printing/format";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { AppHeader } from "@/components/ui/app-header";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
@@ -27,7 +39,9 @@ import { EntrySheet } from "./mie-sheets";
 // Which stat card's list is open. "omzet" and "kg" show the SAME ledger
 // rows (every pesanan in range) — only which number is emphasised differs,
 // exactly as the owner asked ("daftar yang sama, fokus ke kolom kg").
-type Drill = "omzet" | "payments" | "kg";
+// "margin" lists the same pesanan again, each with its own margin (or why it
+// has none).
+type Drill = "omzet" | "payments" | "kg" | "margin";
 
 const OPTIONS: { value: MieGranularity; label: string; unit: string }[] = [
   { value: "harian", label: "Harian", unit: "Hari" },
@@ -35,22 +49,10 @@ const OPTIONS: { value: MieGranularity; label: string; unit: string }[] = [
   { value: "bulanan", label: "Bulanan", unit: "Bulan" },
 ];
 
-const TYPE_ROWS: { type: MieProductType; label: string }[] = [
-  ...MIE_FIXED_PRODUCT_TYPES.map((t) => ({ type: t, label: MIE_PRODUCT_LABEL[t] })),
-  { type: "CUSTOM", label: "Custom" },
-];
+const JENIS_LABEL: Record<MieJenisKey, string> = { ...MIE_COST_KEY_LABEL, CUSTOM: "Custom" };
 
 function formatKg(kg: number): string {
   return `${(Math.round(kg * 100) / 100).toLocaleString("id-ID")} kg`;
-}
-
-function emptyTypeTotals(): Record<MieProductType, { kg: number; amount: number }> {
-  return {
-    MIE_KERITING: { kg: 0, amount: 0 },
-    MIE_LURUS: { kg: 0, amount: 0 },
-    PANGSIT: { kg: 0, amount: 0 },
-    CUSTOM: { kg: 0, amount: 0 },
-  };
 }
 
 function formatDay(day: string): string {
@@ -71,10 +73,12 @@ function formatDay(day: string): string {
 export function MieReportScreen({
   points,
   today,
+  costs,
   nav,
 }: {
   points: MieReportPoint[];
   today: string;
+  costs: MieCosts;
   nav: HeaderNav;
 }) {
   const [granularity, setGranularity] = useState<MieGranularity>("harian");
@@ -88,7 +92,7 @@ export function MieReportScreen({
   // of rules. Its router.refresh() re-reads the page's points, and the cards
   // above recompute from those, which is why they follow along on their own.
   const [editing, setEditing] = useState<{ point: MieReportPoint; action: "edit" | "delete" } | null>(null);
-  const buckets = useMemo(() => bucketMie(points, granularity, range), [points, granularity, range]);
+  const buckets = useMemo(() => bucketMie(points, granularity, range, costs), [points, granularity, range, costs]);
   const selected = buckets.find((b) => b.key === selectedKey) ?? null;
   const unit = OPTIONS.find((o) => o.value === granularity)!.unit;
 
@@ -106,6 +110,7 @@ export function MieReportScreen({
       omzet: 0,
       payments: 0,
       kg: 0,
+      margin: 0,
       byType: emptyTypeTotals(),
       orderRows: [] as MieReportPoint[],
       paymentRows: [] as MieReportPoint[],
@@ -114,12 +119,10 @@ export function MieReportScreen({
       totals.omzet += b.omzet;
       totals.payments += b.payments;
       totals.kg += b.kg;
+      totals.margin += b.margin;
       totals.orderRows.push(...b.orderRows);
       totals.paymentRows.push(...b.paymentRows);
-      for (const row of TYPE_ROWS) {
-        totals.byType[row.type].kg += b.byType[row.type].kg;
-        totals.byType[row.type].amount += b.byType[row.type].amount;
-      }
+      for (const key of MIE_JENIS_KEYS) addTypeTotals(totals.byType[key], b.byType[key]);
     }
     return { label: rangeLabel, ...totals };
   }, [selected, buckets, rangeLabel]);
@@ -133,12 +136,33 @@ export function MieReportScreen({
     return [...source].sort((a, b) => (a.day === b.day ? b.time.localeCompare(a.time) : b.day.localeCompare(a.day)));
   }, [drill, view]);
 
+  // Pesanan left out of the margin, per jenis — the owner must see that the
+  // Margin number is incomplete and why, never a silently bigger margin.
+  const noCostJenis = MIE_JENIS_KEYS.filter((k) => view.byType[k].noCost.count > 0);
+  const noCostCount = noCostJenis.reduce((n, k) => n + view.byType[k].noCost.count, 0);
+
   const drillRows: DrilldownRow[] = drillPoints.map((p) => {
     const kgLabel = p.kg != null ? `${p.kg.toLocaleString("id-ID")} kg` : null;
     const perKg =
       p.kg != null && p.pricePerKg != null
         ? `${formatMieEntryLabel(p)} · ${kgLabel} × Rp${p.pricePerKg.toLocaleString("id-ID")}/kg`
         : null;
+    if (drill === "margin") {
+      const costKey = mieCostKeyOf(p);
+      const cost = costKey ? costs[costKey] : null;
+      const margin = mieOrderMargin(p, costs);
+      return {
+        id: p.id,
+        href: `/note/pelanggan/${p.customerId}`,
+        title: p.customerName,
+        date: p.date,
+        time: p.time,
+        detail: perKg ? `${perKg} · modal ${cost != null ? `Rp${cost.toLocaleString("id-ID")}/kg` : "belum diisi"}` : null,
+        note: p.note,
+        value: margin != null ? formatRupiah(margin) : costKey ? "Modal belum diisi" : "Tanpa modal (custom)",
+        sub: formatRupiah(p.amount),
+      };
+    }
     return {
       id: p.id,
       href: `/note/pelanggan/${p.customerId}`,
@@ -166,6 +190,12 @@ export function MieReportScreen({
       totalLabel: "Total pembayaran",
       totalValue: formatRupiah(view.payments),
       empty: "Tidak ada pembayaran di rentang ini.",
+    },
+    margin: {
+      heading: "Margin per pesanan",
+      totalLabel: noCostCount > 0 ? `Total margin (tanpa ${noCostCount} pesanan)` : "Total margin",
+      totalValue: formatRupiah(view.margin),
+      empty: "Tidak ada pesanan di rentang ini.",
     },
     kg: {
       heading: "Mi terjual",
@@ -283,6 +313,13 @@ export function MieReportScreen({
                 onToggle={() => setDrill(drill === "payments" ? null : "payments")}
               />
               <DrilldownStat
+                label="Margin"
+                value={formatRupiah(view.margin)}
+                open={drill === "margin"}
+                onToggle={() => setDrill(drill === "margin" ? null : "margin")}
+                warning={noCostCount > 0 ? `Tanpa ${noCostCount} pesanan (modal tidak ada)` : null}
+              />
+              <DrilldownStat
                 label="Mi terjual"
                 value={formatKg(view.kg)}
                 open={drill === "kg"}
@@ -290,6 +327,27 @@ export function MieReportScreen({
               />
             </div>
           </section>
+
+          {noCostJenis.length > 0 && (
+            <div className="bg-warning-soft text-warning rounded-card flex flex-col gap-1 px-3 py-2 text-sm font-medium">
+              {noCostJenis.map((k) => {
+                const n = view.byType[k].noCost;
+                const what = `${n.count} pesanan (${formatKg(n.kg)}, ${formatRupiah(n.amount)})`;
+                return (
+                  <p key={k}>
+                    {k === "CUSTOM"
+                      ? `Pesanan Custom tidak punya modal per kg — ${what} tidak dihitung marginnya.`
+                      : `Modal per kg ${JENIS_LABEL[k]} belum diisi — ${what} tidak dihitung marginnya (bukan dianggap modal Rp0).`}
+                  </p>
+                );
+              })}
+              {noCostJenis.some((k) => k !== "CUSTOM") && (
+                <Link href="/note/produk" className="underline">
+                  Isi modal per kg di Harga Produk
+                </Link>
+              )}
+            </div>
+          )}
 
           {drill && (
             <LedgerDrilldown
@@ -307,27 +365,41 @@ export function MieReportScreen({
 
           <section className="flex flex-col gap-2">
             <h2 className="text-ink text-base font-bold">Per jenis mi</h2>
-            <Card>
-              <table className="w-full text-sm tabular-nums">
+            <Card className="overflow-x-auto">
+              <table className="w-full min-w-[26rem] text-sm tabular-nums">
                 <thead>
                   <tr className="text-ink-muted border-border border-b text-left text-xs">
                     <th className="px-4 py-2 font-medium">Jenis</th>
                     <th className="px-4 py-2 text-right font-medium">Kg</th>
                     <th className="px-4 py-2 text-right font-medium">Nilai</th>
+                    <th className="px-4 py-2 text-right font-medium">Margin</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {TYPE_ROWS.map(({ type, label }) => (
-                    <tr key={type} className="border-border border-b">
-                      <td className="text-ink px-4 py-3 font-semibold">{label}</td>
-                      <td className="text-ink px-4 py-3 text-right">{formatKg(view.byType[type].kg)}</td>
-                      <td className="text-ink px-4 py-3 text-right">{formatRupiah(view.byType[type].amount)}</td>
-                    </tr>
-                  ))}
+                  {MIE_JENIS_KEYS.map((key) => {
+                    const t = view.byType[key];
+                    return (
+                      <tr key={key} className="border-border border-b">
+                        <td className="text-ink px-4 py-3 font-semibold">{JENIS_LABEL[key]}</td>
+                        <td className="text-ink px-4 py-3 text-right">{formatKg(t.kg)}</td>
+                        <td className="text-ink px-4 py-3 text-right">{formatRupiah(t.amount)}</td>
+                        <td className="text-ink px-4 py-3 text-right">
+                          {t.noCost.count > 0 ? (
+                            <Badge variant="warning">{key === "CUSTOM" ? "Tanpa modal" : "Modal belum diisi"}</Badge>
+                          ) : t.kg > 0 ? (
+                            formatRupiah(t.margin)
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   <tr>
                     <td className="text-ink px-4 py-3 font-bold">Total</td>
                     <td className="text-ink px-4 py-3 text-right font-bold">{formatKg(view.kg)}</td>
                     <td className="text-ink px-4 py-3 text-right font-bold">{formatRupiah(view.omzet)}</td>
+                    <td className="text-ink px-4 py-3 text-right font-bold">{formatRupiah(view.margin)}</td>
                   </tr>
                 </tbody>
               </table>

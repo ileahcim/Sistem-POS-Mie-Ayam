@@ -125,11 +125,15 @@ export function DrilldownStat({
   value,
   open,
   onToggle,
+  warning,
 }: {
   label: string;
   value: string;
   open: boolean;
   onToggle: () => void;
+  // e.g. Margin's "tanpa 3 pesanan (modal belum diisi)" — the number above
+  // it is incomplete, and must say so right on the card.
+  warning?: string | null;
 }) {
   return (
     <button
@@ -143,6 +147,7 @@ export function DrilldownStat({
     >
       <span className="text-ink-muted text-xs font-medium">{label}</span>
       <span className="text-ink text-xl font-bold tabular-nums">{value}</span>
+      {warning && <span className="text-warning text-xs font-semibold">{warning}</span>}
       <span className="text-ink-faint text-xs">{open ? "Tutup rincian" : "Ketuk untuk rincian"}</span>
     </button>
   );

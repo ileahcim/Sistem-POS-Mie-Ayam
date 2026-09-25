@@ -51,6 +51,51 @@ export const MIE_FIXED_PRODUCT_TYPES: Exclude<MieProductType, "CUSTOM">[] = ["MI
 // from /note/produk — market prices change too often for a code constant),
 // deliberately not the per-customer autofill.
 export const MIE_PASAR_PRODUCT_TYPE = "MIE_KERITING" as const;
+export const MIE_PASAR_LABEL = "Mi Pasar";
+
+// Which "Modal per kg" an ORDER row's margin uses (25 Sep 2026). Reguler
+// per jenis (MieProductDefault.costPerKg), plus MIE_PASAR for rows tapped as
+// "Mi Pasar" — a cheaper recipe (less egg), not just a cheaper sale price.
+// Mi Keriting only: Lurus/Pangsit have no pasar variant. CUSTOM has no
+// cost at all (a one-off request), so it maps to null.
+export type MieCostKey = Exclude<MieProductType, "CUSTOM"> | "MIE_PASAR";
+export type MieCosts = Record<MieCostKey, number | null>;
+
+export const MIE_COST_ROWS: { key: MieCostKey; label: string }[] = [
+  { key: "MIE_KERITING", label: "Mi Keriting — Modal per kg (Reguler)" },
+  { key: "MIE_PASAR", label: "Mi Keriting — Modal per kg (Mi Pasar)" },
+  { key: "MIE_LURUS", label: "Mi Lurus — Modal per kg (Reguler)" },
+  { key: "PANGSIT", label: "Pangsit — Modal per kg (Reguler)" },
+];
+
+// Short name of each cost key, for warnings and the per-jenis table.
+export const MIE_COST_KEY_LABEL: Record<MieCostKey, string> = {
+  MIE_KERITING: "Mi Keriting",
+  MIE_PASAR: MIE_PASAR_LABEL,
+  MIE_LURUS: "Mi Lurus",
+  PANGSIT: "Pangsit",
+};
+
+export function mieCostKeyOf(entry: Pick<MieLedgerEntryDTO, "productType" | "isPasar">): MieCostKey | null {
+  if (entry.productType === "MIE_KERITING") return entry.isPasar ? "MIE_PASAR" : "MIE_KERITING";
+  if (entry.productType === "MIE_LURUS" || entry.productType === "PANGSIT") return entry.productType;
+  return null; // CUSTOM, or a legacy FROZEN row
+}
+
+// Margin of one ORDER row = sale amount (kg × the price snapshotted on the
+// row) − modal per kg × kg. null when the row has no modal to use (not
+// filled in yet, or CUSTOM) — the caller leaves it OUT of the margin total
+// instead of treating the cost as 0, which would overstate the profit.
+export function mieOrderMargin(
+  entry: Pick<MieLedgerEntryDTO, "productType" | "isPasar" | "kg" | "amount">,
+  costs: MieCosts,
+): number | null {
+  const key = mieCostKeyOf(entry);
+  const cost = key ? costs[key] : null;
+  if (cost == null || entry.kg == null) return null;
+  return entry.amount - Math.round(cost * entry.kg);
+}
+
 export const MIE_KG_PRESETS = [5, 10, 15, 20];
 export const MIE_PAYMENT_PRESETS = [50000, 100000, 200000, 500000];
 
@@ -61,6 +106,7 @@ export type MieLedgerEntryDTO = {
   // before the column existed — rendered as "Tidak dicatat", never guessed.
   paymentMethod: NotePaymentMethod | null;
   productType: MieProductType | null;
+  isPasar: boolean; // ORDER only — see mieCostKeyOf
   customLabel: string | null;
   kg: number | null;
   pricePerKg: number | null;
@@ -73,7 +119,9 @@ export type MieLedgerEntryDTO = {
 // The one place "what does this row show as its item name" is decided —
 // used by both the customer detail ledger and the Excel export so they can
 // never read differently.
-export function formatMieEntryLabel(entry: Pick<MieLedgerEntryDTO, "kind" | "productType" | "customLabel">): string {
+export function formatMieEntryLabel(
+  entry: Pick<MieLedgerEntryDTO, "kind" | "productType" | "customLabel"> & { isPasar?: boolean },
+): string {
   if (entry.kind === "PAYMENT") return "Pembayaran";
   if (entry.kind === "OPENING_BALANCE") return "Saldo awal / utang lama";
   if (entry.kind === "CORRECTION_ADD") return "Koreksi (+)";
@@ -83,6 +131,7 @@ export function formatMieEntryLabel(entry: Pick<MieLedgerEntryDTO, "kind" | "pro
   // production data, not yet migrated — see the type's doc comment) even
   // though MieProductType can no longer type-check as that value.
   if ((entry.productType as string) === "FROZEN") return LEGACY_FROZEN_LABEL;
+  if (entry.productType === "MIE_KERITING" && entry.isPasar) return MIE_PASAR_LABEL;
   return entry.productType ? MIE_PRODUCT_LABEL[entry.productType] : "—";
 }
 

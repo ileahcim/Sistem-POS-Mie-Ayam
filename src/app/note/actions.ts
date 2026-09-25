@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { localDateStr, wibDateRange } from "@/lib/timezone";
-import type { MieAdjustmentKind, MieProductType } from "@/lib/mie/types";
+import type { MieAdjustmentKind, MieCostKey, MieProductType } from "@/lib/mie/types";
 import {
   isNotePaymentMethod,
   resolveNotePaymentMethodEdit,
@@ -60,6 +60,7 @@ export async function createMieCustomer(
 export type CreateMieOrderInput = {
   customerId: string;
   productType: MieProductType;
+  isPasar: boolean; // tapped "Mi Pasar" — only valid with MIE_KERITING
   customLabel: string;
   kg: number;
   pricePerKg: number;
@@ -67,15 +68,39 @@ export type CreateMieOrderInput = {
   note: string;
 };
 
+const MIE_PRODUCT_TYPES: MieProductType[] = ["MIE_KERITING", "MIE_LURUS", "PANGSIT", "CUSTOM"];
+
+// One rule for "which jenis is this order", shared by create and edit:
+// a known jenis, "Mi Pasar" only on Mi Keriting (Lurus/Pangsit have no pasar
+// variant), and a name for CUSTOM.
+function validateJenis(
+  productType: MieProductType,
+  isPasar: boolean,
+  customLabel: string,
+): { ok: true; data: { productType: MieProductType; isPasar: boolean; customLabel: string | null } } | { ok: false; error: string } {
+  if (!MIE_PRODUCT_TYPES.includes(productType)) return { ok: false, error: "Jenis mi tidak valid." };
+  if (isPasar && productType !== "MIE_KERITING") return { ok: false, error: "Mi Pasar hanya untuk Mi Keriting." };
+  if (productType === "CUSTOM" && !customLabel.trim()) {
+    return { ok: false, error: "Isi nama jenis mi untuk pesanan custom." };
+  }
+  return {
+    ok: true,
+    data: {
+      productType,
+      isPasar: productType === "MIE_KERITING" && isPasar === true,
+      customLabel: productType === "CUSTOM" ? customLabel.trim() : null,
+    },
+  };
+}
+
 export async function createMieOrder(input: CreateMieOrderInput): Promise<ActionResult> {
   const user = await requireRole("OWNER");
 
   const customer = await prisma.mieCustomer.findUnique({ where: { id: input.customerId } });
   if (!customer || !customer.isActive) return { ok: false, error: "Pelanggan tidak ditemukan." };
 
-  if (input.productType === "CUSTOM" && !input.customLabel.trim()) {
-    return { ok: false, error: "Isi nama jenis mi untuk pesanan custom." };
-  }
+  const jenis = validateJenis(input.productType, input.isPasar, input.customLabel);
+  if (!jenis.ok) return jenis;
   if (!Number.isFinite(input.kg) || input.kg <= 0) return { ok: false, error: "Jumlah kg tidak valid." };
   if (!Number.isFinite(input.pricePerKg) || input.pricePerKg <= 0) {
     return { ok: false, error: "Harga per kg tidak valid." };
@@ -87,8 +112,7 @@ export async function createMieOrder(input: CreateMieOrderInput): Promise<Action
     data: {
       customerId: input.customerId,
       kind: "ORDER",
-      productType: input.productType,
-      customLabel: input.productType === "CUSTOM" ? input.customLabel.trim() : null,
+      ...jenis.data,
       kg: input.kg,
       pricePerKg: input.pricePerKg,
       amount: Math.round(input.kg * input.pricePerKg),
@@ -237,6 +261,9 @@ export async function createMieAdjustment(input: CreateMieAdjustmentInput): Prom
 export type UpdateMieEntryInput = {
   kg?: number; // ORDER only
   pricePerKg?: number; // ORDER only
+  // ORDER only, all three together — the jenis (fix a wrong tap, or a row
+  // the pasar backfill marked wrongly). Omitted = jenis unchanged.
+  jenis?: { productType: MieProductType; isPasar: boolean; customLabel: string };
   amount?: number; // non-ORDER only — an ORDER's amount is always kg × price
   // PAYMENT only. `null` means "leave it unrecorded", which is only allowed
   // while the row has never had a method — see the rule in updateMieEntry.
@@ -260,9 +287,15 @@ export async function updateMieEntry(entryId: string, input: UpdateMieEntryInput
     const pricePerKg = Number(input.pricePerKg);
     if (!Number.isFinite(kg) || kg <= 0) return { ok: false, error: "Jumlah kg tidak valid." };
     if (!Number.isFinite(pricePerKg) || pricePerKg <= 0) return { ok: false, error: "Harga per kg tidak valid." };
+    let jenisData = {};
+    if (input.jenis) {
+      const jenis = validateJenis(input.jenis.productType, input.jenis.isPasar, input.jenis.customLabel);
+      if (!jenis.ok) return jenis;
+      jenisData = jenis.data;
+    }
     await prisma.mieLedgerEntry.update({
       where: { id: entryId },
-      data: { kg, pricePerKg: Math.round(pricePerKg), amount: Math.round(kg * pricePerKg), date, note },
+      data: { ...jenisData, kg, pricePerKg: Math.round(pricePerKg), amount: Math.round(kg * pricePerKg), date, note },
     });
     return { ok: true };
   }
@@ -335,6 +368,33 @@ export async function updateMiePasarPrice(pricePerKg: number): Promise<ActionRes
   return { ok: true };
 }
 
+// Modal per kg (Reguler per jenis, or Mi Pasar) — see MieCostKey. Only a
+// positive number is accepted; there is no "clear back to belum diisi".
+export async function updateMieCostPerKg(key: MieCostKey, costPerKg: number): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  if (!Number.isFinite(costPerKg) || costPerKg <= 0) return { ok: false, error: "Modal tidak valid." };
+  const value = Math.round(costPerKg);
+
+  if (key === "MIE_PASAR") {
+    await prisma.mieSetting.upsert({
+      where: { id: "singleton" },
+      update: { pasarCostPerKg: value },
+      create: { id: "singleton", pasarCostPerKg: value },
+    });
+    return { ok: true };
+  }
+  if (key !== "MIE_KERITING" && key !== "MIE_LURUS" && key !== "PANGSIT") {
+    return { ok: false, error: "Jenis mi tidak valid." };
+  }
+  await prisma.mieProductDefault.upsert({
+    where: { productType: key },
+    update: { costPerKg: value },
+    create: { productType: key, costPerKg: value },
+  });
+  return { ok: true };
+}
+
 // Price autofill for the new-order form: this customer's last price for
 // this exact product if they've ordered it before, else the product's
 // owner-set default (see get-mie-product-defaults.ts) — never for CUSTOM,
@@ -346,7 +406,9 @@ export async function getMieAutofillPrice(
   await requireRole("OWNER");
 
   const lastOrder = await prisma.mieLedgerEntry.findFirst({
-    where: { customerId, kind: "ORDER", productType },
+    // Pasar orders are priced from their own shortcut, not this customer's
+    // regular price — never let one leak into the other's autofill.
+    where: { customerId, kind: "ORDER", productType, isPasar: false },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     select: { pricePerKg: true },
   });

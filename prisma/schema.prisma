@@ -660,6 +660,13 @@ model MieCustomer {
 model MieProductDefault {
   productType       MieProductType @id
   defaultPricePerKg Int?
+  // Modal per kg bahan baku (Reguler) — owner-set from /note/produk, null =
+  // "belum diisi". Unlike the sale price (snapshotted per ledger row, and
+  // different per customer) this is ONE number per jenis that rarely
+  // changes, so it is read live, never snapshotted: Ringkasan's margin for
+  // every ORDER row is (amount − costPerKg × kg). A row whose jenis has no
+  // cost is left OUT of the margin (with a warning), never counted as cost 0.
+  costPerKg Int?
 }
 
 // Singleton for the Note module's own tunables (kept apart from the POS
@@ -677,6 +684,11 @@ model MieSetting {
   // guessed after that, same "don't invent a money number" rule as everywhere
   // else in this module.
   frozenPricePerPcs Int?
+  // Modal per kg for "Mi Pasar" orders (MieLedgerEntry.isPasar) — a
+  // different recipe (less egg) than Reguler Mi Keriting, so a different
+  // cost, not just a different sale price. Mi Keriting only: Lurus/Pangsit
+  // have no pasar variant. Null = "belum diisi", same rule as costPerKg.
+  pasarCostPerKg Int?
 }
 
 // ---------------------------------------------------------------------------
@@ -765,6 +777,11 @@ model MieLedgerEntry {
   customLabel String? // filled only when productType == CUSTOM
   kg          Float?
   pricePerKg  Int? // snapshot at order time — never re-read from MieProductDefault later
+  // ORDER only: tapped as "Mi Pasar" on the order form (always MIE_KERITING).
+  // Picks which modal per kg the margin uses (MieSetting.pasarCostPerKg vs
+  // MieProductDefault.costPerKg). Rows before 25 Sep 2026 were backfilled by
+  // migration 20260925100000_mie_cost_per_kg from an owner-checked list.
+  isPasar     Boolean @default(false)
 
   amount Int // Rupiah, always positive — see `kind` comment above for sign
 
