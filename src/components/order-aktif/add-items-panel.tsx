@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence } from "motion/react";
 import type { MenuCategory, MenuProduct } from "@/lib/menu/get-active-menu";
 import type { CartItem } from "@/lib/cart/types";
@@ -22,12 +23,20 @@ import { useKitchenTicketPrompt } from "@/components/printing/use-kitchen-ticket
 // same "one more forgotten item" affordance on an OPEN order. Confirmed
 // additions are saved immediately (server-snapshotted, see
 // buildOrderItemsCreateData), not staged for the caller to save later.
+//
+// While the panel is open its Batal / "Tambah N Item ke Order" bar is portaled
+// into the screen's bottom bar (`footer`), and the caller hides its own
+// "Lanjut ke Pembayaran" / "Bayar" there (`onOpenChange`). Field problem (26
+// Sep 2026): in a rush the confirm button sat below the product grid, the
+// sticky pay button was the one in view, and tapped items were never added.
 export function AddItemsPanel({
   orderId,
   menu,
   onAdded,
   printerDriver,
   kitchenTicketEnabled,
+  footer,
+  onOpenChange,
 }: {
   orderId: string;
   menu: MenuCategory[];
@@ -36,8 +45,11 @@ export function AddItemsPanel({
   // Off (default, 22 Sep 2026): no "Cetak kertas dapur?" (TAMBAHAN) prompt at
   // all — see CLAUDE.md "Kertas dapur".
   kitchenTicketEnabled: boolean;
+  // The screen's bottom bar; null (not mounted yet) keeps the bar inline.
+  footer: HTMLElement | null;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState(menu[0]?.id ?? "");
   const [pendingItems, setPendingItems] = useState<CartItem[]>([]);
   const [sheetProduct, setSheetProduct] = useState<MenuProduct | null>(null);
@@ -45,6 +57,11 @@ export function AddItemsPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { offer: offerKitchenTicket, prompt: kitchenTicketPrompt } = useKitchenTicketPrompt({ printerDriver });
+
+  function setOpen(next: boolean) {
+    setOpenState(next);
+    onOpenChange(next);
+  }
 
   const activeCategory = menu.find((c) => c.id === activeCategoryId) ?? menu[0];
   const cartQtyByProduct = useMemo(() => {
@@ -139,6 +156,40 @@ export function AddItemsPanel({
     }
   }
 
+  const pendingPortions = pendingItems.reduce((sum, item) => sum + item.qty, 0);
+  const actionBar = (
+    <div className="flex w-full flex-col gap-2">
+      {error && <p className="text-danger text-sm">{error}</p>}
+      <div className="flex gap-2">
+        <Button
+          variant="secondary"
+          size="large"
+          fullWidth
+          onClick={() => {
+            setOpen(false);
+            setPendingItems([]);
+            setError(null);
+          }}
+        >
+          Batal
+        </Button>
+        <Button
+          variant="primary"
+          size="large"
+          fullWidth
+          disabled={pendingItems.length === 0 || saving}
+          onClick={handleConfirmAdd}
+        >
+          {saving
+            ? "Menyimpan..."
+            : pendingPortions > 0
+              ? `Tambah ${pendingPortions} Item ke Order`
+              : "Pilih item dulu"}
+        </Button>
+      </div>
+    </div>
+  );
+
   if (!open) {
     return (
       <>
@@ -184,24 +235,7 @@ export function AddItemsPanel({
         </div>
       )}
 
-      {error && <p className="text-danger px-3 pb-2 text-sm">{error}</p>}
-
-      <div className="border-border flex gap-2 border-t p-3">
-        <Button
-          variant="secondary"
-          fullWidth
-          onClick={() => {
-            setOpen(false);
-            setPendingItems([]);
-            setError(null);
-          }}
-        >
-          Batal
-        </Button>
-        <Button variant="primary" fullWidth disabled={pendingItems.length === 0 || saving} onClick={handleConfirmAdd}>
-          {saving ? "Menyimpan..." : `Tambah ${pendingItems.length || ""} Item ke Order`}
-        </Button>
-      </div>
+      {footer ? createPortal(actionBar, footer) : <div className="border-border border-t p-3">{actionBar}</div>}
 
       <AnimatePresence>
         {sheetProduct && (

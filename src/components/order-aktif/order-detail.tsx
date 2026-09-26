@@ -187,6 +187,11 @@ export function OrderDetail({
   const [editingItem, setEditingItem] = useState<OrderDetailData["items"][number] | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  // "+ Tambah Item" open: its Batal / Tambah bar takes over the bottom bar
+  // (add-items-panel.tsx), so "Lanjut ke Pembayaran" can't be tapped with
+  // picked items still unsaved.
+  const [addingItems, setAddingItems] = useState(false);
+  const [footerEl, setFooterEl] = useState<HTMLDivElement | null>(null);
   const { offer: offerKitchenTicket, prompt: kitchenTicketPrompt } = useKitchenTicketPrompt({ printerDriver });
 
   const allProducts = menu.flatMap((c) => c.products);
@@ -399,6 +404,8 @@ export function OrderDetail({
               onAdded={() => router.refresh()}
               printerDriver={printerDriver}
               kitchenTicketEnabled={kitchenTicketEnabled}
+              footer={footerEl}
+              onOpenChange={setAddingItems}
             />
           </div>
         )}
@@ -488,7 +495,7 @@ export function OrderDetail({
       </div>
 
       <div className="border-border bg-surface flex gap-2 border-t p-3">
-        {needsServing && (
+        {!addingItems && needsServing && (
           <Button
             variant={canPay ? "secondary" : "primary"}
             size="large"
@@ -499,11 +506,12 @@ export function OrderDetail({
             Tandai Sudah Disajikan
           </Button>
         )}
-        {canPay && (
+        {!addingItems && canPay && (
           <LinkButton href={`/pembayaran/${order.id}`} variant="primary" size="large" fullWidth>
             Lanjut ke Pembayaran
           </LinkButton>
         )}
+        <div ref={setFooterEl} className="contents" />
       </div>
 
       {kitchenTicketPrompt}

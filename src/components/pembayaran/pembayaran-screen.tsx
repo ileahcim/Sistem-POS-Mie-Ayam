@@ -88,6 +88,10 @@ export function PembayaranScreen({
   // gates the PRINT action, never the payment.
   const [pendingReceipt, setPendingReceipt] = useState<ReceiptData | null>(null);
   const [printing, setPrinting] = useState(false);
+  // "+ Tambah Item" open: its Batal / Tambah bar replaces Bayar in the bottom
+  // bar (add-items-panel.tsx) — paying with picked items unsaved is impossible.
+  const [addingItems, setAddingItems] = useState(false);
+  const [footerEl, setFooterEl] = useState<HTMLDivElement | null>(null);
 
   // RECEIVABLE (piutang) is still payable — settling it later is the whole
   // point. Only PAID/VOID actually block the payment UI.
@@ -345,6 +349,8 @@ export function PembayaranScreen({
                   onAdded={() => router.refresh()}
                   printerDriver={printerDriver}
                   kitchenTicketEnabled={kitchenTicketEnabled}
+                  footer={footerEl}
+                  onOpenChange={setAddingItems}
                 />
               </div>
             )}
@@ -501,10 +507,13 @@ export function PembayaranScreen({
       </div>
 
       {!alreadyPaid && !pendingReceipt && (
-        <div className="border-border bg-surface border-t p-4">
-          <Button variant="primary" size="large" fullWidth disabled={!canPay || paying} onClick={handlePay}>
-            {paying ? "Memproses..." : payLabel}
-          </Button>
+        <div className="border-border bg-surface flex border-t p-4">
+          {!addingItems && (
+            <Button variant="primary" size="large" fullWidth disabled={!canPay || paying} onClick={handlePay}>
+              {paying ? "Memproses..." : payLabel}
+            </Button>
+          )}
+          <div ref={setFooterEl} className="contents" />
         </div>
       )}
     </div>
