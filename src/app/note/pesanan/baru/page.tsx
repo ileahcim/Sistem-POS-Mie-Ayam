@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getMieCustomers } from "@/lib/mie/get-mie-customers";
 import { getMiePasarPrice } from "@/lib/mie/get-mie-pasar-price";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
+import { getMieDefaultJenis } from "@/lib/mie/get-mie-default-jenis";
 import { NewOrderForm } from "@/components/note/new-order-form";
 import { parseNoteOrigin } from "@/lib/note/books";
 
@@ -15,9 +16,10 @@ export default async function NewMieOrderPage({
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
   const { customerId, dari } = await searchParams;
-  const [customers, pasarPricePerKg, nav] = await Promise.all([
+  const [customers, pasarPricePerKg, defaultJenis, nav] = await Promise.all([
     getMieCustomers(),
     getMiePasarPrice(),
+    getMieDefaultJenis(),
     getHeaderNav(),
   ]);
   return (
@@ -26,6 +28,7 @@ export default async function NewMieOrderPage({
       initialCustomerId={customerId}
       origin={parseNoteOrigin(dari)}
       pasarPricePerKg={pasarPricePerKg}
+      defaultJenis={defaultJenis}
       nav={nav}
     />
   );

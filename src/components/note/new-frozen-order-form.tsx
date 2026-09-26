@@ -12,6 +12,7 @@ import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
+import { LockedPrice } from "./locked-price";
 import { AppHeader } from "@/components/ui/app-header";
 import { noteAfterSaveHref, noteFormCancelHref, type NoteOrigin } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
@@ -40,7 +41,11 @@ export function NewFrozenOrderForm({
   const [customerId, setCustomerId] = useState(initialCustomerId ?? customers[0]?.id ?? "");
   const [pcs, setPcs] = useState("");
   const [pricePerPcs, setPricePerPcs] = useState<number | "">("");
-  const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
+  // "Bekukan harga" — same rule as Pesanan Baru (new-order-form.tsx): a
+  // price from the customer's last pengambilan or the buku's default is
+  // locked until "Ubah harga". "none" = no price exists yet, typed as before.
+  const [unlocked, setUnlocked] = useState(false);
+  const [priceState, setPriceState] = useState<"loading" | "terakhir" | "umum" | "none">("loading");
   const [date, setDate] = useState(todayDateStr());
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -48,19 +53,22 @@ export function NewFrozenOrderForm({
   const { offer, prompt } = useFrozenReceiptPrompt({ printerDriver });
 
   // Autofill: this customer's last price if they've had a pickup before,
-  // else the buku's owner-set default (see getFrozenAutofillPrice). Only
-  // overwrites the field while the owner hasn't typed their own number.
+  // else the buku's owner-set default (see getFrozenAutofillPrice). Never
+  // over a price the owner unlocked and typed.
   useEffect(() => {
-    if (!customerId || priceManuallyEdited) return;
+    if (!customerId || unlocked) return;
     let cancelled = false;
-    getFrozenAutofillPrice(customerId).then((price) => {
-      if (!cancelled && price != null) setPricePerPcs(price);
+    getFrozenAutofillPrice(customerId).then((result) => {
+      if (cancelled) return;
+      if (result) setPricePerPcs(result.price);
+      setPriceState(result?.source ?? "none");
     });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId]);
+  }, [customerId, unlocked]);
+
+  const locked = !unlocked && priceState !== "none";
 
   const pcsNumber = Number(pcs);
   const pcsValid = pcs.trim() !== "" && Number.isInteger(pcsNumber) && pcsNumber > 0;
@@ -127,7 +135,9 @@ export function NewFrozenOrderForm({
                   value={customerId}
                   onChange={(e) => {
                     setCustomerId(e.target.value);
-                    setPriceManuallyEdited(false);
+                    setUnlocked(false);
+                    setPricePerPcs("");
+                    setPriceState("loading");
                   }}
                   className="rounded-input border-border h-12 border px-3 text-base"
                 >
@@ -154,16 +164,31 @@ export function NewFrozenOrderForm({
               </label>
               <label className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="text-ink-muted text-sm font-medium">Harga/pcs</span>
-                <RupiahInput
-                  value={pricePerPcs}
-                  onChange={(v) => {
-                    setPricePerPcs(v);
-                    setPriceManuallyEdited(true);
-                  }}
-                  placeholder="0"
-                  className="h-12 text-base"
-                />
+                {locked ? (
+                  <LockedPrice value={pricePerPcs} unit="pcs" />
+                ) : (
+                  <RupiahInput value={pricePerPcs} onChange={setPricePerPcs} placeholder="0" className="h-12 text-base" />
+                )}
               </label>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-ink-muted min-w-0 flex-1 basis-48 text-sm" data-testid="price-source">
+                {unlocked
+                  ? "Harga diubah untuk pengambilan ini saja."
+                  : priceState === "terakhir"
+                    ? `Harga pengambilan terakhir ${customers.find((c) => c.id === customerId)?.name ?? ""}.`
+                    : priceState === "umum"
+                      ? "Harga default Frozen (dari Harga Produk)."
+                      : priceState === "none"
+                      ? "Harga default Frozen belum diisi — ketik harga/pcs."
+                      : "Memuat harga…"}
+              </p>
+              {locked && pricePerPcs !== "" && (
+                <Button variant="secondary" size="compact" onClick={() => setUnlocked(true)}>
+                  Ubah harga
+                </Button>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2" role="group" aria-label="Pilih cepat jumlah pcs">

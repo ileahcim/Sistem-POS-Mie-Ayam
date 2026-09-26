@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { MieProductType } from "@/lib/mie/types";
+import type { MieDefaultJenis } from "@/lib/mie/get-mie-default-jenis";
 import { MIE_FIXED_PRODUCT_TYPES, MIE_PASAR_LABEL, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
 import { NOTE_RETURN_QTY_PRESETS, type NoteReturnContext } from "@/lib/note/return-window";
 import { createMieReturn, getMieReturnContext } from "@/app/note/actions";
@@ -34,16 +35,21 @@ export function NewReturnForm({
   customers,
   initialCustomerId,
   origin,
+  defaultJenis,
   nav,
 }: {
   customers: MieCustomerRow[];
   initialCustomerId?: string;
   origin: NoteOrigin;
+  // customerId → jenis of their last pesanan (getMieDefaultJenis) — a retur
+  // is almost always of what they usually take (Pasar → Mi Pasar).
+  defaultJenis: Record<string, MieDefaultJenis>;
   nav: HeaderNav;
 }) {
   const router = useRouter();
-  const [customerId, setCustomerId] = useState(initialCustomerId ?? customers[0]?.id ?? "");
-  const [jenis, setJenis] = useState<JenisChoice>("MIE_KERITING");
+  const firstCustomerId = initialCustomerId ?? customers[0]?.id ?? "";
+  const [customerId, setCustomerId] = useState(firstCustomerId);
+  const [jenis, setJenis] = useState<JenisChoice>(defaultJenis[firstCustomerId] ?? "MIE_KERITING");
   const [customLabel, setCustomLabel] = useState("");
   const [kg, setKg] = useState("");
   const [pricePerKg, setPricePerKg] = useState<number | "">("");
@@ -141,6 +147,7 @@ export function NewReturnForm({
                   value={customerId}
                   onChange={(e) => {
                     setCustomerId(e.target.value);
+                    setJenis(defaultJenis[e.target.value] ?? "MIE_KERITING");
                     setPriceManuallyEdited(false);
                     setPricePerKg("");
                   }}

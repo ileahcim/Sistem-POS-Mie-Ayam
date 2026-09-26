@@ -398,8 +398,11 @@ export async function updateFrozenPrice(pricePerPcs: number): Promise<ActionResu
 
 // Price autofill for the pickup form: this customer's last pricePerPcs if
 // they've had a pickup before, else the buku's owner-set default. There is
-// no per-product-type default table here — only one product.
-export async function getFrozenAutofillPrice(customerId: string): Promise<number | null> {
+// no per-product-type default table here — only one product. The source is
+// returned so the form can say where the locked price came from.
+export async function getFrozenAutofillPrice(
+  customerId: string,
+): Promise<{ price: number; source: "terakhir" | "umum" } | null> {
   await requireRole("OWNER");
 
   const lastOrder = await prisma.frozenLedgerEntry.findFirst({
@@ -407,8 +410,8 @@ export async function getFrozenAutofillPrice(customerId: string): Promise<number
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     select: { pricePerPcs: true },
   });
-  if (lastOrder?.pricePerPcs != null) return lastOrder.pricePerPcs;
+  if (lastOrder?.pricePerPcs != null) return { price: lastOrder.pricePerPcs, source: "terakhir" };
 
   const setting = await prisma.mieSetting.findUnique({ where: { id: "singleton" } });
-  return setting?.frozenPricePerPcs ?? null;
+  return setting?.frozenPricePerPcs != null ? { price: setting.frozenPricePerPcs, source: "umum" } : null;
 }
