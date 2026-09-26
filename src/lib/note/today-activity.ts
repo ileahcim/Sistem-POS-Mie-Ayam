@@ -51,7 +51,37 @@ export type TodayCustomerGroup<E = unknown> = {
   paymentCount: number;
   paymentAmount: number;
   latestAt: string; // ISO of the newest row
+} & TodayPaymentSplit;
+
+// How today's payments READ on the Hari Ini row (26 Sep 2026, owner's rule):
+// money paid today covers today's orders first, the rest pays down the old
+// debt, anything beyond that is overpayment. DISPLAY ONLY — the ledger still
+// holds one PAYMENT row, never matched to an order ("Pembayaran tidak
+// dicocokkan ke pesanan tertentu"), and the balance is the same number
+// whichever way it is read. A credit the customer already had (paid ahead
+// before today) covers today's orders before today's money does.
+export type TodayPaymentSplit = {
+  payForToday: number; // today's payments that went to today's orders
+  payForOld: number; // today's payments that paid down debt from before today
+  payExcess: number; // today's payments beyond everything owed (lebih bayar)
+  todayShort: number; // what is still unpaid of today's orders
+  oldRemaining: number; // debt from before today still unpaid after today (≥ 0)
 };
+
+export function splitTodayPayment(orderAmount: number, paymentAmount: number, balance: number): TodayPaymentSplit {
+  const before = balance - orderAmount + paymentAmount; // balance at the start of today
+  const credit = Math.max(-before, 0);
+  const oldDebt = Math.max(before, 0);
+  const payForToday = Math.min(paymentAmount, Math.max(orderAmount - credit, 0));
+  const payForOld = Math.min(paymentAmount - payForToday, oldDebt);
+  return {
+    payForToday,
+    payForOld,
+    payExcess: paymentAmount - payForToday - payForOld,
+    todayShort: orderAmount - Math.min(orderAmount, credit) - payForToday,
+    oldRemaining: oldDebt - payForOld,
+  };
+}
 
 export function todayCustomerStatus(balance: number, paymentCount: number): TodayCustomerStatus {
   if (balance <= 0) return "LUNAS";
@@ -74,6 +104,8 @@ export function groupTodayActivity<E>(activity: TodayActivity<E>): TodayCustomer
     const orders = rows.filter((r) => r.kind === "ORDER");
     const payments = rows.filter((r) => r.kind === "PAYMENT");
     const balance = activity.balances[customerId] ?? 0;
+    const orderAmount = orders.reduce((s, r) => s + r.amount, 0);
+    const paymentAmount = payments.reduce((s, r) => s + r.amount, 0);
     groups.push({
       customerId,
       customerName: rows[0].customerName,
@@ -81,11 +113,12 @@ export function groupTodayActivity<E>(activity: TodayActivity<E>): TodayCustomer
       status: todayCustomerStatus(balance, payments.length),
       rows,
       orderCount: orders.length,
-      orderAmount: orders.reduce((s, r) => s + r.amount, 0),
+      orderAmount,
       orderQty: orders.reduce((s, r) => s + (r.qty ?? 0), 0),
       paymentCount: payments.length,
-      paymentAmount: payments.reduce((s, r) => s + r.amount, 0),
+      paymentAmount,
       latestAt: rows[rows.length - 1].createdAt,
+      ...splitTodayPayment(orderAmount, paymentAmount, balance),
     });
   }
 

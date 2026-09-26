@@ -14,7 +14,8 @@ import { LinkButton } from "@/components/ui/link-button";
 import { cn } from "@/components/ui/cn";
 
 // Note's Hari Ini list (shared by both books): ONE ROW PER CUSTOMER with
-// activity today — their pesanan/pengambilan and pembayaran totals of today
+// activity today — their pesanan/pengambilan of today, how today's money
+// reads (splitTodayPayment: today's orders first, then "Cicil utang lama")
 // and what they owe now. The colour follows the customer's TOTAL balance
 // (todayCustomerStatus): LUNAS solid green and moved to the bottom, KURANG
 // (paid today, still owes) soft yellow, BELUM BAYAR plain.
@@ -54,6 +55,19 @@ export function TodayActivityList<E>({
   const orders = shownRows.filter((r) => r.kind === "ORDER");
   const payments = shownRows.filter((r) => r.kind === "PAYMENT");
   const orderLabel = activity.rows.find((r) => r.kind === "ORDER")?.kindLabel ?? (unit === "pcs" ? "Pengambilan" : "Pesanan");
+  // Where today's money went (splitTodayPayment) — only spelled out when some
+  // of it paid old debt or was overpaid, otherwise it all went to today.
+  const payForToday = shown.reduce((s, g) => s + g.payForToday, 0);
+  const payForOld = shown.reduce((s, g) => s + g.payForOld, 0);
+  const payExcess = shown.reduce((s, g) => s + g.payExcess, 0);
+  const paymentParts =
+    payForOld > 0 || payExcess > 0
+      ? [
+          payForToday > 0 && `${formatRupiah(payForToday)} untuk ${orderLabel.toLowerCase()} hari ini`,
+          payForOld > 0 && `${formatRupiah(payForOld)} cicil utang lama`,
+          payExcess > 0 && `${formatRupiah(payExcess)} lebih bayar`,
+        ].filter((x): x is string => Boolean(x))
+      : [];
   const highlightCustomer = highlightId ? activity.rows.find((r) => r.id === highlightId)?.customerId ?? null : null;
 
   // A paid-up customer's row sits at the bottom, possibly below the fold —
@@ -87,6 +101,7 @@ export function TodayActivityList<E>({
         <span>
           Pembayaran: <strong className="text-ink">{payments.length}</strong> ·{" "}
           {formatRupiah(payments.reduce((s, r) => s + r.amount, 0))}
+          {paymentParts.length > 0 && ` (${paymentParts.join(", ")})`}
         </span>
       </div>
       {shown.map((g) => (
@@ -171,9 +186,11 @@ function CustomerRow<E>({
             {g.orderCount > 0 && (
               <span data-testid="today-orders">
                 {orderLabel} {formatQty(g.orderQty, unit)} · {formatRupiah(g.orderAmount)}
+                {g.todayShort === 0 && (g.paymentCount > 0 || lunas) && " · Lunas"}
+                {g.todayShort > 0 && g.paymentCount > 0 && ` · kurang ${formatRupiah(g.todayShort)}`}
               </span>
             )}
-            {g.paymentCount > 0 && <span data-testid="today-payments">Bayar {formatRupiah(g.paymentAmount)}</span>}
+            {g.payForOld > 0 && <span data-testid="today-old-payment">Cicil utang lama {formatRupiah(g.payForOld)}</span>}
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end" data-testid="today-balance">
@@ -182,8 +199,15 @@ function CustomerRow<E>({
               <span className="text-base font-bold text-white">Lunas</span>
               {g.balance < 0 && <span className="text-xs text-white/90">Lebih bayar {formatRupiah(-g.balance)}</span>}
             </>
-          ) : g.status === "KURANG" ? (
+          ) : g.status === "KURANG" && g.todayShort > 0 && g.oldRemaining === 0 ? (
             <span className="text-ink text-base font-bold tabular-nums">Kurang {formatRupiah(g.balance)}</span>
+          ) : g.status === "KURANG" && g.todayShort === 0 ? (
+            // Today is settled; what's left is from before — not "Kurang",
+            // which would read as if today's order were short.
+            <>
+              <span className="text-ink-muted text-xs">Sisa utang lama</span>
+              <span className="text-ink text-base font-bold tabular-nums">{formatRupiah(g.balance)}</span>
+            </>
           ) : (
             <>
               <span className="text-ink-muted text-xs">Sisa utang</span>
