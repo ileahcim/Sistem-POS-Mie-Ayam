@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import type { MieProductType } from "@/lib/mie/types";
+import type { MiePriceSource, MieProductType } from "@/lib/mie/types";
 import { MIE_FIXED_PRODUCT_TYPES, MIE_KG_PRESETS, MIE_PASAR_PRODUCT_TYPE, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
 import { createMieOrder, getMieAutofillPrice } from "@/app/note/actions";
 import { LinkButton } from "@/components/ui/link-button";
@@ -38,6 +38,10 @@ export function NewOrderForm({
   const [kg, setKg] = useState("");
   const [pricePerKg, setPricePerKg] = useState<number | "">("");
   const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
+  // Where the suggested price came from — shown under the field, so a
+  // general 17.000 that should have been this customer's own price is
+  // easy to spot. Null once the owner types or taps Mi Pasar.
+  const [priceSource, setPriceSource] = useState<MiePriceSource | null>(null);
   // While the "Mie Pasar" preset is on, its fixed price must survive a
   // customer change (the owner often taps the preset first, then picks the
   // customer) — the per-customer autofill stays out of the way.
@@ -47,27 +51,33 @@ export function NewOrderForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Autofill: this customer's last price for this product, else the
-  // product's owner-set default (see getMieAutofillPrice) — never for
+  // Autofill: this customer's harga khusus, else their last price for this
+  // product, else the product's owner-set default (see getMieAutofillPrice) — never for
   // CUSTOM, which is always priced fresh. Only overwrites the field while
   // the owner hasn't typed their own number for this customer/product pair.
   useEffect(() => {
-    if (productType === "CUSTOM" || !customerId || priceManuallyEdited) return;
+    if (productType === "CUSTOM" || !customerId || priceManuallyEdited || pasarPreset) return;
     let cancelled = false;
-    getMieAutofillPrice(customerId, productType).then((price) => {
-      if (!cancelled && price != null) setPricePerKg(price);
+    getMieAutofillPrice(customerId, productType).then((result) => {
+      if (cancelled) return;
+      if (result) setPricePerKg(result.price);
+      setPriceSource(result?.source ?? null);
     });
     return () => {
       cancelled = true;
     };
+    // pasarPreset is a dependency because Mi Pasar is Mi Keriting underneath:
+    // tapping Mi Pasar then Mi Keriting leaves productType unchanged, and
+    // without it the market price would stay in the field.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId, productType]);
+  }, [customerId, productType, pasarPreset]);
 
   function applyPasarPreset() {
     if (pasarPricePerKg == null) return;
     setProductType(MIE_PASAR_PRODUCT_TYPE);
     setPricePerKg(pasarPricePerKg);
     setPriceManuallyEdited(true);
+    setPriceSource(null);
     setPasarPreset(true);
   }
 
@@ -75,9 +85,13 @@ export function NewOrderForm({
     setPasarPreset(false);
     setProductType(next);
     setPriceManuallyEdited(false);
-    if (next === "CUSTOM") setPricePerKg("");
+    if (next === "CUSTOM") {
+      setPricePerKg("");
+      setPriceSource(null);
+    }
   }
 
+  const customerName = customers.find((c) => c.id === customerId)?.name ?? "";
   const kgNumber = Number(kg.replace(",", "."));
   const kgValid = kg.trim() !== "" && Number.isFinite(kgNumber) && kgNumber > 0;
   const canSave =
@@ -237,6 +251,7 @@ export function NewOrderForm({
                   onChange={(v) => {
                     setPricePerKg(v);
                     setPriceManuallyEdited(true);
+                    setPriceSource(null);
                     if (v !== pasarPricePerKg) setPasarPreset(false);
                   }}
                   placeholder="0"
@@ -244,6 +259,16 @@ export function NewOrderForm({
                 />
               </label>
             </div>
+
+            {priceSource && !pasarPreset && productType !== "CUSTOM" && (
+              <p className="text-ink-muted text-sm" data-testid="price-source">
+                {priceSource === "khusus"
+                  ? `Harga khusus ${customerName}.`
+                  : priceSource === "terakhir"
+                    ? `Harga terakhir ${customerName} (belum ada harga khusus).`
+                    : `Harga umum — ${customerName} belum punya harga khusus.`}
+              </p>
+            )}
 
             <div className="flex flex-wrap gap-2" role="group" aria-label="Pilih cepat jumlah kg">
               {MIE_KG_PRESETS.map((preset) => (

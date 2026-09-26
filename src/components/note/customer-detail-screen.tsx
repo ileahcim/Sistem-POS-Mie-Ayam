@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
 import type { MieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import { formatMieEntryLabel, mieEntryReducesDebt } from "@/lib/mie/types";
+import type { MieProductDefaults } from "@/lib/mie/get-mie-product-defaults";
+import { MIE_FIXED_PRODUCT_TYPES, MIE_PRODUCT_LABEL, formatMieEntryLabel, mieEntryReducesDebt } from "@/lib/mie/types";
 import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatId } from "@/lib/timezone";
 import { deleteMieCustomer, setMieCustomerActive } from "@/app/note/actions";
@@ -22,7 +23,7 @@ import { NoHistoryIcon } from "@/components/ui/empty-state-icons";
 import { AppHeader } from "@/components/ui/app-header";
 import { noteSectionHref } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
-import { AdjustmentSheet, EditCustomerSheet, EntrySheet } from "./mie-sheets";
+import { AdjustmentSheet, EditCustomerSheet, EntrySheet, SpecialPriceSheet } from "./mie-sheets";
 
 type Entry = MieCustomerDetail["entries"][number];
 
@@ -36,22 +37,25 @@ type Entry = MieCustomerDetail["entries"][number];
 export function CustomerDetailScreen({
   customer,
   posReceivables,
+  productDefaults,
   backHref,
   nav,
 }: {
   posReceivables: PosReceivableRow[];
   customer: MieCustomerDetail;
+  productDefaults: MieProductDefaults;
   backHref: string;
   nav: HeaderNav;
 }) {
   const router = useRouter();
-  const [sheet, setSheet] = useState<"edit" | "adjust" | null>(null);
+  const [sheet, setSheet] = useState<"edit" | "adjust" | "price" | null>(null);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [confirm, setConfirm] = useState<"deactivate" | "delete" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const entriesNewestFirst = [...customer.entries].reverse();
+  const specialTypes = MIE_FIXED_PRODUCT_TYPES.filter((t) => customer.specialPrices[t] != null);
   const canDeletePermanently = customer.entries.length === 0;
 
   async function handleSetActive(isActive: boolean) {
@@ -123,6 +127,27 @@ export function CustomerDetailScreen({
               </Button>
             </Card>
           )}
+
+          {/* Harga khusus: the order form suggests this customer's own
+              price first, so a forgotten general 17.000 can't slip in. */}
+          <Card padded className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-ink text-sm font-bold">Harga khusus</span>
+              {specialTypes.length === 0 ? (
+                <span className="text-ink-muted text-sm">Belum ada — pesanan baru ikut harga terakhir / harga umum.</span>
+              ) : (
+                specialTypes.map((t) => (
+                  <span key={t} className="text-ink text-sm">
+                    {MIE_PRODUCT_LABEL[t]}{" "}
+                    <strong className="tabular-nums">Rp{customer.specialPrices[t]!.toLocaleString("id-ID")}/kg</strong>
+                  </span>
+                ))
+              )}
+            </div>
+            <Button variant="secondary" onClick={() => setSheet("price")}>
+              {specialTypes.length === 0 ? "Atur harga" : "Ubah harga"}
+            </Button>
+          </Card>
 
           <Card>
             {entriesNewestFirst.length === 0 ? (
@@ -226,6 +251,14 @@ export function CustomerDetailScreen({
 
       <AnimatePresence>
         {sheet === "edit" && <EditCustomerSheet key="edit" customer={customer} onClose={() => setSheet(null)} />}
+        {sheet === "price" && (
+          <SpecialPriceSheet
+            key="price"
+            customer={customer}
+            productDefaults={productDefaults}
+            onClose={() => setSheet(null)}
+          />
+        )}
         {sheet === "adjust" && (
           <AdjustmentSheet key="adjust" customerId={customer.id} onClose={() => setSheet(null)} />
         )}

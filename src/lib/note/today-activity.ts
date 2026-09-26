@@ -14,6 +14,8 @@ export type TodayActivityRow<E = unknown> = {
   id: string;
   customerId: string;
   customerName: string;
+  // Inactive customers can't take a new transaction — no Bayar shortcut.
+  customerActive: boolean;
   kind: "ORDER" | "PAYMENT";
   kindLabel: string; // "Pesanan" / "Pengambilan" / "Pembayaran"
   detail: string | null; // e.g. "Mi Keriting · 10 kg", "7 pcs", "Cash"
@@ -42,6 +44,7 @@ export type TodayCustomerStatus = "LUNAS" | "KURANG" | "BELUM_BAYAR";
 export type TodayCustomerGroup<E = unknown> = {
   customerId: string;
   customerName: string;
+  customerActive: boolean;
   balance: number;
   status: TodayCustomerStatus;
   rows: TodayActivityRow<E>[]; // oldest first — reads as the day's story
@@ -109,6 +112,7 @@ export function groupTodayActivity<E>(activity: TodayActivity<E>): TodayCustomer
     groups.push({
       customerId,
       customerName: rows[0].customerName,
+      customerActive: rows[0].customerActive,
       balance,
       status: todayCustomerStatus(balance, payments.length),
       rows,

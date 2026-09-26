@@ -45,6 +45,11 @@ export const LEGACY_FROZEN_LABEL = "Frozen (akan dipindah)";
 // one list again now that Frozen has its own separate buku.
 export const MIE_FIXED_PRODUCT_TYPES: Exclude<MieProductType, "CUSTOM">[] = ["MIE_KERITING", "MIE_LURUS", "PANGSIT"];
 
+// Where the new-order form's suggested Rp/kg came from (getMieAutofillPrice):
+// this customer's "harga khusus", their last order, or the general default.
+export type MiePriceSource = "khusus" | "terakhir" | "umum";
+export type MieAutofillPrice = { price: number; source: MiePriceSource };
+
 // Tap-first presets for recording while standing in the production area
 // (CLAUDE.md "Catatan Mi Mentah"). "Mie Pasar" is the daily market order:
 // always Mi Keriting, at the owner-editable MieSetting.pasarPricePerKg (set

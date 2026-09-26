@@ -12,7 +12,7 @@ export async function getMieTodayActivity(): Promise<TodayActivity<MieLedgerEntr
   const { start, end } = wibDateRange(localDateStr(new Date()));
   const entries = await prisma.mieLedgerEntry.findMany({
     where: { kind: { in: ["ORDER", "PAYMENT"] }, createdAt: { gte: start, lt: end } },
-    include: { customer: { select: { id: true, name: true } }, createdBy: { select: { name: true } } },
+    include: { customer: { select: { id: true, name: true, isActive: true } }, createdBy: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -33,6 +33,7 @@ export async function getMieTodayActivity(): Promise<TodayActivity<MieLedgerEntr
       id: e.id,
       customerId: e.customer.id,
       customerName: e.customer.name,
+      customerActive: e.customer.isActive,
       kind: e.kind as "ORDER" | "PAYMENT",
       kindLabel: e.kind === "ORDER" ? "Pesanan" : "Pembayaran",
       detail:

@@ -10,7 +10,7 @@ export async function getFrozenTodayActivity(): Promise<TodayActivity<FrozenLedg
   const { start, end } = wibDateRange(localDateStr(new Date()));
   const entries = await prisma.frozenLedgerEntry.findMany({
     where: { kind: { in: ["ORDER", "PAYMENT"] }, createdAt: { gte: start, lt: end } },
-    include: { customer: { select: { id: true, name: true } }, createdBy: { select: { name: true } } },
+    include: { customer: { select: { id: true, name: true, isActive: true } }, createdBy: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -30,6 +30,7 @@ export async function getFrozenTodayActivity(): Promise<TodayActivity<FrozenLedg
     id: e.id,
     customerId: e.customer.id,
     customerName: e.customer.name,
+    customerActive: e.customer.isActive,
     kind: e.kind as "ORDER" | "PAYMENT",
     kindLabel: e.kind === "ORDER" ? "Pengambilan" : "Pembayaran",
     detail: e.kind === "ORDER" ? (e.pcs != null ? `${e.pcs.toLocaleString("id-ID")} pcs` : null) : formatNotePaymentMethod(e.paymentMethod),

@@ -690,6 +690,24 @@ model MieCustomer {
   createdAt DateTime @default(now())
 
   entries MieLedgerEntry[]
+  prices  MieCustomerPrice[]
+}
+
+// "Harga khusus" (26 Sep 2026): a fixed Rp/kg agreed with ONE customer for
+// one jenis — the order form's price autofill uses it before this
+// customer's last price and before the general default (getMieAutofillPrice).
+// It only suggests the price of NEW orders; every ledger row keeps its own
+// pricePerKg snapshot, so setting/changing/removing it never touches an old
+// row. No row = no special price. Fixed jenis only (Keriting/Lurus/Pangsit):
+// Mi Pasar keeps its own market price, CUSTOM is priced fresh every time.
+model MieCustomerPrice {
+  customerId  String
+  customer    MieCustomer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productType MieProductType
+  pricePerKg  Int
+  updatedAt   DateTime       @updatedAt
+
+  @@id([customerId, productType])
 }
 
 // One editable default Rp/kg per fixed product — the starting suggestion

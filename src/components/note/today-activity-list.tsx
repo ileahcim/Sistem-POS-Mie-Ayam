@@ -22,8 +22,10 @@ import { cn } from "@/components/ui/cn";
 //
 // Tapping a row expands it in place to that customer's transactions of
 // today, each with Edit/Hapus (the book's own entry sheet — the same edit/
-// delete path as the customer page and Ringkasan), plus a separate button
-// to the customer's page. The row header is a <button>; the Edit/Hapus/link
+// delete path as the customer page and Ringkasan), plus "+ Bayar" (the
+// book's payment form with this customer filled in, so paying doesn't mean
+// scrolling back up to the big button — only while they owe and are
+// active) and a separate button to the customer's page. The row header is a <button>; the Edit/Hapus/link
 // targets are siblings below it, never nested inside it.
 //
 // The money totals on top are plain sums of the transactions shown — a quick
@@ -34,6 +36,7 @@ export function TodayActivityList<E>({
   activity,
   unit,
   customerHref,
+  paymentHref,
   query,
   highlightId = null,
   onEdit,
@@ -42,6 +45,7 @@ export function TodayActivityList<E>({
   activity: TodayActivity<E>;
   unit: "kg" | "pcs";
   customerHref: (customerId: string) => string;
+  paymentHref: (customerId: string) => string;
   query: string;
   highlightId?: string | null;
   onEdit: (entry: E) => void;
@@ -115,6 +119,7 @@ export function TodayActivityList<E>({
           highlighted={g.customerId === highlightCustomer}
           onToggle={() => toggle(g.customerId)}
           customerHref={customerHref(g.customerId)}
+          paymentHref={paymentHref(g.customerId)}
           onEdit={onEdit}
           onDelete={onDelete}
         />
@@ -136,6 +141,7 @@ function CustomerRow<E>({
   highlighted,
   onToggle,
   customerHref,
+  paymentHref,
   onEdit,
   onDelete,
 }: {
@@ -147,6 +153,7 @@ function CustomerRow<E>({
   highlighted: boolean;
   onToggle: () => void;
   customerHref: string;
+  paymentHref: string;
   onEdit: (entry: E) => void;
   onDelete: (entry: E) => void;
 }) {
@@ -222,7 +229,12 @@ function CustomerRow<E>({
           {g.rows.map((r) => (
             <TransactionRow key={r.id} row={r} customerName={g.customerName} onEdit={onEdit} onDelete={onDelete} />
           ))}
-          <div className="border-border border-t px-4 py-3">
+          <div className="border-border flex flex-wrap gap-2 border-t px-4 py-3">
+            {g.customerActive && g.balance > 0 && (
+              <LinkButton href={paymentHref} variant="primary" size="compact">
+                + Bayar
+              </LinkButton>
+            )}
             <LinkButton href={customerHref} variant="secondary" size="compact" className="border-border border">
               Buka detail pelanggan
             </LinkButton>

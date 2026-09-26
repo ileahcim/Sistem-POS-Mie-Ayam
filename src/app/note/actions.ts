@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { localDateStr, wibDateRange } from "@/lib/timezone";
-import type { MieAdjustmentKind, MieCostKey, MieProductType } from "@/lib/mie/types";
+import type { MieAdjustmentKind, MieAutofillPrice, MieCostKey, MieProductType } from "@/lib/mie/types";
+import { MIE_FIXED_PRODUCT_TYPES } from "@/lib/mie/types";
 import {
   isNotePaymentMethod,
   resolveNotePaymentMethodEdit,
@@ -397,15 +398,24 @@ export async function updateMieCostPerKg(key: MieCostKey, costPerKg: number): Pr
   return { ok: true };
 }
 
-// Price autofill for the new-order form: this customer's last price for
-// this exact product if they've ordered it before, else the product's
-// owner-set default (see get-mie-product-defaults.ts) — never for CUSTOM,
-// which is always priced fresh (see CLAUDE.md-worthy brief).
+// Price autofill for the new-order form, in this order: this customer's
+// "harga khusus" for this jenis (MieCustomerPrice, set on the customer's
+// page), else their last price for this exact product if they've ordered it
+// before, else the product's owner-set default (see
+// get-mie-product-defaults.ts) — never for CUSTOM, which is always priced
+// fresh. The source is returned so the form can say where the number came
+// from (a forgotten 17.000 is easier to catch when it reads "Harga umum").
 export async function getMieAutofillPrice(
   customerId: string,
   productType: Exclude<MieProductType, "CUSTOM">,
-): Promise<number | null> {
+): Promise<MieAutofillPrice | null> {
   await requireRole("OWNER");
+
+  const special = await prisma.mieCustomerPrice.findUnique({
+    where: { customerId_productType: { customerId, productType } },
+    select: { pricePerKg: true },
+  });
+  if (special) return { price: special.pricePerKg, source: "khusus" };
 
   const lastOrder = await prisma.mieLedgerEntry.findFirst({
     // Pasar orders are priced from their own shortcut, not this customer's
@@ -414,8 +424,49 @@ export async function getMieAutofillPrice(
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     select: { pricePerKg: true },
   });
-  if (lastOrder?.pricePerKg != null) return lastOrder.pricePerKg;
+  if (lastOrder?.pricePerKg != null) return { price: lastOrder.pricePerKg, source: "terakhir" };
 
   const productDefault = await prisma.mieProductDefault.findUnique({ where: { productType } });
-  return productDefault?.defaultPricePerKg ?? null;
+  return productDefault?.defaultPricePerKg != null ? { price: productDefault.defaultPricePerKg, source: "umum" } : null;
+}
+
+// "Harga khusus" of one customer — the whole set at once, from the sheet on
+// the customer's page: a price sets/replaces that jenis, null removes it
+// (back to last price / harga umum). Only suggests the price of NEW orders;
+// no ledger row is touched.
+export async function setMieCustomerPrices(
+  customerId: string,
+  prices: { productType: Exclude<MieProductType, "CUSTOM">; pricePerKg: number | null }[],
+): Promise<ActionResult> {
+  await requireRole("OWNER");
+
+  const seen = new Set<string>();
+  for (const p of prices) {
+    if (!MIE_FIXED_PRODUCT_TYPES.includes(p.productType) || seen.has(p.productType)) {
+      return { ok: false, error: "Jenis mi tidak valid." };
+    }
+    seen.add(p.productType);
+    if (p.pricePerKg !== null && (!Number.isFinite(p.pricePerKg) || p.pricePerKg <= 0)) {
+      return { ok: false, error: "Harga tidak valid." };
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const customer = await tx.mieCustomer.findUnique({ where: { id: customerId }, select: { id: true } });
+    if (!customer) return { ok: false as const, error: "Pelanggan tidak ditemukan." };
+    for (const p of prices) {
+      const key = { customerId_productType: { customerId, productType: p.productType } };
+      if (p.pricePerKg === null) {
+        await tx.mieCustomerPrice.deleteMany({ where: { customerId, productType: p.productType } });
+      } else {
+        const pricePerKg = Math.round(p.pricePerKg);
+        await tx.mieCustomerPrice.upsert({
+          where: key,
+          update: { pricePerKg },
+          create: { customerId, productType: p.productType, pricePerKg },
+        });
+      }
+    }
+    return { ok: true as const };
+  });
 }

@@ -1,12 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { mieEntrySignedAmount, type MieLedgerEntryDTO, type MieProductType } from "./types";
 
+export type MieSpecialPrices = Partial<Record<Exclude<MieProductType, "CUSTOM">, number>>;
+
 export type MieCustomerDetail = {
   id: string;
   name: string;
   note: string | null;
   isActive: boolean;
   balance: number;
+  // "Harga khusus" per jenis (MieCustomerPrice) — a jenis missing here has none.
+  specialPrices: MieSpecialPrices;
   entries: (MieLedgerEntryDTO & { runningBalance: number })[]; // oldest first, balance accumulates down the page
 };
 
@@ -18,6 +22,7 @@ export async function getMieCustomerDetail(customerId: string): Promise<MieCusto
         include: { createdBy: { select: { name: true } } },
         orderBy: [{ date: "asc" }, { createdAt: "asc" }],
       },
+      prices: { select: { productType: true, pricePerKg: true } },
     },
   });
   if (!customer) return null;
@@ -50,6 +55,11 @@ export async function getMieCustomerDetail(customerId: string): Promise<MieCusto
     note: customer.note,
     isActive: customer.isActive,
     balance: running,
+    specialPrices: Object.fromEntries(
+      customer.prices
+        .filter((p) => p.productType !== "FROZEN")
+        .map((p) => [p.productType, p.pricePerKg]),
+    ) as MieSpecialPrices,
     entries,
   };
 }

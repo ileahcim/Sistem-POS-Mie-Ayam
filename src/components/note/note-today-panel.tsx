@@ -5,7 +5,7 @@ import { AnimatePresence } from "motion/react";
 import type { TodayActivity } from "@/lib/note/today-activity";
 import type { MieLedgerEntryDTO } from "@/lib/mie/types";
 import type { FrozenLedgerEntryDTO } from "@/lib/frozen/types";
-import { noteCustomerHref, type NoteBook } from "@/lib/note/books";
+import { NOTE_BOOK, noteCustomerHref, type NoteBook } from "@/lib/note/books";
 import { Card } from "@/components/ui/card";
 import { TodayActivityList } from "./today-activity-list";
 import { EntrySheet } from "./mie-sheets";
@@ -64,6 +64,8 @@ export function NoteTodayPanel({
           activity={activity}
           unit={book === "mie" ? "kg" : "pcs"}
           customerHref={(id) => `${noteCustomerHref(book, id)}?dari=hari-ini`}
+          // No `dari` = opened from Hari Ini: Batal and the save land back here.
+          paymentHref={(id) => `${NOTE_BOOK[book].paymentHref}?customerId=${encodeURIComponent(id)}`}
           query={query}
           highlightId={highlight}
           onEdit={(entry) => setEditing({ entry, action: "edit" })}

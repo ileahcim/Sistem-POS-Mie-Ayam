@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
+import type { MieProductDefaults } from "@/lib/mie/get-mie-product-defaults";
 import type { MieAdjustmentKind, MieLedgerEntryDTO, MieProductType } from "@/lib/mie/types";
 import {
   MIE_ADJUSTMENT_LABEL,
@@ -15,6 +16,7 @@ import { todayDateStr, isoToDateInput, dateInputToIso } from "@/lib/mie/date-inp
 import {
   createMieAdjustment,
   deleteMieEntry,
+  setMieCustomerPrices,
   updateMieCustomer,
   updateMieEntry,
 } from "@/app/note/actions";
@@ -81,6 +83,97 @@ export function EditCustomerSheet({
         <Field label="Keterangan (opsional)" htmlFor="edit-customer-note">
           <input id="edit-customer-note" className={INPUT} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
+        {error && <p className="text-danger text-sm">{error}</p>}
+      </div>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Harga khusus — this customer's own Rp/kg per jenis (26 Sep 2026)
+// ---------------------------------------------------------------------------
+
+// Empty field = no special price for that jenis: the order form then falls
+// back to the customer's last price, then harga umum. Saved as a whole set.
+// Only new orders are affected — every recorded order keeps its own price.
+export function SpecialPriceSheet({
+  customer,
+  productDefaults,
+  onClose,
+}: {
+  customer: Pick<MieCustomerDetail, "id" | "name" | "specialPrices">;
+  productDefaults: MieProductDefaults;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [prices, setPrices] = useState<Record<string, number | "">>(() =>
+    Object.fromEntries(MIE_FIXED_PRODUCT_TYPES.map((t) => [t, customer.specialPrices[t] ?? ""])),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    const result = await setMieCustomerPrices(
+      customer.id,
+      MIE_FIXED_PRODUCT_TYPES.map((t) => ({ productType: t, pricePerKg: prices[t] === "" ? null : Number(prices[t]) })),
+    );
+    setSaving(false);
+    if (!result.ok) return setError(result.error);
+    router.refresh();
+    onClose();
+  }
+
+  return (
+    <Sheet
+      title={`Harga khusus ${customer.name}`}
+      onClose={onClose}
+      footer={
+        <Button variant="primary" size="large" fullWidth disabled={saving} onClick={handleSave}>
+          {saving ? "Menyimpan..." : "Simpan"}
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-ink-muted text-sm">
+          Dipakai otomatis di Pesanan Baru untuk pelanggan ini. Kosongkan kalau ikut harga biasa. Pesanan yang sudah
+          tercatat tidak berubah.
+        </p>
+        {MIE_FIXED_PRODUCT_TYPES.map((t) => {
+          const general = productDefaults[t];
+          return (
+            <div key={t} className="flex flex-col gap-1">
+              <label htmlFor={`special-price-${t}`} className="text-ink-muted text-sm font-medium">
+                {MIE_PRODUCT_LABEL[t]} (per kg)
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <RupiahInput
+                    id={`special-price-${t}`}
+                    value={prices[t]}
+                    onChange={(v) => setPrices((prev) => ({ ...prev, [t]: v > 0 ? v : "" }))}
+                    placeholder={general != null ? general.toLocaleString("id-ID") : "Harga biasa"}
+                    className="h-12 text-base"
+                  />
+                </div>
+                {prices[t] !== "" && (
+                  <Button
+                    variant="ghost"
+                    size="compact"
+                    onClick={() => setPrices((prev) => ({ ...prev, [t]: "" }))}
+                    aria-label={`Kosongkan harga khusus ${MIE_PRODUCT_LABEL[t]}`}
+                  >
+                    Kosongkan
+                  </Button>
+                )}
+              </div>
+              <span className="text-ink-faint text-xs">
+                {general != null ? `Harga umum Rp${general.toLocaleString("id-ID")}/kg` : "Harga umum belum diisi"}
+              </span>
+            </div>
+          );
+        })}
         {error && <p className="text-danger text-sm">{error}</p>}
       </div>
     </Sheet>
