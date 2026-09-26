@@ -8,7 +8,7 @@ import { AnimatePresence } from "motion/react";
 import type { FrozenCustomerDetail } from "@/lib/frozen/get-frozen-customer-detail";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver } from "@/lib/printing/types";
-import { formatFrozenEntryLabel, frozenEntryReducesDebt } from "@/lib/frozen/types";
+import { formatFrozenEntryLabel, frozenEntryHasItems, frozenEntryReducesDebt } from "@/lib/frozen/types";
 import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatId } from "@/lib/timezone";
 import { deleteFrozenCustomer, setFrozenCustomerActive } from "@/app/note/frozen-actions";
@@ -141,6 +141,9 @@ export function FrozenCustomerDetailScreen({
               <LinkButton href={`/note/frozen/pembayaran/baru?customerId=${customer.id}&dari=pelanggan`} variant="secondary">
                 + Pembayaran
               </LinkButton>
+              <LinkButton href={`/note/frozen/retur/baru?customerId=${customer.id}&dari=pelanggan`} variant="secondary">
+                + Retur
+              </LinkButton>
               <Button variant="secondary" onClick={() => setSheet("adjust")}>
                 Koreksi Saldo
               </Button>
@@ -173,13 +176,20 @@ export function FrozenCustomerDetailScreen({
             ) : (
               entriesNewestFirst.map((e) => {
                 const reduces = frozenEntryReducesDebt(e.kind);
+                const isReturn = e.kind === "RETURN";
                 const canReprint = (e.kind === "ORDER" || e.kind === "PAYMENT") && !printingUnavailable;
                 return (
                   <ListRow key={e.id} roomy onClick={() => setEditingEntry(e)}>
                     <div className="min-w-0 flex-1">
                       <p className="text-ink-faint text-xs">{formatId(new Date(e.date), { dateStyle: "medium" })}</p>
-                      <p className="text-ink text-base font-semibold">{formatFrozenEntryLabel(e)}</p>
-                      {e.kind === "ORDER" && e.pcs != null && e.pricePerPcs != null && (
+                      {isReturn ? (
+                        <p className="text-base font-semibold">
+                          <Badge variant="warning">Retur</Badge>
+                        </p>
+                      ) : (
+                        <p className="text-ink text-base font-semibold">{formatFrozenEntryLabel(e)}</p>
+                      )}
+                      {frozenEntryHasItems(e.kind) && e.pcs != null && e.pricePerPcs != null && (
                         <p className="text-ink-muted text-sm">
                           {e.pcs.toLocaleString("id-ID")} pcs × Rp{e.pricePerPcs.toLocaleString("id-ID")}/pcs
                         </p>
@@ -206,7 +216,10 @@ export function FrozenCustomerDetailScreen({
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-0.5">
                       <span
-                        className={cn("text-base font-bold tabular-nums", reduces ? "text-primary-strong" : "text-ink")}
+                        className={cn(
+                          "text-base font-bold tabular-nums",
+                          isReturn ? "text-warning" : reduces ? "text-primary-strong" : "text-ink",
+                        )}
                       >
                         {reduces ? "-" : "+"}Rp{e.amount.toLocaleString("id-ID")}
                       </span>
@@ -283,7 +296,12 @@ export function FrozenCustomerDetailScreen({
           <FrozenAdjustmentSheet key="adjust" customerId={customer.id} onClose={() => setSheet(null)} />
         )}
         {editingEntry && (
-          <FrozenEntrySheet key={editingEntry.id} entry={editingEntry} onClose={() => setEditingEntry(null)} />
+          <FrozenEntrySheet
+            key={editingEntry.id}
+            entry={editingEntry}
+            customer={{ id: customer.id, name: customer.name }}
+            onClose={() => setEditingEntry(null)}
+          />
         )}
       </AnimatePresence>
     </div>

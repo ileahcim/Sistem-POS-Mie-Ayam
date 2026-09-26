@@ -37,7 +37,11 @@ export function NoteTodayPanel({
 }) {
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(highlightId);
-  const [editing, setEditing] = useState<{ entry: NoteTodayEntry; action: "edit" | "delete" } | null>(null);
+  const [editing, setEditing] = useState<{
+    entry: NoteTodayEntry;
+    customer: { id: string; name: string };
+    action: "edit" | "delete";
+  } | null>(null);
 
   useEffect(() => {
     if (!highlightId) return;
@@ -66,10 +70,11 @@ export function NoteTodayPanel({
           customerHref={(id) => `${noteCustomerHref(book, id)}?dari=hari-ini`}
           // No `dari` = opened from Hari Ini: Batal and the save land back here.
           paymentHref={(id) => `${NOTE_BOOK[book].paymentHref}?customerId=${encodeURIComponent(id)}`}
+          returnHref={(id) => `${NOTE_BOOK[book].returnHref}?customerId=${encodeURIComponent(id)}`}
           query={query}
           highlightId={highlight}
-          onEdit={(entry) => setEditing({ entry, action: "edit" })}
-          onDelete={(entry) => setEditing({ entry, action: "delete" })}
+          onEdit={(entry, customer) => setEditing({ entry, customer, action: "edit" })}
+          onDelete={(entry, customer) => setEditing({ entry, customer, action: "delete" })}
         />
       </Card>
 
@@ -79,6 +84,7 @@ export function NoteTodayPanel({
             <EntrySheet
               key={editing.entry.id}
               entry={editing.entry as MieLedgerEntryDTO}
+              customer={editing.customer}
               initialAction={editing.action}
               onClose={() => setEditing(null)}
             />
@@ -86,6 +92,7 @@ export function NoteTodayPanel({
             <FrozenEntrySheet
               key={editing.entry.id}
               entry={editing.entry as FrozenLedgerEntryDTO}
+              customer={editing.customer}
               initialAction={editing.action}
               onClose={() => setEditing(null)}
             />

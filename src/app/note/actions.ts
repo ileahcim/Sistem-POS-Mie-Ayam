@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { localDateStr, wibDateRange } from "@/lib/timezone";
 import type { MieAdjustmentKind, MieAutofillPrice, MieCostKey, MieProductType } from "@/lib/mie/types";
-import { MIE_FIXED_PRODUCT_TYPES } from "@/lib/mie/types";
+import { MIE_FIXED_PRODUCT_TYPES, mieEntryHasItems } from "@/lib/mie/types";
+import { noteReturnWindow, type NoteReturnContext } from "@/lib/note/return-window";
 import {
   isNotePaymentMethod,
   resolveNotePaymentMethodEdit,
@@ -98,6 +99,23 @@ function validateJenis(
 
 export async function createMieOrder(input: CreateMieOrderInput): Promise<CreateMieEntryResult> {
   const user = await requireRole("OWNER");
+  return createMieItemEntry("ORDER", input, user.id);
+}
+
+// "Retur" — mi titip-jual that came back unsold. Same fields and rules as a
+// pesanan (the jenis, kg, harga/kg it was sold at), but the row LOWERS the
+// debt by kg × harga/kg (mieEntrySignedAmount).
+export async function createMieReturn(input: CreateMieOrderInput): Promise<CreateMieEntryResult> {
+  const user = await requireRole("OWNER");
+  return createMieItemEntry("RETURN", input, user.id);
+}
+
+// Callers have already passed requireRole("OWNER").
+async function createMieItemEntry(
+  kind: "ORDER" | "RETURN",
+  input: CreateMieOrderInput,
+  userId: string,
+): Promise<CreateMieEntryResult> {
 
   const customer = await prisma.mieCustomer.findUnique({ where: { id: input.customerId } });
   if (!customer || !customer.isActive) return { ok: false, error: "Pelanggan tidak ditemukan." };
@@ -114,18 +132,63 @@ export async function createMieOrder(input: CreateMieOrderInput): Promise<Create
   const entry = await prisma.mieLedgerEntry.create({
     data: {
       customerId: input.customerId,
-      kind: "ORDER",
+      kind,
       ...jenis.data,
       kg: input.kg,
       pricePerKg: input.pricePerKg,
       amount: Math.round(input.kg * input.pricePerKg),
       date,
       note: input.note.trim() || null,
-      createdById: user.id,
+      createdById: userId,
     },
   });
 
   return { ok: true, entryId: entry.id };
+}
+
+// For the retur form and the retur edit sheet: the price this customer was
+// last sold this exact jenis at (Mi Pasar apart from Reguler, a custom one by
+// name), and how many kg of it they ordered in the retur's window — the form
+// warns when the retur is bigger (see return-window.ts).
+export async function getMieReturnContext(input: {
+  customerId: string;
+  productType: MieProductType;
+  isPasar: boolean;
+  customLabel: string;
+  date: string;
+}): Promise<NoteReturnContext | null> {
+  await requireRole("OWNER");
+
+  const date = new Date(input.date);
+  if (Number.isNaN(date.getTime()) || !MIE_PRODUCT_TYPES.includes(input.productType)) return null;
+  const custom = input.productType === "CUSTOM";
+  if (custom && !input.customLabel.trim()) return null;
+  const same = {
+    customerId: input.customerId,
+    kind: "ORDER" as const,
+    productType: input.productType,
+    isPasar: input.productType === "MIE_KERITING" && input.isPasar,
+    ...(custom ? { customLabel: { equals: input.customLabel.trim(), mode: "insensitive" as const } } : {}),
+  };
+  const window = noteReturnWindow(date);
+  const [last, sum] = await Promise.all([
+    prisma.mieLedgerEntry.findFirst({
+      where: same,
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      select: { pricePerKg: true, date: true },
+    }),
+    prisma.mieLedgerEntry.aggregate({
+      where: { ...same, date: { gte: window.start, lt: window.end } },
+      _sum: { kg: true },
+    }),
+  ]);
+  return {
+    lastPrice: last?.pricePerKg ?? null,
+    lastPriceDay: last ? localDateStr(last.date) : null,
+    windowQty: sum._sum.kg ?? 0,
+    fromDay: window.fromDay,
+    toDay: window.toDay,
+  };
 }
 
 export type CreateMiePaymentInput = {
@@ -261,6 +324,8 @@ export async function createMieAdjustment(input: CreateMieAdjustmentInput): Prom
 // recomputes on the next read (balance is always a sum over rows).
 // ---------------------------------------------------------------------------
 
+// ORDER and RETURN rows carry the same item fields ("ORDER only" below
+// means both).
 export type UpdateMieEntryInput = {
   kg?: number; // ORDER only
   pricePerKg?: number; // ORDER only
@@ -285,7 +350,7 @@ export async function updateMieEntry(entryId: string, input: UpdateMieEntryInput
   if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
   const note = input.note.trim() || null;
 
-  if (entry.kind === "ORDER") {
+  if (mieEntryHasItems(entry.kind)) {
     const kg = Number(input.kg);
     const pricePerKg = Number(input.pricePerKg);
     if (!Number.isFinite(kg) || kg <= 0) return { ok: false, error: "Jumlah kg tidak valid." };

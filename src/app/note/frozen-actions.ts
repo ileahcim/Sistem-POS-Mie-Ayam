@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
 import { localDateStr, wibDateRange } from "@/lib/timezone";
-import { frozenEntrySignedAmount, type FrozenAdjustmentKind } from "@/lib/frozen/types";
+import { frozenEntryHasItems, frozenEntrySignedAmount, type FrozenAdjustmentKind } from "@/lib/frozen/types";
+import { noteReturnWindow, type NoteReturnContext } from "@/lib/note/return-window";
 import {
   isNotePaymentMethod,
   resolveNotePaymentMethodEdit,
@@ -256,6 +257,69 @@ export async function createFrozenAdjustment(input: CreateFrozenAdjustmentInput)
 // Edit / hapus a ledger row.
 // ---------------------------------------------------------------------------
 
+// "Retur" — pcs given back unsold. Same fields as a pengambilan, LOWERS the
+// debt (frozenEntrySignedAmount). No "Cetak bukti" for it (not asked for;
+// FrozenReceiptData only knows pengambilan/pembayaran).
+export async function createFrozenReturn(
+  input: CreateFrozenOrderInput,
+): Promise<{ ok: true; entryId: string } | { ok: false; error: string }> {
+  const user = await requireRole("OWNER");
+
+  const customer = await prisma.frozenCustomer.findUnique({ where: { id: input.customerId } });
+  if (!customer || !customer.isActive) return { ok: false, error: "Pelanggan tidak ditemukan." };
+  if (!Number.isInteger(input.pcs) || input.pcs <= 0) return { ok: false, error: "Jumlah pcs tidak valid." };
+  if (!Number.isFinite(input.pricePerPcs) || input.pricePerPcs <= 0) {
+    return { ok: false, error: "Harga per pcs tidak valid." };
+  }
+  const date = new Date(input.date);
+  if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
+
+  const entry = await prisma.frozenLedgerEntry.create({
+    data: {
+      customerId: input.customerId,
+      kind: "RETURN",
+      pcs: input.pcs,
+      pricePerPcs: Math.round(input.pricePerPcs),
+      amount: Math.round(input.pcs * input.pricePerPcs),
+      date,
+      note: input.note.trim() || null,
+      createdById: user.id,
+    },
+  });
+  return { ok: true, entryId: entry.id };
+}
+
+// Retur form/sheet: the customer's last pengambilan price and the pcs taken
+// in the retur's window (see return-window.ts; mirrors getMieReturnContext).
+export async function getFrozenReturnContext(input: { customerId: string; date: string }): Promise<NoteReturnContext | null> {
+  await requireRole("OWNER");
+
+  const date = new Date(input.date);
+  if (Number.isNaN(date.getTime())) return null;
+  const window = noteReturnWindow(date);
+  const same = { customerId: input.customerId, kind: "ORDER" as const };
+  const [last, sum] = await Promise.all([
+    prisma.frozenLedgerEntry.findFirst({
+      where: same,
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      select: { pricePerPcs: true, date: true },
+    }),
+    prisma.frozenLedgerEntry.aggregate({
+      where: { ...same, date: { gte: window.start, lt: window.end } },
+      _sum: { pcs: true },
+    }),
+  ]);
+  return {
+    lastPrice: last?.pricePerPcs ?? null,
+    lastPriceDay: last ? localDateStr(last.date) : null,
+    windowQty: sum._sum.pcs ?? 0,
+    fromDay: window.fromDay,
+    toDay: window.toDay,
+  };
+}
+
+// ORDER and RETURN rows carry the same item fields ("ORDER only" below means
+// both).
 export type UpdateFrozenEntryInput = {
   pcs?: number; // ORDER only
   pricePerPcs?: number; // ORDER only
@@ -275,7 +339,7 @@ export async function updateFrozenEntry(entryId: string, input: UpdateFrozenEntr
   if (Number.isNaN(date.getTime())) return { ok: false, error: "Tanggal tidak valid." };
   const note = input.note.trim() || null;
 
-  if (entry.kind === "ORDER") {
+  if (frozenEntryHasItems(entry.kind)) {
     const pcs = Number(input.pcs);
     const pricePerPcs = Number(input.pricePerPcs);
     if (!Number.isInteger(pcs) || pcs <= 0) return { ok: false, error: "Jumlah pcs tidak valid." };

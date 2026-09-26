@@ -17,12 +17,21 @@ import { NoteNav } from "./note-nav";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
 import { ReportGranularityToggle, GRANULARITY_OPTIONS, effectiveGranularity } from "./report-granularity";
-import { DrilldownStat, LedgerDrilldown, type DrilldownRow } from "./ledger-drilldown";
+import {
+  DrilldownStat,
+  LedgerDrilldown,
+  ReturnBreakdown,
+  summarizeReturns,
+  type DrilldownRow,
+} from "./ledger-drilldown";
 import { FrozenEntrySheet } from "./frozen-sheets";
 
 // Mirrors mie-report-screen.tsx's Drill: "omzet" and "pcs" open the same
-// pengambilan rows, only the emphasised number differs.
-type Drill = "omzet" | "payments" | "pcs";
+// pengambilan rows, only the emphasised number differs; a retur sits in them
+// as a minus row (the numbers are net of retur). "returns" is the Retur card.
+type Drill = "omzet" | "payments" | "pcs" | "returns";
+
+const minus = (text: string) => `−${text}`;
 
 function formatPcs(pcs: number): string {
   return `${pcs.toLocaleString("id-ID")} pcs`;
@@ -71,15 +80,21 @@ export function FrozenReportScreen({
       omzet: 0,
       payments: 0,
       pcs: 0,
+      returns: 0,
+      returnPcs: 0,
       orderRows: [] as FrozenReportPoint[],
       paymentRows: [] as FrozenReportPoint[],
+      returnRows: [] as FrozenReportPoint[],
     };
     for (const b of buckets) {
       totals.omzet += b.omzet;
       totals.payments += b.payments;
       totals.pcs += b.pcs;
+      totals.returns += b.returns;
+      totals.returnPcs += b.returnPcs;
       totals.orderRows.push(...b.orderRows);
       totals.paymentRows.push(...b.paymentRows);
+      totals.returnRows.push(...b.returnRows);
     }
     return { label: rangeLabel, ...totals };
   }, [selected, buckets, rangeLabel]);
@@ -87,16 +102,41 @@ export function FrozenReportScreen({
   // Newest first — the exact rows the open card's number was summed from.
   const drillPoints = useMemo(() => {
     if (!drill) return [];
-    const source = drill === "payments" ? view.paymentRows : view.orderRows;
+    const source = drill === "payments" ? view.paymentRows : drill === "returns" ? view.returnRows : view.orderRows;
     return [...source].sort((a, b) => (a.day === b.day ? b.time.localeCompare(a.time) : b.day.localeCompare(a.day)));
   }, [drill, view]);
 
+  const returnSummary = useMemo(
+    () =>
+      drill === "returns"
+        ? summarizeReturns(
+            view.returnRows.map((p) => ({ ...p, qty: p.pcs ?? 0 })),
+            view.orderRows.map((p) => ({ ...p, qty: p.pcs ?? 0 })),
+          )
+        : [],
+    [drill, view],
+  );
+
   const drillRows: DrilldownRow[] = drillPoints.map((p) => {
+    const isReturn = p.kind === "RETURN" && drill !== "returns";
     const pcsLabel = p.pcs != null ? formatPcs(p.pcs) : null;
     const perPcs =
       p.pcs != null && p.pricePerPcs != null
-        ? `${pcsLabel} × Rp${p.pricePerPcs.toLocaleString("id-ID")}/pcs`
+        ? `${p.kind === "RETURN" ? "Retur · " : ""}${pcsLabel} × Rp${p.pricePerPcs.toLocaleString("id-ID")}/pcs`
         : null;
+    if (drill === "returns") {
+      return {
+        id: p.id,
+        href: `/note/frozen/pelanggan/${p.customerId}`,
+        title: p.customerName,
+        date: p.date,
+        time: p.time,
+        detail: perPcs,
+        note: p.note,
+        value: pcsLabel ?? "—",
+        sub: formatRupiah(p.amount),
+      };
+    }
     return {
       id: p.id,
       href: `/note/frozen/pelanggan/${p.customerId}`,
@@ -106,15 +146,24 @@ export function FrozenReportScreen({
       // See mie-report-screen.tsx — "Tidak dicatat" for pre-column rows.
       detail: drill === "payments" ? formatNotePaymentMethod(p.paymentMethod) : perPcs,
       note: p.note,
-      value: drill === "pcs" ? (pcsLabel ?? "—") : formatRupiah(p.amount),
-      sub: drill === "pcs" ? formatRupiah(p.amount) : null,
+      value:
+        drill === "pcs"
+          ? pcsLabel
+            ? isReturn
+              ? minus(pcsLabel)
+              : pcsLabel
+            : "—"
+          : isReturn
+            ? minus(formatRupiah(p.amount))
+            : formatRupiah(p.amount),
+      sub: drill === "pcs" ? (isReturn ? minus(formatRupiah(p.amount)) : formatRupiah(p.amount)) : null,
     };
   });
 
   const DRILL_META: Record<Drill, { heading: string; totalLabel: string; totalValue: string; empty: string }> = {
     omzet: {
-      heading: "Pengambilan",
-      totalLabel: "Total omzet",
+      heading: view.returnRows.length > 0 ? "Pengambilan & retur" : "Pengambilan",
+      totalLabel: view.returnRows.length > 0 ? "Total omzet (bersih)" : "Total omzet",
       totalValue: formatRupiah(view.omzet),
       empty: "Tidak ada pengambilan di rentang ini.",
     },
@@ -124,9 +173,15 @@ export function FrozenReportScreen({
       totalValue: formatRupiah(view.payments),
       empty: "Tidak ada pembayaran di rentang ini.",
     },
+    returns: {
+      heading: "Rincian retur",
+      totalLabel: "Total retur",
+      totalValue: `${formatPcs(view.returnPcs)} · ${formatRupiah(view.returns)}`,
+      empty: "Tidak ada retur di rentang ini.",
+    },
     pcs: {
-      heading: "Pcs terjual",
-      totalLabel: "Total pcs",
+      heading: view.returnRows.length > 0 ? "Pcs terjual & retur" : "Pcs terjual",
+      totalLabel: view.returnRows.length > 0 ? "Total pcs (bersih)" : "Total pcs",
       totalValue: formatPcs(view.pcs),
       empty: "Tidak ada pengambilan di rentang ini.",
     },
@@ -193,6 +248,7 @@ export function FrozenReportScreen({
               <DrilldownStat
                 label="Omzet (pengambilan)"
                 value={formatRupiah(view.omzet)}
+                hint={view.returns > 0 ? `sudah dikurangi retur ${formatRupiah(view.returns)}` : null}
                 open={drill === "omzet"}
                 onToggle={() => setDrill(drill === "omzet" ? null : "omzet")}
               />
@@ -205,11 +261,29 @@ export function FrozenReportScreen({
               <DrilldownStat
                 label="Pcs terjual"
                 value={formatPcs(view.pcs)}
+                hint={view.returnPcs > 0 ? `sudah dikurangi retur ${formatPcs(view.returnPcs)}` : null}
                 open={drill === "pcs"}
                 onToggle={() => setDrill(drill === "pcs" ? null : "pcs")}
               />
+              <DrilldownStat
+                label="Retur"
+                value={formatPcs(view.returnPcs)}
+                hint={formatRupiah(view.returns)}
+                open={drill === "returns"}
+                onToggle={() => setDrill(drill === "returns" ? null : "returns")}
+              />
             </div>
           </section>
+
+          {drill === "returns" && (
+            <ReturnBreakdown
+              heading={`Retur per pelanggan · ${view.label}`}
+              rows={returnSummary}
+              unit="pcs"
+              customerHref={(id) => `/note/frozen/pelanggan/${id}`}
+              orderWord="pengambilan"
+            />
+          )}
 
           {drill && (
             <LedgerDrilldown
@@ -285,7 +359,7 @@ export function FrozenReportScreen({
             <p className="text-ink-faint text-xs">
               Ketuk baris untuk melihat rincian periode itu. Kalau rentang tanggal berhenti di tengah minggu/bulan,
               periode di tepi hanya menghitung hari yang masuk rentang. Omzet dihitung dari semua pengambilan (bukan
-              cuma yang belum lunas); saldo awal dan koreksi tidak dihitung sebagai omzet maupun pembayaran.
+              cuma yang belum lunas) dikurangi retur; saldo awal dan koreksi tidak dihitung sebagai omzet maupun pembayaran.
             </p>
           </section>
         </div>
@@ -296,6 +370,7 @@ export function FrozenReportScreen({
           <FrozenEntrySheet
             key={editing.point.id}
             entry={editing.point}
+            customer={{ id: editing.point.customerId, name: editing.point.customerName }}
             initialAction={editing.action}
             onClose={() => setEditing(null)}
           />

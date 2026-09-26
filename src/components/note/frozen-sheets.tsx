@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FrozenCustomerDetail } from "@/lib/frozen/get-frozen-customer-detail";
 import type { FrozenAdjustmentKind, FrozenLedgerEntryDTO } from "@/lib/frozen/types";
-import { FROZEN_ADJUSTMENT_LABEL, formatFrozenEntryLabel } from "@/lib/frozen/types";
+import { FROZEN_ADJUSTMENT_LABEL, formatFrozenEntryLabel, frozenEntryHasItems } from "@/lib/frozen/types";
+import type { NoteReturnContext } from "@/lib/note/return-window";
 import { todayDateStr, isoToDateInput, dateInputToIso } from "@/lib/mie/date-input";
 import {
   createFrozenAdjustment,
   deleteFrozenEntry,
+  getFrozenReturnContext,
   updateFrozenCustomer,
   updateFrozenEntry,
 } from "@/app/note/frozen-actions";
@@ -17,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
 import { PaymentMethodPicker } from "./payment-method-picker";
+import { ReturnQtyWarning } from "./return-hints";
 
 const INPUT = "rounded-input border-border h-12 w-full border px-3 text-base";
 
@@ -178,17 +181,23 @@ export function FrozenAdjustmentSheet({ customerId, onClose }: { customerId: str
 // Takes a plain FrozenLedgerEntryDTO — see EntrySheet in mie-sheets.tsx for
 // why (one edit/delete path shared by the customer ledger and Ringkasan's
 // drill-down list).
+//
+// A RETURN row edits like a pengambilan (pcs, harga/pcs); with `customer`
+// given it re-checks the pcs against the retur's window (warning only).
 export function FrozenEntrySheet({
   entry,
+  customer,
   onClose,
   initialAction = "edit",
 }: {
   entry: FrozenLedgerEntryDTO;
+  customer?: { id: string; name: string };
   onClose: () => void;
   initialAction?: "edit" | "delete";
 }) {
   const router = useRouter();
-  const isOrder = entry.kind === "ORDER";
+  const isOrder = frozenEntryHasItems(entry.kind);
+  const isReturn = entry.kind === "RETURN";
   const isCorrection = entry.kind === "CORRECTION_ADD" || entry.kind === "CORRECTION_SUBTRACT";
   const [pcs, setPcs] = useState(entry.pcs != null ? String(entry.pcs) : "");
   const [pricePerPcs, setPricePerPcs] = useState<number | "">(entry.pricePerPcs ?? "");
@@ -202,6 +211,18 @@ export function FrozenEntrySheet({
   const [error, setError] = useState<string | null>(null);
 
   const isPayment = entry.kind === "PAYMENT";
+  const [returnContext, setReturnContext] = useState<NoteReturnContext | null>(null);
+  const returnCustomerId = customer?.id; // a primitive dep — callers pass a fresh object each render
+  useEffect(() => {
+    if (!isReturn || !returnCustomerId) return;
+    let cancelled = false;
+    getFrozenReturnContext({ customerId: returnCustomerId, date: dateInputToIso(date) }).then((ctx) => {
+      if (!cancelled) setReturnContext(ctx);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isReturn, returnCustomerId, date]);
   const pcsNumber = Number(pcs);
   const pcsValid = pcs.trim() !== "" && Number.isInteger(pcsNumber) && pcsNumber > 0;
   const canSave = isOrder
@@ -288,8 +309,18 @@ export function FrozenEntrySheet({
             </div>
             {pcsValid && pricePerPcs !== "" && (
               <p className="text-ink-muted text-sm">
-                Total: Rp{Math.round(pcsNumber * Number(pricePerPcs)).toLocaleString("id-ID")}
+                {isReturn ? "Mengurangi utang" : "Total"}: Rp
+                {Math.round(pcsNumber * Number(pricePerPcs)).toLocaleString("id-ID")}
               </p>
+            )}
+            {isReturn && pcsValid && customer && (
+              <ReturnQtyWarning
+                qty={pcsNumber}
+                unit="pcs"
+                context={returnContext}
+                itemLabel="pengambilan"
+                customerName={customer.name}
+              />
             )}
           </>
         ) : (

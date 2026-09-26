@@ -8,13 +8,16 @@ export type FrozenBucket = {
   key: string;
   label: string; // short, for the chart axis
   longLabel: string; // for the table / selected-period heading
-  omzet: number; // sum of ORDER amounts
+  omzet: number; // ORDER amounts minus RETURN amounts (omzet bersih, see bucket-mie.ts)
   payments: number; // sum of PAYMENT amounts
-  pcs: number;
+  pcs: number; // net of retur
+  returns: number; // sum of RETURN amounts (the Retur card)
+  returnPcs: number;
   // The exact rows each total was summed from — see bucket-mie.ts for why
   // the drill-down list reads these instead of re-filtering the points.
-  orderRows: FrozenReportPoint[];
+  orderRows: FrozenReportPoint[]; // ORDER and RETURN rows
   paymentRows: FrozenReportPoint[];
+  returnRows: FrozenReportPoint[];
 };
 
 // Default window per granularity — mirrors bucket-mie.ts's DEFAULT_BUCKET_COUNT.
@@ -102,8 +105,11 @@ export function bucketFrozen(points: FrozenReportPoint[], g: FrozenGranularity, 
       omzet: 0,
       payments: 0,
       pcs: 0,
+      returns: 0,
+      returnPcs: 0,
       orderRows: [],
       paymentRows: [],
+      returnRows: [],
     };
     buckets.push(bucket);
     byKey.set(key, bucket);
@@ -120,9 +126,15 @@ export function bucketFrozen(points: FrozenReportPoint[], g: FrozenGranularity, 
       bucket.paymentRows.push(p);
       continue;
     }
-    bucket.omzet += p.amount;
-    bucket.pcs += p.pcs ?? 0;
+    const sign = p.kind === "RETURN" ? -1 : 1;
+    bucket.omzet += sign * p.amount;
+    bucket.pcs += sign * (p.pcs ?? 0);
     bucket.orderRows.push(p);
+    if (p.kind === "RETURN") {
+      bucket.returns += p.amount;
+      bucket.returnPcs += p.pcs ?? 0;
+      bucket.returnRows.push(p);
+    }
   }
   return buckets;
 }

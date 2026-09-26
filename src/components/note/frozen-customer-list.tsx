@@ -43,6 +43,13 @@ function CustomerRows({ rows }: { rows: FrozenCustomerRow[] }) {
           <LinkButton href={`/note/frozen/pembayaran/baru?customerId=${c.id}&dari=utang`} variant="secondary">
             + Bayar
           </LinkButton>
+          {/* Retur is rare: on a phone it lives on the customer page only, so
+              this row keeps two buttons that fit. */}
+          <span className="hidden md:contents">
+            <LinkButton href={`/note/frozen/retur/baru?customerId=${c.id}&dari=utang`} variant="ghost">
+              + Retur
+            </LinkButton>
+          </span>
         </div>
       )}
     </div>

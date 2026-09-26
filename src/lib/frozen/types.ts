@@ -7,7 +7,13 @@
 // and there is no "jenis" concept at all: every pickup is the same product.
 import type { NotePaymentMethod } from "@/lib/note/payment-method";
 
-export type FrozenLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT";
+export type FrozenLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT" | "RETURN";
+
+// "Retur" — pcs given back unsold; same fields as ORDER (pcs, harga/pcs),
+// lowers the debt. See mieEntryHasItems for the Mi Mentah twin.
+export function frozenEntryHasItems(kind: FrozenLedgerKind): boolean {
+  return kind === "ORDER" || kind === "RETURN";
+}
 
 // Kinds that carry a plain amount (no pcs/price) and are added from the
 // customer page's "Koreksi Saldo" sheet.
@@ -43,13 +49,14 @@ export type FrozenLedgerEntryDTO = {
 export function formatFrozenEntryLabel(entry: Pick<FrozenLedgerEntryDTO, "kind">): string {
   if (entry.kind === "PAYMENT") return "Pembayaran";
   if (entry.kind === "ORDER") return "Pengambilan";
+  if (entry.kind === "RETURN") return "Retur";
   if (entry.kind === "OPENING_BALANCE") return "Saldo awal / utang lama";
   if (entry.kind === "CORRECTION_ADD") return "Koreksi (+)";
   return "Koreksi (−)";
 }
 
 // ORDER, OPENING_BALANCE and CORRECTION_ADD add to what the customer owes;
-// PAYMENT and CORRECTION_SUBTRACT reduce it. `amount` is always
+// PAYMENT, CORRECTION_SUBTRACT and RETURN reduce it. `amount` is always
 // stored/returned positive — this is the one place the sign is decided
 // (mirrors mieEntrySignedAmount).
 export function frozenEntrySignedAmount(entry: Pick<FrozenLedgerEntryDTO, "kind" | "amount">): number {
@@ -57,5 +64,5 @@ export function frozenEntrySignedAmount(entry: Pick<FrozenLedgerEntryDTO, "kind"
 }
 
 export function frozenEntryReducesDebt(kind: FrozenLedgerKind): boolean {
-  return kind === "PAYMENT" || kind === "CORRECTION_SUBTRACT";
+  return kind === "PAYMENT" || kind === "CORRECTION_SUBTRACT" || kind === "RETURN";
 }

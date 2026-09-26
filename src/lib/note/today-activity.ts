@@ -16,10 +16,10 @@ export type TodayActivityRow<E = unknown> = {
   customerName: string;
   // Inactive customers can't take a new transaction — no Bayar shortcut.
   customerActive: boolean;
-  kind: "ORDER" | "PAYMENT";
-  kindLabel: string; // "Pesanan" / "Pengambilan" / "Pembayaran"
+  kind: "ORDER" | "PAYMENT" | "RETURN";
+  kindLabel: string; // "Pesanan" / "Pengambilan" / "Pembayaran" / "Retur"
   detail: string | null; // e.g. "Mi Keriting · 10 kg", "7 pcs", "Cash"
-  qty: number | null; // ORDER rows: kg (Mi Mentah) or pcs (Frozen)
+  qty: number | null; // ORDER/RETURN rows: kg (Mi Mentah) or pcs (Frozen)
   amount: number;
   time: string; // "HH.MM" Jakarta, when it was recorded
   createdAt: string; // ISO, for ordering
@@ -53,6 +53,11 @@ export type TodayCustomerGroup<E = unknown> = {
   orderQty: number;
   paymentCount: number;
   paymentAmount: number;
+  // Retur (26 Sep 2026): mi given back today — lowers what today's orders
+  // come to before today's payments are split (see splitTodayPayment).
+  returnCount: number;
+  returnAmount: number;
+  returnQty: number;
   latestAt: string; // ISO of the newest row
 } & TodayPaymentSplit;
 
@@ -62,7 +67,10 @@ export type TodayCustomerGroup<E = unknown> = {
 // holds one PAYMENT row, never matched to an order ("Pembayaran tidak
 // dicocokkan ke pesanan tertentu"), and the balance is the same number
 // whichever way it is read. A credit the customer already had (paid ahead
-// before today) covers today's orders before today's money does.
+// before today) covers today's orders before today's money does. Today's
+// retur comes off today's orders first; a retur bigger than them (mi from an
+// earlier order) comes off the old debt. Without a retur this is exactly the
+// split it was before retur existed.
 export type TodayPaymentSplit = {
   payForToday: number; // today's payments that went to today's orders
   payForOld: number; // today's payments that paid down debt from before today
@@ -71,17 +79,24 @@ export type TodayPaymentSplit = {
   oldRemaining: number; // debt from before today still unpaid after today (≥ 0)
 };
 
-export function splitTodayPayment(orderAmount: number, paymentAmount: number, balance: number): TodayPaymentSplit {
-  const before = balance - orderAmount + paymentAmount; // balance at the start of today
+export function splitTodayPayment(
+  orderAmount: number,
+  paymentAmount: number,
+  balance: number,
+  returnAmount = 0,
+): TodayPaymentSplit {
+  const net = orderAmount - returnAmount; // today's orders after today's retur
+  const before = balance - net + paymentAmount; // balance at the start of today
   const credit = Math.max(-before, 0);
-  const oldDebt = Math.max(before, 0);
-  const payForToday = Math.min(paymentAmount, Math.max(orderAmount - credit, 0));
+  const oldDebt = Math.max(Math.max(before, 0) + Math.min(net, 0), 0); // a retur beyond today's orders pays old debt
+  const today = Math.max(net, 0);
+  const payForToday = Math.min(paymentAmount, Math.max(today - credit, 0));
   const payForOld = Math.min(paymentAmount - payForToday, oldDebt);
   return {
     payForToday,
     payForOld,
     payExcess: paymentAmount - payForToday - payForOld,
-    todayShort: orderAmount - Math.min(orderAmount, credit) - payForToday,
+    todayShort: today - Math.min(today, credit) - payForToday,
     oldRemaining: oldDebt - payForOld,
   };
 }
@@ -106,6 +121,8 @@ export function groupTodayActivity<E>(activity: TodayActivity<E>): TodayCustomer
     const rows = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const orders = rows.filter((r) => r.kind === "ORDER");
     const payments = rows.filter((r) => r.kind === "PAYMENT");
+    const returns = rows.filter((r) => r.kind === "RETURN");
+    const returnAmount = returns.reduce((s, r) => s + r.amount, 0);
     const balance = activity.balances[customerId] ?? 0;
     const orderAmount = orders.reduce((s, r) => s + r.amount, 0);
     const paymentAmount = payments.reduce((s, r) => s + r.amount, 0);
@@ -121,8 +138,11 @@ export function groupTodayActivity<E>(activity: TodayActivity<E>): TodayCustomer
       orderQty: orders.reduce((s, r) => s + (r.qty ?? 0), 0),
       paymentCount: payments.length,
       paymentAmount,
+      returnCount: returns.length,
+      returnAmount,
+      returnQty: returns.reduce((s, r) => s + (r.qty ?? 0), 0),
       latestAt: rows[rows.length - 1].createdAt,
-      ...splitTodayPayment(orderAmount, paymentAmount, balance),
+      ...splitTodayPayment(orderAmount, paymentAmount, balance, returnAmount),
     });
   }
 

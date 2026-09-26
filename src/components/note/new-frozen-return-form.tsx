@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { FrozenCustomerRow } from "@/lib/frozen/get-frozen-customers";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import type { PrinterDriver } from "@/lib/printing/types";
-import { FROZEN_PCS_PRESETS } from "@/lib/frozen/types";
-import { createFrozenOrder, getFrozenAutofillPrice } from "@/app/note/frozen-actions";
+import { NOTE_RETURN_QTY_PRESETS, type NoteReturnContext } from "@/lib/note/return-window";
+import { createFrozenReturn, getFrozenReturnContext } from "@/app/note/frozen-actions";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,24 +14,21 @@ import { AppHeader } from "@/components/ui/app-header";
 import { noteAfterSaveHref, noteFormCancelHref, type NoteOrigin } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
 import { todayDateStr, dateInputToIso } from "@/lib/mie/date-input";
-import { useFrozenReceiptPrompt } from "@/components/printing/use-frozen-receipt-prompt";
+import { ReturnPriceHint, ReturnQtyWarning } from "./return-hints";
 
-// "Pengambilan Baru" — pcs taken, priced per pcs. No jenis buttons at all
-// (unlike Mi Mentah's order form): Frozen has only one product.
-export function NewFrozenOrderForm({
+// "Retur Baru" (Frozen) — pcs given back unsold by the reseller. Mirrors the
+// Mi Mentah retur form without jenis: harga/pcs from the customer's last
+// pengambilan, the amount lowers the debt, a warning (never a block) when the
+// pcs is more than they took in the last days. No "Cetak bukti".
+export function NewFrozenReturnForm({
   customers,
   initialCustomerId,
   origin,
-  printerDriver,
-  store,
   nav,
 }: {
   customers: FrozenCustomerRow[];
   initialCustomerId?: string;
-  // Where the form was opened from — decides Batal and where a save lands.
   origin: NoteOrigin;
-  printerDriver: PrinterDriver;
-  store: { storeName: string; address: string | null; phone: string | null; printLogo: boolean };
   nav: HeaderNav;
 }) {
   const router = useRouter();
@@ -43,25 +38,28 @@ export function NewFrozenOrderForm({
   const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
   const [date, setDate] = useState(todayDateStr());
   const [note, setNote] = useState("");
+  // Tagged with what it was read for — see new-return-form.tsx.
+  const [loaded, setLoaded] = useState<{ key: string; context: NoteReturnContext | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { offer, prompt } = useFrozenReceiptPrompt({ printerDriver });
 
-  // Autofill: this customer's last price if they've had a pickup before,
-  // else the buku's owner-set default (see getFrozenAutofillPrice). Only
-  // overwrites the field while the owner hasn't typed their own number.
+  const contextKey = `${customerId}|${date}`;
   useEffect(() => {
-    if (!customerId || priceManuallyEdited) return;
+    if (!customerId) return;
     let cancelled = false;
-    getFrozenAutofillPrice(customerId).then((price) => {
-      if (!cancelled && price != null) setPricePerPcs(price);
+    getFrozenReturnContext({ customerId, date: dateInputToIso(date) }).then((ctx) => {
+      if (cancelled) return;
+      setLoaded({ key: contextKey, context: ctx });
+      if (!priceManuallyEdited && ctx?.lastPrice != null) setPricePerPcs(ctx.lastPrice);
     });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId]);
+  }, [customerId, date]);
 
+  const context = loaded?.key === contextKey ? loaded.context : null;
+  const customerName = customers.find((c) => c.id === customerId)?.name ?? "";
   const pcsNumber = Number(pcs);
   const pcsValid = pcs.trim() !== "" && Number.isInteger(pcsNumber) && pcsNumber > 0;
   const canSave = !saving && customerId && pcsValid && pricePerPcs !== "" && Number(pricePerPcs) > 0;
@@ -69,7 +67,7 @@ export function NewFrozenOrderForm({
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await createFrozenOrder({
+    const result = await createFrozenReturn({
       customerId,
       pcs: pcsNumber,
       pricePerPcs: Number(pricePerPcs),
@@ -78,30 +76,14 @@ export function NewFrozenOrderForm({
     });
     setSaving(false);
     if (!result.ok) return setError(result.error);
-
-    offer(
-      {
-        storeName: store.storeName,
-        address: store.address,
-        phone: store.phone,
-        printLogo: store.printLogo,
-        kind: "PENGAMBILAN",
-        customerName: result.customerName,
-        printedAt: new Date(result.recordedAt),
-        pcs: result.pcs,
-        pricePerPcs: result.pricePerPcs,
-        pickupTotal: result.amount,
-        debtAfter: result.debtAfter,
-      },
-      () => router.push(noteAfterSaveHref("frozen", origin, customerId, result.entryId)),
-    );
+    router.push(noteAfterSaveHref("frozen", origin, customerId, result.entryId));
   }
 
   return (
     <div className="bg-canvas flex h-dvh flex-col">
       <AppHeader
         nav={nav}
-        title="Pengambilan Baru"
+        title="Retur Baru"
         actions={
           <LinkButton href={noteFormCancelHref("frozen", origin, initialCustomerId ?? "")} variant="secondary" size="compact">
             Batal
@@ -112,14 +94,11 @@ export function NewFrozenOrderForm({
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-md flex-col gap-3">
           <Card padded className="flex flex-col gap-3">
+            <p className="text-ink-muted text-sm">
+              Mi frozen titipan yang kembali tidak laku. Utang pelanggan berkurang sebesar pcs × harga/pcs.
+            </p>
             {customers.length === 0 ? (
-              <p className="text-ink-muted text-sm">
-                Belum ada pelanggan.{" "}
-                <Link href="/note/frozen/pelanggan/baru" className="text-primary font-semibold underline">
-                  Tambah pelanggan
-                </Link>{" "}
-                dulu.
-              </p>
+              <p className="text-ink-muted text-sm">Belum ada pelanggan aktif.</p>
             ) : (
               <label className="flex flex-col gap-1">
                 <span className="text-ink-muted text-sm font-medium">Pelanggan</span>
@@ -128,6 +107,7 @@ export function NewFrozenOrderForm({
                   onChange={(e) => {
                     setCustomerId(e.target.value);
                     setPriceManuallyEdited(false);
+                    setPricePerPcs("");
                   }}
                   className="rounded-input border-border h-12 border px-3 text-base"
                 >
@@ -165,9 +145,12 @@ export function NewFrozenOrderForm({
                 />
               </label>
             </div>
+            {!priceManuallyEdited && (
+              <ReturnPriceHint context={context} itemLabel="pengambilan" customerName={customerName} unit="pcs" />
+            )}
 
             <div className="flex flex-wrap gap-2" role="group" aria-label="Pilih cepat jumlah pcs">
-              {FROZEN_PCS_PRESETS.map((preset) => (
+              {NOTE_RETURN_QTY_PRESETS.map((preset) => (
                 <button
                   key={preset}
                   type="button"
@@ -183,9 +166,13 @@ export function NewFrozenOrderForm({
               ))}
             </div>
 
+            {pcsValid && (
+              <ReturnQtyWarning qty={pcsNumber} unit="pcs" context={context} itemLabel="pengambilan" customerName={customerName} />
+            )}
+
             {pcsValid && pricePerPcs !== "" && (
               <p className="text-ink-muted text-sm">
-                Total: Rp{Math.round(pcsNumber * Number(pricePerPcs)).toLocaleString("id-ID")}
+                Mengurangi utang: Rp{Math.round(pcsNumber * Number(pricePerPcs)).toLocaleString("id-ID")}
               </p>
             )}
 
@@ -212,13 +199,11 @@ export function NewFrozenOrderForm({
             {error && <p className="text-danger text-sm">{error}</p>}
 
             <Button variant="primary" size="large" fullWidth disabled={!canSave} onClick={handleSave}>
-              {saving ? "Menyimpan..." : "Simpan Pengambilan"}
+              {saving ? "Menyimpan..." : "Simpan Retur"}
             </Button>
           </Card>
         </div>
       </div>
-
-      {prompt}
     </div>
   );
 }

@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
-import type { MiePriceSource, MieProductType } from "@/lib/mie/types";
-import { MIE_FIXED_PRODUCT_TYPES, MIE_KG_PRESETS, MIE_PASAR_PRODUCT_TYPE, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
-import { createMieOrder, getMieAutofillPrice } from "@/app/note/actions";
+import type { MieProductType } from "@/lib/mie/types";
+import { MIE_FIXED_PRODUCT_TYPES, MIE_PASAR_LABEL, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
+import { NOTE_RETURN_QTY_PRESETS, type NoteReturnContext } from "@/lib/note/return-window";
+import { createMieReturn, getMieReturnContext } from "@/app/note/actions";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,82 +16,76 @@ import { AppHeader } from "@/components/ui/app-header";
 import { noteAfterSaveHref, noteFormCancelHref, type NoteOrigin } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
 import { todayDateStr, dateInputToIso } from "@/lib/mie/date-input";
+import { ReturnPriceHint, ReturnQtyWarning } from "./return-hints";
 
-export function NewOrderForm({
+type JenisChoice = MieProductType | "PASAR";
+const JENIS: { value: JenisChoice; label: string }[] = [
+  ...MIE_FIXED_PRODUCT_TYPES.map((t) => ({ value: t as JenisChoice, label: MIE_PRODUCT_LABEL[t] })),
+  { value: "PASAR", label: MIE_PASAR_LABEL },
+  { value: "CUSTOM", label: "Custom" },
+];
+
+// "Retur Baru" (Mi Mentah) — mi titip-jual that came back unsold. Same shape
+// as Pesanan Baru (jenis, kg, harga/kg), but the harga/kg is the price this
+// customer was last SOLD that jenis at (Mi Pasar apart from Reguler), since a
+// retur cancels that sale; the amount lowers the debt. Warns — never blocks —
+// when the kg is more than they ordered of that jenis in the last days.
+export function NewReturnForm({
   customers,
   initialCustomerId,
   origin,
-  pasarPricePerKg,
   nav,
 }: {
   customers: MieCustomerRow[];
   initialCustomerId?: string;
-  // Where the form was opened from — decides Batal and where a save lands.
   origin: NoteOrigin;
-  pasarPricePerKg: number | null;
   nav: HeaderNav;
 }) {
   const router = useRouter();
   const [customerId, setCustomerId] = useState(initialCustomerId ?? customers[0]?.id ?? "");
-  const [productType, setProductType] = useState<MieProductType>("MIE_KERITING");
+  const [jenis, setJenis] = useState<JenisChoice>("MIE_KERITING");
   const [customLabel, setCustomLabel] = useState("");
   const [kg, setKg] = useState("");
   const [pricePerKg, setPricePerKg] = useState<number | "">("");
   const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
-  // Where the suggested price came from — shown under the field, so a
-  // general 17.000 that should have been this customer's own price is
-  // easy to spot. Null once the owner types or taps Mi Pasar.
-  const [priceSource, setPriceSource] = useState<MiePriceSource | null>(null);
-  // While the "Mie Pasar" preset is on, its fixed price must survive a
-  // customer change (the owner often taps the preset first, then picks the
-  // customer) — the per-customer autofill stays out of the way.
-  const [pasarPreset, setPasarPreset] = useState(false);
   const [date, setDate] = useState(todayDateStr());
   const [note, setNote] = useState("");
+  // Tagged with what it was read for, so a stale answer (previous customer/
+  // jenis/date, still loading) is never shown against the current inputs.
+  const [loaded, setLoaded] = useState<{ key: string; context: NoteReturnContext | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Autofill: this customer's harga khusus, else their last price for this
-  // product, else the product's owner-set default (see getMieAutofillPrice) — never for
-  // CUSTOM, which is always priced fresh. Only overwrites the field while
-  // the owner hasn't typed their own number for this customer/product pair.
+  const productType: MieProductType = jenis === "PASAR" ? "MIE_KERITING" : jenis;
+  const isPasar = jenis === "PASAR";
+
+  // Last sale price + the window's ordered kg, re-read whenever the customer,
+  // jenis or date changes. The price only fills the field while the owner
+  // hasn't typed one.
+  const contextKey = `${customerId}|${jenis}|${customLabel.trim().toLowerCase()}|${date}`;
   useEffect(() => {
-    if (productType === "CUSTOM" || !customerId || priceManuallyEdited || pasarPreset) return;
+    if (!customerId || (jenis === "CUSTOM" && !customLabel.trim())) return;
     let cancelled = false;
-    getMieAutofillPrice(customerId, productType).then((result) => {
+    getMieReturnContext({ customerId, productType, isPasar, customLabel, date: dateInputToIso(date) }).then((ctx) => {
       if (cancelled) return;
-      if (result) setPricePerKg(result.price);
-      setPriceSource(result?.source ?? null);
+      setLoaded({ key: contextKey, context: ctx });
+      if (!priceManuallyEdited && ctx?.lastPrice != null) setPricePerKg(ctx.lastPrice);
     });
     return () => {
       cancelled = true;
     };
-    // pasarPreset is a dependency because Mi Pasar is Mi Keriting underneath:
-    // tapping Mi Pasar then Mi Keriting leaves productType unchanged, and
-    // without it the market price would stay in the field.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId, productType, pasarPreset]);
+  }, [customerId, jenis, customLabel, date]);
 
-  function applyPasarPreset() {
-    if (pasarPricePerKg == null) return;
-    setProductType(MIE_PASAR_PRODUCT_TYPE);
-    setPricePerKg(pasarPricePerKg);
-    setPriceManuallyEdited(true);
-    setPriceSource(null);
-    setPasarPreset(true);
-  }
-
-  function handleProductTypeChange(next: MieProductType) {
-    setPasarPreset(false);
-    setProductType(next);
+  function pickJenis(next: JenisChoice) {
+    setJenis(next);
     setPriceManuallyEdited(false);
-    if (next === "CUSTOM") {
-      setPricePerKg("");
-      setPriceSource(null);
-    }
+    setPricePerKg("");
   }
 
+  const context = loaded?.key === contextKey ? loaded.context : null;
   const customerName = customers.find((c) => c.id === customerId)?.name ?? "";
+  const jenisLabel = jenis === "CUSTOM" ? customLabel.trim() || "Custom" : JENIS.find((j) => j.value === jenis)!.label;
   const kgNumber = Number(kg.replace(",", "."));
   const kgValid = kg.trim() !== "" && Number.isFinite(kgNumber) && kgNumber > 0;
   const canSave =
@@ -100,17 +94,15 @@ export function NewOrderForm({
     kgValid &&
     pricePerKg !== "" &&
     Number(pricePerKg) > 0 &&
-    (productType !== "CUSTOM" || customLabel.trim() !== "");
+    (jenis !== "CUSTOM" || customLabel.trim() !== "");
 
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await createMieOrder({
+    const result = await createMieReturn({
       customerId,
       productType,
-      // Recorded on the row so Ringkasan's margin uses the Mi Pasar modal
-      // (different recipe), not the Reguler one.
-      isPasar: pasarPreset,
+      isPasar,
       customLabel,
       kg: kgNumber,
       pricePerKg: Number(pricePerKg),
@@ -126,7 +118,7 @@ export function NewOrderForm({
     <div className="bg-canvas flex h-dvh flex-col">
       <AppHeader
         nav={nav}
-        title="Pesanan Baru"
+        title="Retur Baru"
         actions={
           <LinkButton href={noteFormCancelHref("mie", origin, initialCustomerId ?? "")} variant="secondary" size="compact">
             Batal
@@ -137,14 +129,11 @@ export function NewOrderForm({
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex max-w-md flex-col gap-3">
           <Card padded className="flex flex-col gap-3">
+            <p className="text-ink-muted text-sm">
+              Mi titip jual yang kembali tidak laku. Utang pelanggan berkurang sebesar kg × harga/kg.
+            </p>
             {customers.length === 0 ? (
-              <p className="text-ink-muted text-sm">
-                Belum ada pelanggan.{" "}
-                <Link href="/note/pelanggan/baru" className="text-primary font-semibold underline">
-                  Tambah pelanggan
-                </Link>{" "}
-                dulu.
-              </p>
+              <p className="text-ink-muted text-sm">Belum ada pelanggan aktif.</p>
             ) : (
               <label className="flex flex-col gap-1">
                 <span className="text-ink-muted text-sm font-medium">Pelanggan</span>
@@ -152,7 +141,8 @@ export function NewOrderForm({
                   value={customerId}
                   onChange={(e) => {
                     setCustomerId(e.target.value);
-                    if (!pasarPreset) setPriceManuallyEdited(false);
+                    setPriceManuallyEdited(false);
+                    setPricePerKg("");
                   }}
                   className="rounded-input border-border h-12 border px-3 text-base"
                 >
@@ -167,66 +157,31 @@ export function NewOrderForm({
 
             <div className="flex flex-col gap-1">
               <span className="text-ink-muted text-sm font-medium">Jenis mi</span>
-              <div className="flex flex-wrap gap-2">
-                {MIE_FIXED_PRODUCT_TYPES.map((type) => (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Jenis mi">
+                {JENIS.map((j) => (
                   <button
-                    key={type}
+                    key={j.value}
                     type="button"
-                    onClick={() => handleProductTypeChange(type)}
+                    aria-pressed={jenis === j.value}
+                    onClick={() => pickJenis(j.value)}
                     className={cn(
-                      "rounded-pill h-11 px-4 text-sm font-semibold",
-                      productType === type && !pasarPreset ? "bg-primary text-white" : "bg-muted text-ink-muted",
+                      "rounded-pill h-12 px-4 text-sm font-semibold",
+                      jenis === j.value ? "bg-primary text-white" : "bg-muted text-ink-muted",
                     )}
                   >
-                    {MIE_PRODUCT_LABEL[type]}
+                    {j.label}
                   </button>
                 ))}
-                {/* "Mi Pasar" is the daily market order: the same Mi Keriting
-                    row, but priced from Harga Produk instead of this
-                    customer's last price — so it belongs in this row, as one
-                    more choice, not in a separate card above the form. */}
-                <button
-                  type="button"
-                  onClick={applyPasarPreset}
-                  disabled={pasarPricePerKg == null}
-                  title={pasarPricePerKg == null ? "Harga belum diisi di Harga Produk" : undefined}
-                  className={cn(
-                    "rounded-pill h-11 px-4 text-sm font-semibold disabled:opacity-50",
-                    pasarPreset ? "bg-primary text-white" : "bg-muted text-ink-muted",
-                  )}
-                >
-                  Mi Pasar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleProductTypeChange("CUSTOM")}
-                  className={cn(
-                    "rounded-pill h-11 px-4 text-sm font-semibold",
-                    productType === "CUSTOM" ? "bg-primary text-white" : "bg-muted text-ink-muted",
-                  )}
-                >
-                  Custom
-                </button>
               </div>
-              {pasarPreset && pasarPricePerKg != null && (
-                <span className="text-ink-muted text-sm">
-                  {MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]}, harga pasar Rp
-                  {pasarPricePerKg.toLocaleString("id-ID")}/kg (dari Harga Produk).
-                </span>
-              )}
-              {pasarPricePerKg == null && (
-                <span className="text-ink-muted text-sm">Harga Mi Pasar belum diisi di halaman Harga Produk.</span>
-              )}
             </div>
 
-            {productType === "CUSTOM" && (
+            {jenis === "CUSTOM" && (
               <label className="flex flex-col gap-1">
-                <span className="text-ink-muted text-sm font-medium">Nama jenis mi (request khusus)</span>
+                <span className="text-ink-muted text-sm font-medium">Nama jenis mi (sama dengan di pesanannya)</span>
                 <input
                   type="text"
                   value={customLabel}
                   onChange={(e) => setCustomLabel(e.target.value)}
-                  placeholder="Mis. Mi Kuning Tebal"
                   className="rounded-input border-border h-12 border px-3 text-base"
                 />
               </label>
@@ -251,27 +206,18 @@ export function NewOrderForm({
                   onChange={(v) => {
                     setPricePerKg(v);
                     setPriceManuallyEdited(true);
-                    setPriceSource(null);
-                    if (v !== pasarPricePerKg) setPasarPreset(false);
                   }}
                   placeholder="0"
                   className="h-12 text-base"
                 />
               </label>
             </div>
-
-            {priceSource && !pasarPreset && productType !== "CUSTOM" && (
-              <p className="text-ink-muted text-sm" data-testid="price-source">
-                {priceSource === "khusus"
-                  ? `Harga khusus ${customerName}.`
-                  : priceSource === "terakhir"
-                    ? `Harga terakhir ${customerName} (belum ada harga khusus).`
-                    : `Harga umum — ${customerName} belum punya harga khusus.`}
-              </p>
+            {!priceManuallyEdited && (
+              <ReturnPriceHint context={context} itemLabel={`pesanan ${jenisLabel}`} customerName={customerName} unit="kg" />
             )}
 
             <div className="flex flex-wrap gap-2" role="group" aria-label="Pilih cepat jumlah kg">
-              {MIE_KG_PRESETS.map((preset) => (
+              {NOTE_RETURN_QTY_PRESETS.map((preset) => (
                 <button
                   key={preset}
                   type="button"
@@ -287,9 +233,19 @@ export function NewOrderForm({
               ))}
             </div>
 
+            {kgValid && (
+              <ReturnQtyWarning
+                qty={kgNumber}
+                unit="kg"
+                context={context}
+                itemLabel={`pesanan ${jenisLabel}`}
+                customerName={customerName}
+              />
+            )}
+
             {kgValid && pricePerKg !== "" && (
               <p className="text-ink-muted text-sm">
-                Total: Rp{Math.round(kgNumber * Number(pricePerKg)).toLocaleString("id-ID")}
+                Mengurangi utang: Rp{Math.round(kgNumber * Number(pricePerKg)).toLocaleString("id-ID")}
               </p>
             )}
 
@@ -316,7 +272,7 @@ export function NewOrderForm({
             {error && <p className="text-danger text-sm">{error}</p>}
 
             <Button variant="primary" size="large" fullWidth disabled={!canSave} onClick={handleSave}>
-              {saving ? "Menyimpan..." : "Simpan Pesanan"}
+              {saving ? "Menyimpan..." : "Simpan Retur"}
             </Button>
           </Card>
         </div>

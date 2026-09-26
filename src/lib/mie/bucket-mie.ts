@@ -10,6 +10,10 @@ export type MieGranularity = "harian" | "mingguan" | "bulanan";
 export type MieJenisKey = MieCostKey | "CUSTOM";
 export const MIE_JENIS_KEYS: MieJenisKey[] = ["MIE_KERITING", "MIE_PASAR", "MIE_LURUS", "PANGSIT", "CUSTOM"];
 
+// Every total here is NET of retur (26 Sep 2026): a RETURN row takes its kg,
+// value and margin back off, since the sale didn't happen after all — and
+// no loss is booked, because the returned mi is used at the warung. With the
+// same price on both, the margin is (harga − modal) × kg bersih.
 export type MieTypeTotals = {
   kg: number;
   amount: number;
@@ -46,17 +50,20 @@ export type MieBucket = {
   key: string;
   label: string; // short, for the chart axis
   longLabel: string; // for the table / selected-period heading
-  omzet: number; // sum of ORDER amounts
+  omzet: number; // ORDER amounts minus RETURN amounts (omzet bersih)
   payments: number; // sum of PAYMENT amounts
-  kg: number;
+  kg: number; // net of retur, like omzet
+  returns: number; // sum of RETURN amounts (the Retur card)
+  returnKg: number;
   margin: number; // sum of byType[*].margin
   byType: Record<MieJenisKey, MieTypeTotals>;
   // The exact rows each total above was summed from, kept so the drill-down
   // list under the stat cards can never show a different set than the number
   // it opened from — a row is pushed here in the same branch that adds it to
   // the total, never re-filtered separately.
-  orderRows: MieReportPoint[];
+  orderRows: MieReportPoint[]; // ORDER and RETURN rows — what omzet/kg/margin were summed from
   paymentRows: MieReportPoint[];
+  returnRows: MieReportPoint[];
 };
 
 // Default window per granularity — what the screen opens on, and what the
@@ -164,10 +171,13 @@ export function bucketMie(
       omzet: 0,
       payments: 0,
       kg: 0,
+      returns: 0,
+      returnKg: 0,
       margin: 0,
       byType: emptyTypeTotals(),
       orderRows: [],
       paymentRows: [],
+      returnRows: [],
     };
     buckets.push(bucket);
     byKey.set(key, bucket);
@@ -193,21 +203,30 @@ export function bucketMie(
     const key = mieJenisKeyOf(p);
     if (!key) continue;
     const t = bucket.byType[key];
+    const isReturn = p.kind === "RETURN";
+    const sign = isReturn ? -1 : 1;
     const kg = p.kg ?? 0;
-    bucket.omzet += p.amount;
-    bucket.kg += kg;
-    t.kg += kg;
-    t.amount += p.amount;
+    bucket.omzet += sign * p.amount;
+    bucket.kg += sign * kg;
+    t.kg += sign * kg;
+    t.amount += sign * p.amount;
     const margin = mieOrderMargin(p, costs);
     if (margin == null) {
-      t.noCost.count += 1;
-      t.noCost.kg += kg;
-      t.noCost.amount += p.amount;
+      // A retur of a jenis without modal is left out of the margin exactly
+      // like its pesanan; `count` stays a count of pesanan (the warning text).
+      if (!isReturn) t.noCost.count += 1;
+      t.noCost.kg += sign * kg;
+      t.noCost.amount += sign * p.amount;
     } else {
-      t.margin += margin;
-      bucket.margin += margin;
+      t.margin += sign * margin;
+      bucket.margin += sign * margin;
     }
     bucket.orderRows.push(p);
+    if (isReturn) {
+      bucket.returns += p.amount;
+      bucket.returnKg += kg;
+      bucket.returnRows.push(p);
+    }
   }
   return buckets;
 }

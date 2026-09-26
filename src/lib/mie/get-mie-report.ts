@@ -7,7 +7,7 @@ import type { MieLedgerEntryDTO, MieProductType } from "./types";
 // uses — same edit/delete actions, same validation, no second path) plus
 // who it belongs to and the two derived time strings the screen renders.
 export type MieReportPoint = MieLedgerEntryDTO & {
-  kind: "ORDER" | "PAYMENT";
+  kind: "ORDER" | "PAYMENT" | "RETURN";
   day: string; // "YYYY-MM-DD", Jakarta calendar date of the business date — what bucketing groups by
   // "HH:MM" Jakarta, from createdAt — NOT from `date`: the business date is
   // stored as device-local midnight (dateInputToIso), so its clock component
@@ -18,14 +18,14 @@ export type MieReportPoint = MieLedgerEntryDTO & {
 };
 
 // Raw points for the Ringkasan page — bucketed client-side (bucket-mie.ts)
-// so switching Harian/Mingguan/Bulanan is instant. Only ORDER (omzet) and
-// PAYMENT (uang diterima) rows: opening balances and corrections are
+// so switching Harian/Mingguan/Bulanan is instant. Only ORDER (omzet),
+// RETURN (retur — taken off omzet/kg/margin) and PAYMENT (uang diterima) rows: opening balances and corrections are
 // bookkeeping fixes, not sales or cash received. All customers, aktif and
 // nonaktif — a sale doesn't un-happen because the customer was later
 // deactivated. Nothing here touches the POS tables.
 export async function getMieReportPoints(): Promise<{ points: MieReportPoint[]; today: string }> {
   const entries = await prisma.mieLedgerEntry.findMany({
-    where: { kind: { in: ["ORDER", "PAYMENT"] } },
+    where: { kind: { in: ["ORDER", "PAYMENT", "RETURN"] } },
     include: {
       customer: { select: { id: true, name: true } },
       createdBy: { select: { name: true } },
@@ -37,7 +37,7 @@ export async function getMieReportPoints(): Promise<{ points: MieReportPoint[]; 
     today: localDateStr(new Date()),
     points: entries.map((e) => ({
       id: e.id,
-      kind: e.kind as "ORDER" | "PAYMENT",
+      kind: e.kind as "ORDER" | "PAYMENT" | "RETURN",
       paymentMethod: e.paymentMethod,
       // The DB enum still has the retired FROZEN value (existing rows, not
       // yet migrated — see types.ts) — bucket-mie.ts skips anything its

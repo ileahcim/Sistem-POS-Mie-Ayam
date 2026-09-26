@@ -679,6 +679,11 @@ enum MieLedgerKind {
   // lowers it).
   CORRECTION_ADD
   CORRECTION_SUBTRACT
+  // "Retur" (26 Sep 2026): mi titip-jual that came back unsold. Carries the
+  // same jenis/kg/pricePerKg fields as ORDER, and LOWERS the debt by kg ×
+  // price — it cancels that part of the sale (Ringkasan counts omzet, kg
+  // and margin net of it). Not a loss: the returned mi is used at the warung.
+  RETURN
 }
 
 model MieCustomer {
@@ -776,6 +781,7 @@ enum FrozenLedgerKind {
   OPENING_BALANCE
   CORRECTION_ADD
   CORRECTION_SUBTRACT
+  RETURN // "Retur" — pcs given back unsold, same fields as ORDER; lowers the debt (see MieLedgerKind.RETURN)
 }
 
 model FrozenCustomer {

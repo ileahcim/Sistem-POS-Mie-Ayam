@@ -6,7 +6,7 @@ import type { FrozenLedgerEntryDTO } from "./types";
 // handed straight to the same FrozenEntrySheet the customer page uses)
 // plus its customer and the derived time strings.
 export type FrozenReportPoint = FrozenLedgerEntryDTO & {
-  kind: "ORDER" | "PAYMENT";
+  kind: "ORDER" | "PAYMENT" | "RETURN";
   day: string; // "YYYY-MM-DD", Jakarta calendar date of the business date
   time: string; // "HH:MM" Jakarta, from createdAt — see get-mie-report.ts for why not `date`
   customerId: string;
@@ -20,7 +20,7 @@ export type FrozenReportPoint = FrozenLedgerEntryDTO & {
 // Mi Mentah ledger.
 export async function getFrozenReportPoints(): Promise<{ points: FrozenReportPoint[]; today: string }> {
   const entries = await prisma.frozenLedgerEntry.findMany({
-    where: { kind: { in: ["ORDER", "PAYMENT"] } },
+    where: { kind: { in: ["ORDER", "PAYMENT", "RETURN"] } },
     include: {
       customer: { select: { id: true, name: true } },
       createdBy: { select: { name: true } },
@@ -32,7 +32,7 @@ export async function getFrozenReportPoints(): Promise<{ points: FrozenReportPoi
     today: localDateStr(new Date()),
     points: entries.map((e) => ({
       id: e.id,
-      kind: e.kind as "ORDER" | "PAYMENT",
+      kind: e.kind as "ORDER" | "PAYMENT" | "RETURN",
       paymentMethod: e.paymentMethod,
       pcs: e.pcs,
       pricePerPcs: e.pricePerPcs,

@@ -8,7 +8,14 @@ import { AnimatePresence } from "motion/react";
 import type { MieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { MieProductDefaults } from "@/lib/mie/get-mie-product-defaults";
-import { MIE_FIXED_PRODUCT_TYPES, MIE_PRODUCT_LABEL, formatMieEntryLabel, mieEntryReducesDebt } from "@/lib/mie/types";
+import {
+  MIE_FIXED_PRODUCT_TYPES,
+  MIE_PRODUCT_LABEL,
+  formatMieEntryLabel,
+  formatMieJenisLabel,
+  mieEntryHasItems,
+  mieEntryReducesDebt,
+} from "@/lib/mie/types";
 import { formatNotePaymentMethod } from "@/lib/note/payment-method";
 import { formatId } from "@/lib/timezone";
 import { deleteMieCustomer, setMieCustomerActive } from "@/app/note/actions";
@@ -113,6 +120,9 @@ export function CustomerDetailScreen({
               <LinkButton href={`/note/pembayaran/baru?customerId=${customer.id}&dari=pelanggan`} variant="secondary">
                 + Pembayaran
               </LinkButton>
+              <LinkButton href={`/note/retur/baru?customerId=${customer.id}&dari=pelanggan`} variant="secondary">
+                + Retur
+              </LinkButton>
               <Button variant="secondary" onClick={() => setSheet("adjust")}>
                 Koreksi Saldo
               </Button>
@@ -159,12 +169,22 @@ export function CustomerDetailScreen({
             ) : (
               entriesNewestFirst.map((e) => {
                 const reduces = mieEntryReducesDebt(e.kind);
+                const isReturn = e.kind === "RETURN";
                 return (
                   <ListRow key={e.id} roomy onClick={() => setEditingEntry(e)}>
                     <div className="min-w-0 flex-1">
                       <p className="text-ink-faint text-xs">{formatId(new Date(e.date), { dateStyle: "medium" })}</p>
-                      <p className="text-ink text-base font-semibold">{formatMieEntryLabel(e)}</p>
-                      {e.kind === "ORDER" && e.kg != null && e.pricePerKg != null && (
+                      {/* A retur is told apart at a glance: its own badge and
+                          amount colour, neither the pesanan's nor the payment's. */}
+                      {isReturn ? (
+                        <p className="text-ink flex items-center gap-2 text-base font-semibold">
+                          <Badge variant="warning">Retur</Badge>
+                          {formatMieJenisLabel(e)}
+                        </p>
+                      ) : (
+                        <p className="text-ink text-base font-semibold">{formatMieEntryLabel(e)}</p>
+                      )}
+                      {mieEntryHasItems(e.kind) && e.kg != null && e.pricePerKg != null && (
                         <p className="text-ink-muted text-sm">
                           {e.kg.toLocaleString("id-ID")} kg × Rp{e.pricePerKg.toLocaleString("id-ID")}/kg
                         </p>
@@ -178,7 +198,10 @@ export function CustomerDetailScreen({
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-0.5">
                       <span
-                        className={cn("text-base font-bold tabular-nums", reduces ? "text-primary-strong" : "text-ink")}
+                        className={cn(
+                          "text-base font-bold tabular-nums",
+                          isReturn ? "text-warning" : reduces ? "text-primary-strong" : "text-ink",
+                        )}
                       >
                         {reduces ? "-" : "+"}Rp{e.amount.toLocaleString("id-ID")}
                       </span>
@@ -263,7 +286,12 @@ export function CustomerDetailScreen({
           <AdjustmentSheet key="adjust" customerId={customer.id} onClose={() => setSheet(null)} />
         )}
         {editingEntry && (
-          <EntrySheet key={editingEntry.id} entry={editingEntry} onClose={() => setEditingEntry(null)} />
+          <EntrySheet
+            key={editingEntry.id}
+            entry={editingEntry}
+            customer={{ id: customer.id, name: customer.name }}
+            onClose={() => setEditingEntry(null)}
+          />
         )}
       </AnimatePresence>
     </div>

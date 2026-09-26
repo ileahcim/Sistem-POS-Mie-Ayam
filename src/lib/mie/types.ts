@@ -14,7 +14,16 @@
 import type { NotePaymentMethod } from "@/lib/note/payment-method";
 
 export type MieProductType = "MIE_KERITING" | "MIE_LURUS" | "PANGSIT" | "CUSTOM";
-export type MieLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT";
+export type MieLedgerKind = "ORDER" | "PAYMENT" | "OPENING_BALANCE" | "CORRECTION_ADD" | "CORRECTION_SUBTRACT" | "RETURN";
+
+// "Retur" (26 Sep 2026): mi titip-jual that came back unsold. Same item
+// fields as ORDER (jenis, kg, harga/kg), amount = kg × harga/kg, and it
+// LOWERS the debt — it cancels that part of the sale. Ringkasan counts omzet,
+// kg and margin net of it; it is never a loss (the mi is used at the warung).
+export function mieEntryHasItems(kind: MieLedgerKind): boolean {
+  return kind === "ORDER" || kind === "RETURN";
+}
+
 
 // Kinds that carry a plain amount (no kg/price) and are added from the
 // customer page's "Koreksi Saldo" sheet.
@@ -131,6 +140,15 @@ export function formatMieEntryLabel(
   if (entry.kind === "OPENING_BALANCE") return "Saldo awal / utang lama";
   if (entry.kind === "CORRECTION_ADD") return "Koreksi (+)";
   if (entry.kind === "CORRECTION_SUBTRACT") return "Koreksi (−)";
+  if (entry.kind === "RETURN") return `Retur ${formatMieJenisLabel(entry)}`;
+  return formatMieJenisLabel(entry);
+}
+
+// The jenis name alone ("Mi Keriting", "Mi Pasar", a custom name) of an
+// ORDER/RETURN row.
+export function formatMieJenisLabel(
+  entry: Pick<MieLedgerEntryDTO, "productType" | "customLabel"> & { isPasar?: boolean },
+): string {
   if (entry.productType === "CUSTOM") return entry.customLabel || "Custom";
   // A live row can still carry the DB's retired "FROZEN" value (existing
   // production data, not yet migrated — see the type's doc comment) even
@@ -141,7 +159,7 @@ export function formatMieEntryLabel(
 }
 
 // ORDER, OPENING_BALANCE and CORRECTION_ADD add to what the customer owes;
-// PAYMENT and CORRECTION_SUBTRACT reduce it. `amount` is always stored/returned positive — this is the one place
+// PAYMENT, CORRECTION_SUBTRACT and RETURN reduce it. `amount` is always stored/returned positive — this is the one place
 // the sign is decided, so balance math can never disagree between the
 // summary card, the ledger table, and the Excel export.
 export function mieEntrySignedAmount(entry: Pick<MieLedgerEntryDTO, "kind" | "amount">): number {
@@ -149,5 +167,5 @@ export function mieEntrySignedAmount(entry: Pick<MieLedgerEntryDTO, "kind" | "am
 }
 
 export function mieEntryReducesDebt(kind: MieLedgerKind): boolean {
-  return kind === "PAYMENT" || kind === "CORRECTION_SUBTRACT";
+  return kind === "PAYMENT" || kind === "CORRECTION_SUBTRACT" || kind === "RETURN";
 }

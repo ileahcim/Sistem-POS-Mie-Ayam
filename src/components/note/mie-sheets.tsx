@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MieCustomerDetail } from "@/lib/mie/get-mie-customer-detail";
 import type { MieProductDefaults } from "@/lib/mie/get-mie-product-defaults";
@@ -11,11 +11,15 @@ import {
   MIE_PASAR_LABEL,
   MIE_PRODUCT_LABEL,
   formatMieEntryLabel,
+  formatMieJenisLabel,
+  mieEntryHasItems,
 } from "@/lib/mie/types";
+import type { NoteReturnContext } from "@/lib/note/return-window";
 import { todayDateStr, isoToDateInput, dateInputToIso } from "@/lib/mie/date-input";
 import {
   createMieAdjustment,
   deleteMieEntry,
+  getMieReturnContext,
   setMieCustomerPrices,
   updateMieCustomer,
   updateMieEntry,
@@ -25,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { cn } from "@/components/ui/cn";
 import { PaymentMethodPicker } from "./payment-method-picker";
+import { ReturnQtyWarning } from "./return-hints";
 
 const INPUT = "rounded-input border-border h-12 w-full border px-3 text-base";
 
@@ -302,17 +307,24 @@ function initialJenis(entry: MieLedgerEntryDTO): JenisChoice | null {
 // (runningBalance was never read here). `initialAction: "delete"` just opens
 // on the confirmation this sheet already had, for the Hapus button that sits
 // on a Ringkasan row — not a second delete path.
+//
+// A RETURN row edits exactly like an ORDER (jenis, kg, harga/kg); with
+// `customer` given, it also re-checks the kg against what that customer
+// ordered in the retur's window (a warning, like the retur form).
 export function EntrySheet({
   entry,
+  customer,
   onClose,
   initialAction = "edit",
 }: {
   entry: MieLedgerEntryDTO;
+  customer?: { id: string; name: string };
   onClose: () => void;
   initialAction?: "edit" | "delete";
 }) {
   const router = useRouter();
-  const isOrder = entry.kind === "ORDER";
+  const isOrder = mieEntryHasItems(entry.kind);
+  const isReturn = entry.kind === "RETURN";
   const isCorrection = entry.kind === "CORRECTION_ADD" || entry.kind === "CORRECTION_SUBTRACT";
   const [jenis, setJenis] = useState<JenisChoice | null>(initialJenis(entry));
   const [customLabel, setCustomLabel] = useState(entry.customLabel ?? "");
@@ -329,6 +341,24 @@ export function EntrySheet({
   const [error, setError] = useState<string | null>(null);
 
   const isPayment = entry.kind === "PAYMENT";
+  const [returnContext, setReturnContext] = useState<NoteReturnContext | null>(null);
+  const returnCustomerId = customer?.id; // a primitive dep — callers pass a fresh object each render
+  useEffect(() => {
+    if (!isReturn || !returnCustomerId || !jenis || (jenis === "CUSTOM" && !customLabel.trim())) return;
+    let cancelled = false;
+    getMieReturnContext({
+      customerId: returnCustomerId,
+      productType: jenis === "PASAR" ? "MIE_KERITING" : jenis,
+      isPasar: jenis === "PASAR",
+      customLabel,
+      date: dateInputToIso(date),
+    }).then((ctx) => {
+      if (!cancelled) setReturnContext(ctx);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isReturn, returnCustomerId, jenis, customLabel, date]);
   const kgNumber = Number(kg.replace(",", "."));
   const kgValid = kg.trim() !== "" && Number.isFinite(kgNumber) && kgNumber > 0;
   const canSave = isOrder
@@ -461,8 +491,22 @@ export function EntrySheet({
             </div>
             {kgValid && pricePerKg !== "" && (
               <p className="text-ink-muted text-sm">
-                Total: Rp{Math.round(kgNumber * Number(pricePerKg)).toLocaleString("id-ID")}
+                {isReturn ? "Mengurangi utang" : "Total"}: Rp
+                {Math.round(kgNumber * Number(pricePerKg)).toLocaleString("id-ID")}
               </p>
+            )}
+            {isReturn && kgValid && customer && jenis && (
+              <ReturnQtyWarning
+                qty={kgNumber}
+                unit="kg"
+                context={returnContext}
+                itemLabel={`pesanan ${
+                  jenis === "PASAR"
+                    ? MIE_PASAR_LABEL
+                    : formatMieJenisLabel({ productType: jenis, customLabel: customLabel.trim() || null })
+                }`}
+                customerName={customer.name}
+              />
             )}
           </>
         ) : (

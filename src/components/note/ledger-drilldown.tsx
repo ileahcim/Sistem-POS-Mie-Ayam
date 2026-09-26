@@ -126,11 +126,14 @@ export function DrilldownStat({
   open,
   onToggle,
   warning,
+  hint,
 }: {
   label: string;
   value: string;
   open: boolean;
   onToggle: () => void;
+  // A quiet second line, e.g. "setelah retur Rp70.000" or the Retur card's value.
+  hint?: string | null;
   // e.g. Margin's "tanpa 3 pesanan (modal belum diisi)" — the number above
   // it is incomplete, and must say so right on the card.
   warning?: string | null;
@@ -147,8 +150,100 @@ export function DrilldownStat({
     >
       <span className="text-ink-muted text-xs font-medium">{label}</span>
       <span className="text-ink text-xl font-bold tabular-nums">{value}</span>
+      {hint && <span className="text-ink-muted text-xs tabular-nums">{hint}</span>}
       {warning && <span className="text-warning text-xs font-semibold">{warning}</span>}
       <span className="text-ink-faint text-xs">{open ? "Tutup rincian" : "Ketuk untuk rincian"}</span>
     </button>
+  );
+}
+
+// The Retur card's breakdown (both Ringkasan screens): one row per customer
+// who gave mi back in the range — how often, how much, the average per retur
+// and what share of what they ordered in the same range came back — so the
+// owner sees who keeps returning. Biggest first.
+export type ReturnByCustomer = {
+  customerId: string;
+  customerName: string;
+  count: number;
+  qty: number;
+  amount: number;
+  orderedQty: number; // ordered/taken in the same range
+};
+
+export function summarizeReturns(
+  returnRows: { customerId: string; customerName: string; kind: string; qty: number; amount: number }[],
+  orderRows: { customerId: string; kind: string; qty: number }[],
+): ReturnByCustomer[] {
+  const by = new Map<string, ReturnByCustomer>();
+  for (const r of returnRows) {
+    const row = by.get(r.customerId) ?? {
+      customerId: r.customerId,
+      customerName: r.customerName,
+      count: 0,
+      qty: 0,
+      amount: 0,
+      orderedQty: 0,
+    };
+    row.count += 1;
+    row.qty += r.qty;
+    row.amount += r.amount;
+    by.set(r.customerId, row);
+  }
+  for (const o of orderRows) {
+    const row = by.get(o.customerId);
+    if (row && o.kind === "ORDER") row.orderedQty += o.qty;
+  }
+  return [...by.values()].sort((a, b) => b.qty - a.qty || b.amount - a.amount);
+}
+
+function formatQty(qty: number, unit: "kg" | "pcs"): string {
+  return `${(Math.round(qty * 100) / 100).toLocaleString("id-ID")} ${unit}`;
+}
+
+export function ReturnBreakdown({
+  heading,
+  rows,
+  unit,
+  customerHref,
+  orderWord,
+}: {
+  heading: string;
+  rows: ReturnByCustomer[];
+  unit: "kg" | "pcs";
+  customerHref: (customerId: string) => string;
+  orderWord: string; // "pesanan" / "pengambilan"
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-2" data-testid="return-breakdown">
+      <h2 className="text-ink text-base font-bold">{heading}</h2>
+      <Card>
+        {rows.map((r) => (
+          <Link
+            key={r.customerId}
+            href={customerHref(r.customerId)}
+            data-customer-id={r.customerId}
+            className="border-border flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 last:border-b-0"
+          >
+            <span className="flex min-w-0 flex-1 basis-40 flex-col">
+              <span className="text-ink truncate text-base font-semibold">{r.customerName}</span>
+              <span className="text-ink-muted text-xs">
+                {r.count}× retur · rata-rata {formatQty(r.qty / r.count, unit)} per retur
+              </span>
+            </span>
+            <span className="ml-auto flex flex-col items-end">
+              <span className="text-ink text-base font-bold tabular-nums">
+                {formatQty(r.qty, unit)} · Rp{r.amount.toLocaleString("id-ID")}
+              </span>
+              <span className="text-ink-faint text-xs tabular-nums">
+                {r.orderedQty > 0
+                  ? `${Math.round((r.qty / r.orderedQty) * 100)}% dari ${formatQty(r.orderedQty, unit)} ${orderWord}`
+                  : `tidak ada ${orderWord} di rentang ini`}
+              </span>
+            </span>
+          </Link>
+        ))}
+      </Card>
+    </section>
   );
 }

@@ -25,7 +25,9 @@ import { cn } from "@/components/ui/cn";
 // delete path as the customer page and Ringkasan), plus "+ Bayar" (the
 // book's payment form with this customer filled in, so paying doesn't mean
 // scrolling back up to the big button — only while they owe and are
-// active) and a separate button to the customer's page. The row header is a <button>; the Edit/Hapus/link
+// active), "+ Retur" (active customers) and a separate button to the
+// customer's page. A retur of today is one more transaction in the panel and
+// lowers what today's orders come to (splitTodayPayment). The row header is a <button>; the Edit/Hapus/link
 // targets are siblings below it, never nested inside it.
 //
 // The money totals on top are plain sums of the transactions shown — a quick
@@ -37,6 +39,7 @@ export function TodayActivityList<E>({
   unit,
   customerHref,
   paymentHref,
+  returnHref,
   query,
   highlightId = null,
   onEdit,
@@ -46,10 +49,11 @@ export function TodayActivityList<E>({
   unit: "kg" | "pcs";
   customerHref: (customerId: string) => string;
   paymentHref: (customerId: string) => string;
+  returnHref: (customerId: string) => string;
   query: string;
   highlightId?: string | null;
-  onEdit: (entry: E) => void;
-  onDelete: (entry: E) => void;
+  onEdit: (entry: E, customer: { id: string; name: string }) => void;
+  onDelete: (entry: E, customer: { id: string; name: string }) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const groups = useMemo(() => groupTodayActivity(activity), [activity]);
@@ -58,6 +62,7 @@ export function TodayActivityList<E>({
   const shownRows = shown.flatMap((g) => g.rows);
   const orders = shownRows.filter((r) => r.kind === "ORDER");
   const payments = shownRows.filter((r) => r.kind === "PAYMENT");
+  const returns = shownRows.filter((r) => r.kind === "RETURN");
   const orderLabel = activity.rows.find((r) => r.kind === "ORDER")?.kindLabel ?? (unit === "pcs" ? "Pengambilan" : "Pesanan");
   // Where today's money went (splitTodayPayment) — only spelled out when some
   // of it paid old debt or was overpaid, otherwise it all went to today.
@@ -107,6 +112,12 @@ export function TodayActivityList<E>({
           {formatRupiah(payments.reduce((s, r) => s + r.amount, 0))}
           {paymentParts.length > 0 && ` (${paymentParts.join(", ")})`}
         </span>
+        {returns.length > 0 && (
+          <span>
+            Retur: <strong className="text-ink">{returns.length}</strong> ·{" "}
+            {formatRupiah(returns.reduce((s, r) => s + r.amount, 0))}
+          </span>
+        )}
       </div>
       {shown.map((g) => (
         <CustomerRow
@@ -120,6 +131,7 @@ export function TodayActivityList<E>({
           onToggle={() => toggle(g.customerId)}
           customerHref={customerHref(g.customerId)}
           paymentHref={paymentHref(g.customerId)}
+          returnHref={returnHref(g.customerId)}
           onEdit={onEdit}
           onDelete={onDelete}
         />
@@ -142,6 +154,7 @@ function CustomerRow<E>({
   onToggle,
   customerHref,
   paymentHref,
+  returnHref,
   onEdit,
   onDelete,
 }: {
@@ -154,8 +167,9 @@ function CustomerRow<E>({
   onToggle: () => void;
   customerHref: string;
   paymentHref: string;
-  onEdit: (entry: E) => void;
-  onDelete: (entry: E) => void;
+  returnHref: string;
+  onEdit: (entry: E, customer: { id: string; name: string }) => void;
+  onDelete: (entry: E, customer: { id: string; name: string }) => void;
 }) {
   const lunas = g.status === "LUNAS";
   const panelId = `today-${g.customerId}`;
@@ -197,6 +211,11 @@ function CustomerRow<E>({
                 {g.todayShort > 0 && g.paymentCount > 0 && ` · kurang ${formatRupiah(g.todayShort)}`}
               </span>
             )}
+            {g.returnCount > 0 && (
+              <span data-testid="today-returns">
+                Retur {formatQty(g.returnQty, unit)} · {formatRupiah(g.returnAmount)}
+              </span>
+            )}
             {g.payForOld > 0 && <span data-testid="today-old-payment">Cicil utang lama {formatRupiah(g.payForOld)}</span>}
           </span>
         </span>
@@ -227,12 +246,23 @@ function CustomerRow<E>({
       {open && (
         <div id={panelId} className="bg-surface flex flex-col">
           {g.rows.map((r) => (
-            <TransactionRow key={r.id} row={r} customerName={g.customerName} onEdit={onEdit} onDelete={onDelete} />
+            <TransactionRow
+              key={r.id}
+              row={r}
+              customerName={g.customerName}
+              onEdit={(entry) => onEdit(entry, { id: g.customerId, name: g.customerName })}
+              onDelete={(entry) => onDelete(entry, { id: g.customerId, name: g.customerName })}
+            />
           ))}
           <div className="border-border flex flex-wrap gap-2 border-t px-4 py-3">
             {g.customerActive && g.balance > 0 && (
               <LinkButton href={paymentHref} variant="primary" size="compact">
                 + Bayar
+              </LinkButton>
+            )}
+            {g.customerActive && (
+              <LinkButton href={returnHref} variant="secondary" size="compact" className="border-border border">
+                + Retur
               </LinkButton>
             )}
             <LinkButton href={customerHref} variant="secondary" size="compact" className="border-border border">
@@ -265,7 +295,7 @@ function TransactionRow<E>({
       <span className="text-ink-muted w-12 shrink-0 text-sm tabular-nums">{r.time}</span>
       <span className="flex min-w-0 flex-1 basis-32 flex-col">
         <span className="flex min-w-0 items-center gap-1.5">
-          <Badge variant={r.kind === "PAYMENT" ? "success" : "info"}>{r.kindLabel}</Badge>
+          <Badge variant={r.kind === "PAYMENT" ? "success" : r.kind === "RETURN" ? "warning" : "info"}>{r.kindLabel}</Badge>
         </span>
         {r.detail && <span className="text-ink-muted truncate text-xs">{r.detail}</span>}
       </span>

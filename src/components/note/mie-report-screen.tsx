@@ -35,15 +35,26 @@ import { NoteNav } from "./note-nav";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
 import { ReportGranularityToggle, GRANULARITY_OPTIONS, effectiveGranularity } from "./report-granularity";
-import { DrilldownStat, LedgerDrilldown, type DrilldownRow } from "./ledger-drilldown";
+import {
+  DrilldownStat,
+  LedgerDrilldown,
+  ReturnBreakdown,
+  summarizeReturns,
+  type DrilldownRow,
+} from "./ledger-drilldown";
 import { EntrySheet } from "./mie-sheets";
 
 // Which stat card's list is open. "omzet" and "kg" show the SAME ledger
 // rows (every pesanan in range) — only which number is emphasised differs,
 // exactly as the owner asked ("daftar yang sama, fokus ke kolom kg").
 // "margin" lists the same pesanan again, each with its own margin (or why it
-// has none).
-type Drill = "omzet" | "payments" | "kg" | "margin";
+// has none). A retur sits in those lists too, as a minus row, because the
+// numbers are net of retur (bucket-mie.ts) and each list's Total must equal
+// its card. "returns" is the Retur card: who gave mi back, then the rows.
+type Drill = "omzet" | "payments" | "kg" | "margin" | "returns";
+
+// "−Rp70.000" / "−5 kg" for a retur row in the omzet/kg/margin lists.
+const minus = (text: string) => `−${text}`;
 
 const JENIS_LABEL: Record<MieJenisKey, string> = { ...MIE_COST_KEY_LABEL, CUSTOM: "Custom" };
 
@@ -108,18 +119,24 @@ export function MieReportScreen({
       omzet: 0,
       payments: 0,
       kg: 0,
+      returns: 0,
+      returnKg: 0,
       margin: 0,
       byType: emptyTypeTotals(),
       orderRows: [] as MieReportPoint[],
       paymentRows: [] as MieReportPoint[],
+      returnRows: [] as MieReportPoint[],
     };
     for (const b of buckets) {
       totals.omzet += b.omzet;
       totals.payments += b.payments;
       totals.kg += b.kg;
+      totals.returns += b.returns;
+      totals.returnKg += b.returnKg;
       totals.margin += b.margin;
       totals.orderRows.push(...b.orderRows);
       totals.paymentRows.push(...b.paymentRows);
+      totals.returnRows.push(...b.returnRows);
       for (const key of MIE_JENIS_KEYS) addTypeTotals(totals.byType[key], b.byType[key]);
     }
     return { label: rangeLabel, ...totals };
@@ -130,7 +147,7 @@ export function MieReportScreen({
   // total), so the list's own Total line can never disagree with the card.
   const drillPoints = useMemo(() => {
     if (!drill) return [];
-    const source = drill === "payments" ? view.paymentRows : view.orderRows;
+    const source = drill === "payments" ? view.paymentRows : drill === "returns" ? view.returnRows : view.orderRows;
     return [...source].sort((a, b) => (a.day === b.day ? b.time.localeCompare(a.time) : b.day.localeCompare(a.day)));
   }, [drill, view]);
 
@@ -139,7 +156,19 @@ export function MieReportScreen({
   const noCostJenis = MIE_JENIS_KEYS.filter((k) => view.byType[k].noCost.count > 0);
   const noCostCount = noCostJenis.reduce((n, k) => n + view.byType[k].noCost.count, 0);
 
+  const returnSummary = useMemo(
+    () =>
+      drill === "returns"
+        ? summarizeReturns(
+            view.returnRows.map((p) => ({ ...p, qty: p.kg ?? 0 })),
+            view.orderRows.map((p) => ({ ...p, qty: p.kg ?? 0 })),
+          )
+        : [],
+    [drill, view],
+  );
+
   const drillRows: DrilldownRow[] = drillPoints.map((p) => {
+    const isReturn = p.kind === "RETURN" && drill !== "returns";
     const kgLabel = p.kg != null ? `${p.kg.toLocaleString("id-ID")} kg` : null;
     const perKg =
       p.kg != null && p.pricePerKg != null
@@ -157,7 +186,27 @@ export function MieReportScreen({
         time: p.time,
         detail: perKg ? `${perKg} · modal ${cost != null ? `Rp${cost.toLocaleString("id-ID")}/kg` : "belum diisi"}` : null,
         note: p.note,
-        value: margin != null ? formatRupiah(margin) : costKey ? "Modal belum diisi" : "Tanpa modal (custom)",
+        value:
+          margin != null
+            ? isReturn
+              ? minus(formatRupiah(margin))
+              : formatRupiah(margin)
+            : costKey
+              ? "Modal belum diisi"
+              : "Tanpa modal (custom)",
+        sub: isReturn ? minus(formatRupiah(p.amount)) : formatRupiah(p.amount),
+      };
+    }
+    if (drill === "returns") {
+      return {
+        id: p.id,
+        href: `/note/pelanggan/${p.customerId}`,
+        title: p.customerName,
+        date: p.date,
+        time: p.time,
+        detail: perKg,
+        note: p.note,
+        value: kgLabel ?? "—",
         sub: formatRupiah(p.amount),
       };
     }
@@ -171,15 +220,15 @@ export function MieReportScreen({
       // before the column existed, never silently blank and never guessed.
       detail: drill === "payments" ? formatNotePaymentMethod(p.paymentMethod) : perKg,
       note: p.note,
-      value: drill === "kg" ? (kgLabel ?? "—") : formatRupiah(p.amount),
-      sub: drill === "kg" ? formatRupiah(p.amount) : null,
+      value: drill === "kg" ? (kgLabel ? (isReturn ? minus(kgLabel) : kgLabel) : "—") : isReturn ? minus(formatRupiah(p.amount)) : formatRupiah(p.amount),
+      sub: drill === "kg" ? (isReturn ? minus(formatRupiah(p.amount)) : formatRupiah(p.amount)) : null,
     };
   });
 
   const DRILL_META: Record<Drill, { heading: string; totalLabel: string; totalValue: string; empty: string }> = {
     omzet: {
-      heading: "Pesanan",
-      totalLabel: "Total omzet",
+      heading: view.returnRows.length > 0 ? "Pesanan & retur" : "Pesanan",
+      totalLabel: view.returnRows.length > 0 ? "Total omzet (bersih)" : "Total omzet",
       totalValue: formatRupiah(view.omzet),
       empty: "Tidak ada pesanan di rentang ini.",
     },
@@ -195,9 +244,15 @@ export function MieReportScreen({
       totalValue: formatRupiah(view.margin),
       empty: "Tidak ada pesanan di rentang ini.",
     },
+    returns: {
+      heading: "Rincian retur",
+      totalLabel: "Total retur",
+      totalValue: `${formatKg(view.returnKg)} · ${formatRupiah(view.returns)}`,
+      empty: "Tidak ada retur di rentang ini.",
+    },
     kg: {
-      heading: "Mi terjual",
-      totalLabel: "Total kg",
+      heading: view.returnRows.length > 0 ? "Mi terjual & retur" : "Mi terjual",
+      totalLabel: view.returnRows.length > 0 ? "Total kg (bersih)" : "Total kg",
       totalValue: formatKg(view.kg),
       empty: "Tidak ada pesanan di rentang ini.",
     },
@@ -264,6 +319,7 @@ export function MieReportScreen({
               <DrilldownStat
                 label="Omzet (pesanan)"
                 value={formatRupiah(view.omzet)}
+                hint={view.returns > 0 ? `sudah dikurangi retur ${formatRupiah(view.returns)}` : null}
                 open={drill === "omzet"}
                 onToggle={() => setDrill(drill === "omzet" ? null : "omzet")}
               />
@@ -283,8 +339,16 @@ export function MieReportScreen({
               <DrilldownStat
                 label="Mi terjual"
                 value={formatKg(view.kg)}
+                hint={view.returnKg > 0 ? `sudah dikurangi retur ${formatKg(view.returnKg)}` : null}
                 open={drill === "kg"}
                 onToggle={() => setDrill(drill === "kg" ? null : "kg")}
+              />
+              <DrilldownStat
+                label="Retur"
+                value={formatKg(view.returnKg)}
+                hint={formatRupiah(view.returns)}
+                open={drill === "returns"}
+                onToggle={() => setDrill(drill === "returns" ? null : "returns")}
               />
             </div>
           </section>
@@ -308,6 +372,16 @@ export function MieReportScreen({
                 </Link>
               )}
             </div>
+          )}
+
+          {drill === "returns" && (
+            <ReturnBreakdown
+              heading={`Retur per pelanggan · ${view.label}`}
+              rows={returnSummary}
+              unit="kg"
+              customerHref={(id) => `/note/pelanggan/${id}`}
+              orderWord="pesanan"
+            />
           )}
 
           {drill && (
@@ -431,8 +505,8 @@ export function MieReportScreen({
             <p className="text-ink-faint text-xs">
               Ketuk baris untuk melihat rincian per jenis mi periode itu. Kalau rentang tanggal berhenti di tengah
               minggu/bulan, periode di tepi hanya menghitung hari yang masuk rentang. Omzet dihitung dari semua
-              pesanan (bukan cuma yang belum lunas); saldo awal dan koreksi tidak dihitung sebagai omzet maupun
-              pembayaran.
+              pesanan (bukan cuma yang belum lunas) dikurangi retur; saldo awal dan koreksi tidak dihitung sebagai
+              omzet maupun pembayaran.
             </p>
           </section>
         </div>
@@ -443,6 +517,7 @@ export function MieReportScreen({
           <EntrySheet
             key={editing.point.id}
             entry={editing.point}
+            customer={{ id: editing.point.customerId, name: editing.point.customerName }}
             initialAction={editing.action}
             onClose={() => setEditing(null)}
           />
