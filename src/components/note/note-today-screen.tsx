@@ -1,23 +1,23 @@
-import type { TodayActivityRow } from "@/lib/note/today-activity";
+import type { TodayActivity } from "@/lib/note/today-activity";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import { NOTE_BOOK, type NoteBook } from "@/lib/note/books";
 import { LinkButton } from "@/components/ui/link-button";
 import { AppHeader } from "@/components/ui/app-header";
 import { NoteNav } from "./note-nav";
-import { NoteTodayPanel } from "./note-today-panel";
+import { NoteTodayPanel, type NoteTodayEntry } from "./note-today-panel";
 
 // Hari Ini — the tab Note opens on, built for RECORDING (the most frequent
-// job, done standing up): two big buttons, then everything recorded today,
-// newest first. Customer management, prices and export live on the Utang
-// tab so this one stays clean.
+// job, done standing up): two big buttons, then one row per customer with
+// activity today (see TodayActivityList). Customer management, prices and
+// export live on the Utang tab so this one stays clean.
 export function NoteTodayScreen({
   book,
-  rows,
+  activity,
   highlightId,
   nav,
 }: {
   book: NoteBook;
-  rows: TodayActivityRow[];
+  activity: TodayActivity<NoteTodayEntry>;
   highlightId: string | null;
   nav: HeaderNav;
 }) {
@@ -39,7 +39,7 @@ export function NoteTodayScreen({
             </LinkButton>
           </div>
 
-          <NoteTodayPanel book={book} rows={rows} highlightId={highlightId} />
+          <NoteTodayPanel book={book} activity={activity} highlightId={highlightId} />
         </div>
       </div>
     </div>

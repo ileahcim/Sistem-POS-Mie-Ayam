@@ -12,6 +12,6 @@ export default async function NotePage({ searchParams }: { searchParams: Promise
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const [{ baru }, rows, nav] = await Promise.all([searchParams, getMieTodayActivity(), getHeaderNav()]);
-  return <NoteTodayScreen book="mie" rows={rows} highlightId={baru ?? null} nav={nav} />;
+  const [{ baru }, activity, nav] = await Promise.all([searchParams, getMieTodayActivity(), getHeaderNav()]);
+  return <NoteTodayScreen book="mie" activity={activity} highlightId={baru ?? null} nav={nav} />;
 }

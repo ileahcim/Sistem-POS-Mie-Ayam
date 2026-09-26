@@ -16,18 +16,13 @@ import { NOTE_BOOK } from "@/lib/note/books";
 import { NoteNav } from "./note-nav";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
+import { ReportGranularityToggle, GRANULARITY_OPTIONS, effectiveGranularity } from "./report-granularity";
 import { DrilldownStat, LedgerDrilldown, type DrilldownRow } from "./ledger-drilldown";
 import { FrozenEntrySheet } from "./frozen-sheets";
 
 // Mirrors mie-report-screen.tsx's Drill: "omzet" and "pcs" open the same
 // pengambilan rows, only the emphasised number differs.
 type Drill = "omzet" | "payments" | "pcs";
-
-const OPTIONS: { value: FrozenGranularity; label: string; unit: string }[] = [
-  { value: "harian", label: "Harian", unit: "Hari" },
-  { value: "mingguan", label: "Mingguan", unit: "Minggu" },
-  { value: "bulanan", label: "Bulanan", unit: "Bulan" },
-];
 
 function formatPcs(pcs: number): string {
   return `${pcs.toLocaleString("id-ID")} pcs`;
@@ -58,9 +53,11 @@ export function FrozenReportScreen({
   // edit/delete path, one set of rules. Its router.refresh() re-reads the
   // points, so the cards above follow the change on their own.
   const [editing, setEditing] = useState<{ point: FrozenReportPoint; action: "edit" | "delete" } | null>(null);
-  const buckets = useMemo(() => bucketFrozen(points, granularity, range), [points, granularity, range]);
+  // A one-day range has nothing to group — see effectiveGranularity.
+  const grouping = effectiveGranularity(granularity, range.from, range.to);
+  const buckets = useMemo(() => bucketFrozen(points, grouping, range), [points, grouping, range]);
   const selected = buckets.find((b) => b.key === selectedKey) ?? null;
-  const unit = OPTIONS.find((o) => o.value === granularity)!.unit;
+  const unit = GRANULARITY_OPTIONS.find((o) => o.value === grouping)!.unit;
 
   const safeRange = normalizeRange(range);
   const rangeLabel =
@@ -154,32 +151,6 @@ export function FrozenReportScreen({
           <NoteNav book="frozen" section="ringkasan" />
           <Card padded className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-3">
-              <div
-                className="rounded-pill bg-muted flex h-12 items-center p-1"
-                role="group"
-                aria-label="Kelompokkan per"
-              >
-                {OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={granularity === opt.value}
-                    onClick={() => {
-                      const untouched = isDefaultRange(range, granularity, today);
-                      setGranularity(opt.value);
-                      if (untouched) setRange(defaultRangeFor(opt.value, today));
-                      setSelectedKey(null);
-                    }}
-                    className={cn(
-                      "rounded-pill h-10 px-4 text-sm font-semibold",
-                      granularity === opt.value ? "bg-surface text-ink shadow-card" : "text-ink-muted",
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-ink-muted font-medium">Dari</span>
                 <input
@@ -255,7 +226,20 @@ export function FrozenReportScreen({
           )}
 
           <section className="flex flex-col gap-2">
-            <h2 className="text-ink text-base font-bold">Omzet per {unit.toLowerCase()}</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-ink text-base font-bold">Omzet per {unit.toLowerCase()}</h2>
+              {safeRange.from !== safeRange.to && (
+                <ReportGranularityToggle
+                  value={granularity}
+                  onChange={(next) => {
+                    const untouched = isDefaultRange(range, granularity, today);
+                    setGranularity(next);
+                    if (untouched) setRange(defaultRangeFor(next, today));
+                    setSelectedKey(null);
+                  }}
+                />
+              )}
+            </div>
             <Card padded className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                 <span className="text-ink-muted">{rangeLabel}</span>

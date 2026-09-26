@@ -12,6 +12,6 @@ export default async function FrozenPage({ searchParams }: { searchParams: Promi
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const [{ baru }, rows, nav] = await Promise.all([searchParams, getFrozenTodayActivity(), getHeaderNav()]);
-  return <NoteTodayScreen book="frozen" rows={rows} highlightId={baru ?? null} nav={nav} />;
+  const [{ baru }, activity, nav] = await Promise.all([searchParams, getFrozenTodayActivity(), getHeaderNav()]);
+  return <NoteTodayScreen book="frozen" activity={activity} highlightId={baru ?? null} nav={nav} />;
 }

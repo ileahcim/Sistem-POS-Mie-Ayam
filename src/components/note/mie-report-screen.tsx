@@ -34,6 +34,7 @@ import { NOTE_BOOK } from "@/lib/note/books";
 import { NoteNav } from "./note-nav";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
+import { ReportGranularityToggle, GRANULARITY_OPTIONS, effectiveGranularity } from "./report-granularity";
 import { DrilldownStat, LedgerDrilldown, type DrilldownRow } from "./ledger-drilldown";
 import { EntrySheet } from "./mie-sheets";
 
@@ -43,12 +44,6 @@ import { EntrySheet } from "./mie-sheets";
 // "margin" lists the same pesanan again, each with its own margin (or why it
 // has none).
 type Drill = "omzet" | "payments" | "kg" | "margin";
-
-const OPTIONS: { value: MieGranularity; label: string; unit: string }[] = [
-  { value: "harian", label: "Harian", unit: "Hari" },
-  { value: "mingguan", label: "Mingguan", unit: "Minggu" },
-  { value: "bulanan", label: "Bulanan", unit: "Bulan" },
-];
 
 const JENIS_LABEL: Record<MieJenisKey, string> = { ...MIE_COST_KEY_LABEL, CUSTOM: "Custom" };
 
@@ -93,9 +88,11 @@ export function MieReportScreen({
   // of rules. Its router.refresh() re-reads the page's points, and the cards
   // above recompute from those, which is why they follow along on their own.
   const [editing, setEditing] = useState<{ point: MieReportPoint; action: "edit" | "delete" } | null>(null);
-  const buckets = useMemo(() => bucketMie(points, granularity, range, costs), [points, granularity, range, costs]);
+  // A one-day range has nothing to group — see effectiveGranularity.
+  const grouping = effectiveGranularity(granularity, range.from, range.to);
+  const buckets = useMemo(() => bucketMie(points, grouping, range, costs), [points, grouping, range, costs]);
   const selected = buckets.find((b) => b.key === selectedKey) ?? null;
-  const unit = OPTIONS.find((o) => o.value === granularity)!.unit;
+  const unit = GRANULARITY_OPTIONS.find((o) => o.value === grouping)!.unit;
 
   const safeRange = normalizeRange(range);
   const rangeLabel =
@@ -225,36 +222,6 @@ export function MieReportScreen({
           <NoteNav book="mie" section="ringkasan" />
           <Card padded className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-3">
-              <div
-                className="rounded-pill bg-muted flex h-12 items-center p-1"
-                role="group"
-                aria-label="Kelompokkan per"
-              >
-                {OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={granularity === opt.value}
-                    onClick={() => {
-                      // An untouched range follows the view (so Bulanan doesn't
-                      // open on one lone bar), but a range the owner picked
-                      // themselves is kept — switching to Bulanan is exactly how
-                      // you'd want to read a long custom range.
-                      const untouched = isDefaultRange(range, granularity, today);
-                      setGranularity(opt.value);
-                      if (untouched) setRange(defaultRangeFor(opt.value, today));
-                      setSelectedKey(null);
-                    }}
-                    className={cn(
-                      "rounded-pill h-10 px-4 text-sm font-semibold",
-                      granularity === opt.value ? "bg-surface text-ink shadow-card" : "text-ink-muted",
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-ink-muted font-medium">Dari</span>
                 <input
@@ -401,7 +368,24 @@ export function MieReportScreen({
           </section>
 
           <section className="flex flex-col gap-2">
-            <h2 className="text-ink text-base font-bold">Omzet per {unit.toLowerCase()}</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-ink text-base font-bold">Omzet per {unit.toLowerCase()}</h2>
+              {safeRange.from !== safeRange.to && (
+                <ReportGranularityToggle
+                  value={granularity}
+                  onChange={(next) => {
+                    // An untouched range follows the view (so Bulanan doesn't
+                    // open on one lone bar), but a range the owner picked
+                    // themselves is kept — switching to Bulanan is exactly how
+                    // you'd want to read a long custom range.
+                    const untouched = isDefaultRange(range, granularity, today);
+                    setGranularity(next);
+                    if (untouched) setRange(defaultRangeFor(next, today));
+                    setSelectedKey(null);
+                  }}
+                />
+              )}
+            </div>
             <Card padded className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                 <span className="text-ink-muted">{rangeLabel}</span>
