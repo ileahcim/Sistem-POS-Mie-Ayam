@@ -18,14 +18,14 @@ Pengaturan (Manajemen Menu dan Isi HPP), plus perbaikan kecil di Form Pesanan Ba
 **Judul:** Section "Mi Mentah" & "Mi Frozen" di Manajemen Menu (`/admin/menu`).
 
 **File diubah:**
-- `src/app/admin/menu/page.tsx` (± baris 1–40)
-  - Tambah impor `getMieProductDefaults`, `getMiePasarPrice`, `getFrozenPrice`.
+- `src/app/admin/menu/page.tsx` (baris 5–7 dan 19–42, file akhir 44 baris)
+  - Tambah impor `getMieProductDefaults`, `getMiePasarPrice`, `getFrozenPrice` (baris 5–7).
   - Sebelum → sesudah: `Promise.all` semula hanya `getMenuAdminData`, `getBaksoUsageSetting`,
     `getHeaderNav`; sekarang ditambah tiga query harga mi. Prop baru diteruskan ke `MenuAdminScreen`
     (`mieDefaults`, `miePasarPricePerKg`, `frozenPricePerPcs`).
-- `src/components/admin/menu-admin-screen.tsx` (± baris 1–30 dan 130–165)
+- `src/components/admin/menu-admin-screen.tsx` (baris 3–14 dan 113–146, file akhir 154 baris)
   - Tambah impor `MieProductDefaults`, `MIE_FIXED_PRODUCT_TYPES`, `MIE_PASAR_LABEL`,
-    `MIE_PRODUCT_LABEL`, dan komponen `MieProductDefaultRow` (komponen Note yang sudah ada).
+    `MIE_PRODUCT_LABEL`, dan komponen `MieProductDefaultRow` (komponen Note yang sudah ada) (baris 3–9).
   - Tambah prop `mieDefaults`, `miePasarPricePerKg`, `frozenPricePerPcs`.
   - Tambah `<section>` **"Mi Mentah"** di **paling bawah, setelah semua section lain** (setelah
     Perkiraan Bakso Terpakai): 4 baris harga jual default per kg — Mi Keriting, Mi Lurus, Pangsit,
@@ -51,21 +51,21 @@ Pengaturan (Manajemen Menu dan Isi HPP), plus perbaikan kecil di Form Pesanan Ba
 **Judul:** Section "Mi Mentah" (modal per kg) di Isi HPP (`/admin/hpp`).
 
 **File diubah:**
-- `src/app/admin/hpp/page.tsx` (± baris 1–30)
-  - Tambah impor `getMieCosts`, `getMieProductDefaults`, `getMiePasarPrice`.
+- `src/app/admin/hpp/page.tsx` (baris 4–6 dan 18–35, file akhir 35 baris)
+  - Tambah impor `getMieCosts`, `getMieProductDefaults`, `getMiePasarPrice` (baris 4–6).
   - Sebelum → sesudah: `Promise.all` semula `getHppItems`, `getHeaderNav`; sekarang ditambah tiga
     query modal/harga mi. Prop baru diteruskan ke `HppScreen` (`mieCosts`, `mieDefaults`,
     `miePasarPricePerKg`).
-- `src/components/admin/hpp-screen.tsx` (± baris 1–20 dan 90–120)
-  - Tambah impor `MieCostKey`, `MieCosts`, `MIE_COST_ROWS`, `MieProductDefaults`, `MieCostAdminRow`.
+- `src/components/admin/hpp-screen.tsx` (baris 4–11 dan 110–127, file akhir 131 baris)
+  - Tambah impor `MieCostKey`, `MieCosts`, `MIE_COST_ROWS`, `MieProductDefaults`, `MieCostAdminRow` (baris 4–11).
   - Tambah prop `mieCosts`, `mieDefaults`, `miePasarPricePerKg`; tambah map `mieSalePrice`
-    (harga jual default per jenis; Mi Pasar pakai harga pasar).
+    (baris 40–45; harga jual default per jenis; Mi Pasar pakai harga pasar).
   - Tambah `<section>` **"Mi Mentah"** di **paling bawah** (setelah Add-on): 4 baris modal per kg
     dari `MIE_COST_ROWS` (Keriting Reguler, Keriting Mi Pasar, Lurus, Pangsit), masing-masing
     menampilkan untung/kg + persen.
 
 **File dibuat:**
-- `src/components/admin/mie-cost-admin-row.tsx` (± 110 baris) — editor modal per kg: input inline
+- `src/components/admin/mie-cost-admin-row.tsx` (104 baris) — editor modal per kg: input inline
   "Modal Rp … /kg" + tombol **Simpan selalu tampil** (nonaktif bila tak ada perubahan), untung/kg
   dan % dihitung live via `computeMarginPercent` (`src/lib/hpp/margin-math.ts`) terhadap harga jual
   default jenis itu; badge "Modal belum diisi" bila kosong, badge "Margin rendah" bila di bawah
@@ -87,7 +87,7 @@ Schema Prisma, `prisma/migrations`, `.env`, data produksi tidak disentuh.
 **Judul:** Tombol "Simpan" selalu tampil di baris harga mi (bukan hanya saat berubah).
 
 **File diubah:**
-- `src/components/note/mie-product-default-row.tsx` (baris ± 84–90)
+- `src/components/note/mie-product-default-row.tsx` (baris 85–89, file akhir 90 baris)
   - Sebelum: tombol Simpan hanya dirender saat `dirty` (`{dirty && (<Button …>)}`).
   - Sesudah: tombol Simpan **selalu dirender**, dengan `disabled={!dirty || saving}` — abu-abu/nonaktif
     bila belum ada perubahan, aktif bila ada perubahan. Pesan "Tersimpan ✓" tetap muncul sesaat setelah
@@ -111,13 +111,13 @@ memang sudah sesuai.
 **Judul:** Link harga default + perbaikan label "Mi Pasar" di Form Pesanan Baru (`/note/pesanan/baru`).
 
 **File diubah:**
-- `src/components/note/new-order-form.tsx`
-  - Impor: tambah `MIE_PASAR_LABEL` (baris ± 7–14).
-  - **Perbaikan label** (baris ± 245): saat tombol "Mi Pasar" aktif, teks keterangan semula memakai
+- `src/components/note/new-order-form.tsx` (file akhir 378 baris)
+  - Impor: tambah `MIE_PASAR_LABEL` (baris 10–16).
+  - **Perbaikan label** (baris 243–248): saat tombol "Mi Pasar" aktif, teks keterangan semula memakai
     `MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]` — karena `MIE_PASAR_PRODUCT_TYPE = "MIE_KERITING"`,
     yang tercetak selalu **"Mi Keriting"**. Sebelum → sesudah: `MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]`
     → `MIE_PASAR_LABEL` sehingga tertulis **"Mi Pasar"**.
-  - **Link bantuan** (baris ± 315–320): di bawah baris "Ubah harga" (blok `productType !== "CUSTOM"`),
+  - **Link bantuan** (baris 314–321): di bawah baris "Ubah harga" (blok `productType !== "CUSTOM"`),
     tambah teks kecil "Ubah harga di sini hanya berlaku untuk pesanan ini." + tautan
     **"Ubah harga default di Manajemen Menu"** → `/admin/menu` (memakai `<Link>` yang sudah diimpor).
     Perilaku tombol "Ubah harga" per pesanan **tidak diubah**.
@@ -130,3 +130,18 @@ OWNER dan pasti bisa membuka link `/admin/menu`. Tidak ada pembatasan yang mengh
 **Sengaja tidak diubah:** schema Prisma, `prisma/migrations`, `.env`, data produksi; aturan auth.
 
 **Verifikasi:** `npm run lint` bersih.
+
+---
+
+## v5 — 14 Okt 2026
+
+**Judul:** Rapikan nomor baris catatan ini agar cocok dengan kondisi file akhir.
+
+**File diubah:**
+- `CATATAN_OPENCODE.md` saja — menyesuaikan referensi nomor baris di entri v1–v4 dengan hasil akhir
+  tiap file (mis. `menu-admin-screen.tsx` = 154 baris, `mie-cost-admin-row.tsx` = 104 baris,
+  `new-order-form.tsx` = 378 baris). Tidak ada perubahan kode di commit ini.
+
+**Sengaja tidak diubah:** seluruh file kode, schema Prisma, `prisma/migrations`, `.env`, data produksi.
+
+**Verifikasi:** tidak ada kode yang berubah; `npm run build` sudah dijalankan sukses sebelum commit ini.
