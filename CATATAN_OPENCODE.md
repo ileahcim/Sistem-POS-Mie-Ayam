@@ -1,0 +1,45 @@
+# Catatan Perubahan — opencode
+
+Log tiap tahap/commit pengerjaan fitur pengaturan harga **Mi Mentah** & **Mi Frozen** di halaman
+Pengaturan (Manajemen Menu dan Isi HPP), plus perbaikan kecil di Form Pesanan Baru Note.
+
+- Aturan commit: tiap pesan diakhiri ` -opencode`, versi naik `update v1`, `update v2`, dst.
+- Lingkup: **hanya** judul section di halaman pengaturan. Tidak membuat Product/Category/Add-on
+  baru, tidak menyentuh layar kasir / order-aktif / pembayaran. Data tetap dari tabel modul Note
+  yang sudah ada (`MieProductDefault`, `MieSetting`).
+- **Sengaja TIDAK diubah** (lihat juga tiap entri): schema Prisma, folder `prisma/migrations`,
+  file `.env`, dan seluruh data produksi (tidak ada UPDATE/seed/migrasi data). Field modal Mi
+  Frozen tidak dibuat karena memang belum ada di schema.
+
+---
+
+## v1 — 14 Okt 2026
+
+**Judul:** Section "Mi Mentah" & "Mi Frozen" di Manajemen Menu (`/admin/menu`).
+
+**File diubah:**
+- `src/app/admin/menu/page.tsx` (± baris 1–40)
+  - Tambah impor `getMieProductDefaults`, `getMiePasarPrice`, `getFrozenPrice`.
+  - Sebelum → sesudah: `Promise.all` semula hanya `getMenuAdminData`, `getBaksoUsageSetting`,
+    `getHeaderNav`; sekarang ditambah tiga query harga mi. Prop baru diteruskan ke `MenuAdminScreen`
+    (`mieDefaults`, `miePasarPricePerKg`, `frozenPricePerPcs`).
+- `src/components/admin/menu-admin-screen.tsx` (± baris 1–30 dan 130–165)
+  - Tambah impor `MieProductDefaults`, `MIE_FIXED_PRODUCT_TYPES`, `MIE_PASAR_LABEL`,
+    `MIE_PRODUCT_LABEL`, dan komponen `MieProductDefaultRow` (komponen Note yang sudah ada).
+  - Tambah prop `mieDefaults`, `miePasarPricePerKg`, `frozenPricePerPcs`.
+  - Tambah `<section>` **"Mi Mentah"** di **paling bawah, setelah semua section lain** (setelah
+    Perkiraan Bakso Terpakai): 4 baris harga jual default per kg — Mi Keriting, Mi Lurus, Pangsit,
+    Mi Pasar — lalu sub-section **"Mi Frozen"** (1 baris harga jual per pcs).
+  - Sebelum → sesudah: halaman berakhir di `BaksoUsageSettingsForm`; sekarang ada section Mi Mentah
+    di bawahnya.
+
+**Yang dipakai ulang (tanpa sumber data baru):**
+- Action: `updateMieProductDefault`, `updateMiePasarPrice` (note/actions.ts) dan `updateFrozenPrice`
+  (note/frozen-actions.ts) — lewat komponen `MieProductDefaultRow` yang sudah ada.
+- Query: `getMieProductDefaults`, `getMiePasarPrice`, `getFrozenPrice`.
+- Tabel DB: `MieProductDefault` (Keriting/Lurus/Pangsit) dan `MieSetting` (pasar & frozen).
+
+**Sengaja tidak diubah:** schema Prisma, `prisma/migrations`, `.env`, data produksi. `Product` /
+`Category` / `Addon` tidak disentuh; kasir tidak diubah.
+
+**Verifikasi:** `npm run lint` bersih.
