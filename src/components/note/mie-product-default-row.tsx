@@ -82,11 +82,9 @@ export function MieProductDefaultRow({
         <span className="text-ink-muted text-sm">/ {target.kind === "frozenPrice" ? "pcs" : "kg"}</span>
       </div>
       {error && <p className="text-danger text-sm">{error}</p>}
-      {dirty && (
-        <Button variant="primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Menyimpan..." : "Simpan"}
-        </Button>
-      )}
+      <Button variant="primary" onClick={handleSave} disabled={!dirty || saving}>
+        {saving ? "Menyimpan..." : "Simpan"}
+      </Button>
       {!dirty && savedFlash && <p className="text-primary-strong text-sm font-medium">Tersimpan ✓</p>}
     </div>
   );

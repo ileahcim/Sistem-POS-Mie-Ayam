@@ -79,3 +79,27 @@ Frozen di schema, jadi tidak ada field/migrasi baru yang dibuat (hanya harga jua
 Schema Prisma, `prisma/migrations`, `.env`, data produksi tidak disentuh.
 
 **Verifikasi:** `npm run lint` bersih.
+
+---
+
+## v3 — 14 Okt 2026
+
+**Judul:** Tombol "Simpan" selalu tampil di baris harga mi (bukan hanya saat berubah).
+
+**File diubah:**
+- `src/components/note/mie-product-default-row.tsx` (baris ± 84–90)
+  - Sebelum: tombol Simpan hanya dirender saat `dirty` (`{dirty && (<Button …>)}`).
+  - Sesudah: tombol Simpan **selalu dirender**, dengan `disabled={!dirty || saving}` — abu-abu/nonaktif
+    bila belum ada perubahan, aktif bila ada perubahan. Pesan "Tersimpan ✓" tetap muncul sesaat setelah
+    sukses, dan pesan error tetap tampil bila gagal.
+  - Berlaku otomatis di dua tempat yang memakai komponen ini: `/note/produk` (Harga Mi Mentah: harga
+    default, harga pasar, modal per kg, harga Frozen) dan section **Mi Mentah / Mi Frozen** di
+    `/admin/menu` (dari v1).
+
+**Tidak termasuk:** baris HPP warung (`hpp-item-row.tsx`) dan baris modal Mi Mentah baru
+(`mie-cost-admin-row.tsx`, sudah selalu tampil sejak v2) — di luar lingkup Mi Mentah/Frozen atau
+memang sudah sesuai.
+
+**Sengaja tidak diubah:** schema Prisma, `prisma/migrations`, `.env`, data produksi.
+
+**Verifikasi:** `npm run lint` bersih.
