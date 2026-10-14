@@ -103,3 +103,30 @@ memang sudah sesuai.
 **Sengaja tidak diubah:** schema Prisma, `prisma/migrations`, `.env`, data produksi.
 
 **Verifikasi:** `npm run lint` bersih.
+
+---
+
+## v4 — 14 Okt 2026
+
+**Judul:** Link harga default + perbaikan label "Mi Pasar" di Form Pesanan Baru (`/note/pesanan/baru`).
+
+**File diubah:**
+- `src/components/note/new-order-form.tsx`
+  - Impor: tambah `MIE_PASAR_LABEL` (baris ± 7–14).
+  - **Perbaikan label** (baris ± 245): saat tombol "Mi Pasar" aktif, teks keterangan semula memakai
+    `MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]` — karena `MIE_PASAR_PRODUCT_TYPE = "MIE_KERITING"`,
+    yang tercetak selalu **"Mi Keriting"**. Sebelum → sesudah: `MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]`
+    → `MIE_PASAR_LABEL` sehingga tertulis **"Mi Pasar"**.
+  - **Link bantuan** (baris ± 315–320): di bawah baris "Ubah harga" (blok `productType !== "CUSTOM"`),
+    tambah teks kecil "Ubah harga di sini hanya berlaku untuk pesanan ini." + tautan
+    **"Ubah harga default di Manajemen Menu"** → `/admin/menu` (memakai `<Link>` yang sudah diimpor).
+    Perilaku tombol "Ubah harga" per pesanan **tidak diubah**.
+
+**Catatan auth (diverifikasi, tidak ada perubahan aturan):** `/note` (dan halaman form di dalamnya) dan
+`/admin/menu` sama-sama OWNER-only lewat `getCurrentUser()` + `role !== "OWNER"` → `redirect("/kasir")`
+(`src/app/note/pesanan/baru/page.tsx`, `src/app/admin/menu/page.tsx`). Jadi user yang membuka Note sudah
+OWNER dan pasti bisa membuka link `/admin/menu`. Tidak ada pembatasan yang menghalangi.
+
+**Sengaja tidak diubah:** schema Prisma, `prisma/migrations`, `.env`, data produksi; aturan auth.
+
+**Verifikasi:** `npm run lint` bersih.

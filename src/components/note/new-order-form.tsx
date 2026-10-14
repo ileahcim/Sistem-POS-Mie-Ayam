@@ -7,7 +7,13 @@ import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { MiePriceSource, MieProductType } from "@/lib/mie/types";
 import type { MieDefaultJenis } from "@/lib/mie/get-mie-default-jenis";
-import { MIE_FIXED_PRODUCT_TYPES, MIE_KG_PRESETS, MIE_PASAR_PRODUCT_TYPE, MIE_PRODUCT_LABEL } from "@/lib/mie/types";
+import {
+  MIE_FIXED_PRODUCT_TYPES,
+  MIE_KG_PRESETS,
+  MIE_PASAR_LABEL,
+  MIE_PASAR_PRODUCT_TYPE,
+  MIE_PRODUCT_LABEL,
+} from "@/lib/mie/types";
 import { createMieOrder, getMieAutofillPrice } from "@/app/note/actions";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card } from "@/components/ui/card";
@@ -236,7 +242,7 @@ export function NewOrderForm({
               </div>
               {pasarPreset && pasarPricePerKg != null && (
                 <span className="text-ink-muted text-sm">
-                  {MIE_PRODUCT_LABEL[MIE_PASAR_PRODUCT_TYPE]}, harga pasar Rp
+                  {MIE_PASAR_LABEL}, harga pasar Rp
                   {pasarPricePerKg.toLocaleString("id-ID")}/kg (dari Harga Produk).
                 </span>
               )}
@@ -283,28 +289,37 @@ export function NewOrderForm({
             </div>
 
             {productType !== "CUSTOM" && (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-ink-muted min-w-0 flex-1 basis-48 text-sm" data-testid="price-source">
-                  {unlocked
-                    ? "Harga diubah untuk pesanan ini saja."
-                    : priceSource === "pasar"
-                      ? "Harga pasar (dari Harga Produk)."
-                      : priceSource === "khusus"
-                        ? `Harga khusus ${customerName}.`
-                        : priceSource === "terakhir"
-                          ? `Harga terakhir ${customerName} (belum ada harga khusus).`
-                          : priceSource === "umum"
-                            ? `Harga umum — ${customerName} belum punya harga khusus.`
-                            : priceSource === "none"
-                              ? "Harga umum belum diisi — ketik harga/kg."
-                              : "Memuat harga…"}
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-ink-muted min-w-0 flex-1 basis-48 text-sm" data-testid="price-source">
+                    {unlocked
+                      ? "Harga diubah untuk pesanan ini saja."
+                      : priceSource === "pasar"
+                        ? "Harga pasar (dari Harga Produk)."
+                        : priceSource === "khusus"
+                          ? `Harga khusus ${customerName}.`
+                          : priceSource === "terakhir"
+                            ? `Harga terakhir ${customerName} (belum ada harga khusus).`
+                            : priceSource === "umum"
+                              ? `Harga umum — ${customerName} belum punya harga khusus.`
+                              : priceSource === "none"
+                                ? "Harga umum belum diisi — ketik harga/kg."
+                                : "Memuat harga…"}
+                  </p>
+                  {locked && pricePerKg !== "" && (
+                    <Button variant="secondary" size="compact" onClick={() => setUnlocked(true)}>
+                      Ubah harga
+                    </Button>
+                  )}
+                </div>
+                <p className="text-ink-faint text-xs">
+                  Ubah harga di sini hanya berlaku untuk pesanan ini.{" "}
+                  <Link href="/admin/menu" className="underline">
+                    Ubah harga default di Manajemen Menu
+                  </Link>
+                  .
                 </p>
-                {locked && pricePerKg !== "" && (
-                  <Button variant="secondary" size="compact" onClick={() => setUnlocked(true)}>
-                    Ubah harga
-                  </Button>
-                )}
-              </div>
+              </>
             )}
 
             <div className="flex flex-wrap gap-2" role="group" aria-label="Pilih cepat jumlah kg">
