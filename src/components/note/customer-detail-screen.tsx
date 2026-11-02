@@ -139,12 +139,13 @@ export function CustomerDetailScreen({
           )}
 
           {/* Harga khusus: the order form suggests this customer's own
-              price first, so a forgotten general 17.000 can't slip in. */}
+              price first, else the default. Same data as Manajemen Menu's
+              "Harga Khusus Pelanggan" table. */}
           <Card padded className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="text-ink text-sm font-bold">Harga khusus</span>
               {specialTypes.length === 0 ? (
-                <span className="text-ink-muted text-sm">Belum ada — pesanan baru ikut harga terakhir / harga umum.</span>
+                <span className="text-ink-muted text-sm">Belum ada — pesanan baru ikut harga default.</span>
               ) : (
                 specialTypes.map((t) => (
                   <span key={t} className="text-ink text-sm">

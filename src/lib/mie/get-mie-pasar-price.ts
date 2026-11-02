@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-// "Mie Pasar" shortcut price (Rp/kg), owner-editable from /note/produk.
+// "Mie Pasar" shortcut price (Rp/kg), owner-editable from Manajemen Menu → Mi Mentah.
 // Null when never set — the shortcut then shows "belum diisi" instead of
 // inventing a number.
 export async function getMiePasarPrice(): Promise<number | null> {

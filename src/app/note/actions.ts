@@ -463,13 +463,15 @@ export async function updateMieCostPerKg(key: MieCostKey, costPerKg: number): Pr
   return { ok: true };
 }
 
-// Price autofill for the new-order form, in this order: this customer's
-// "harga khusus" for this jenis (MieCustomerPrice, set on the customer's
-// page), else their last price for this exact product if they've ordered it
-// before, else the product's owner-set default (see
-// get-mie-product-defaults.ts) — never for CUSTOM, which is always priced
-// fresh. The source is returned so the form can say where the number came
-// from (a forgotten 17.000 is easier to catch when it reads "Harga umum").
+// Price autofill for the new-order form — TWO layers only (owner's call,
+// 2 Nov 2026): this customer's "harga khusus" for this jenis
+// (MieCustomerPrice — Manajemen Menu or the customer's page), else the
+// jenis's default price (MieProductDefault). The old middle layer "this
+// customer's last price" is gone on purpose: a price changed with "Ubah
+// harga" for ONE pesanan used to come back as next time's suggestion, which
+// read as "the price I set didn't stick". Never for CUSTOM (priced fresh),
+// and Mi Pasar never comes here (its own default, MieSetting). The source is
+// returned so the form can say where the number came from.
 export async function getMieAutofillPrice(
   customerId: string,
   productType: Exclude<MieProductType, "CUSTOM">,
@@ -482,22 +484,14 @@ export async function getMieAutofillPrice(
   });
   if (special) return { price: special.pricePerKg, source: "khusus" };
 
-  const lastOrder = await prisma.mieLedgerEntry.findFirst({
-    // Pasar orders are priced from their own shortcut, not this customer's
-    // regular price — never let one leak into the other's autofill.
-    where: { customerId, kind: "ORDER", productType, isPasar: false },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    select: { pricePerKg: true },
-  });
-  if (lastOrder?.pricePerKg != null) return { price: lastOrder.pricePerKg, source: "terakhir" };
-
   const productDefault = await prisma.mieProductDefault.findUnique({ where: { productType } });
   return productDefault?.defaultPricePerKg != null ? { price: productDefault.defaultPricePerKg, source: "umum" } : null;
 }
 
-// "Harga khusus" of one customer — the whole set at once, from the sheet on
-// the customer's page: a price sets/replaces that jenis, null removes it
-// (back to last price / harga umum). Only suggests the price of NEW orders;
+// "Harga khusus" of one customer — from the sheet on the customer's page (the
+// whole set at once) or one row of Manajemen Menu's "Harga Khusus Pelanggan"
+// table (one jenis): a price sets/replaces that jenis, null removes it (back
+// to the default price). Only suggests the price of NEW orders;
 // no ledger row is touched.
 export async function setMieCustomerPrices(
   customerId: string,

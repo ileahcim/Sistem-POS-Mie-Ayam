@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MieCustomerRow } from "@/lib/mie/get-mie-customers";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
@@ -20,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RupiahInput } from "@/components/ui/rupiah-input";
 import { LockedPrice } from "./locked-price";
+import { useUnsavedChangesGuard } from "@/components/ui/use-unsaved-changes-guard";
 import { AppHeader } from "@/components/ui/app-header";
 import { noteAfterSaveHref, noteFormCancelHref, type NoteOrigin } from "@/lib/note/books";
 import { cn } from "@/components/ui/cn";
@@ -42,9 +42,8 @@ export function NewOrderForm({
   defaultJenis: Record<string, MieDefaultJenis>;
   nav: HeaderNav;
 }) {
-  const router = useRouter();
   // The jenis a customer's form opens on: their last pesanan's (Pasar → Mi
-  // Pasar), else Mi Keriting. Mi Pasar needs its price set in Harga Produk.
+  // Pasar), else Mi Keriting. Mi Pasar needs its price set in Manajemen Menu.
   function startFor(id: string): { productType: MieProductType; pasar: boolean } {
     const j = defaultJenis[id];
     if (j === "PASAR") return { productType: MIE_PASAR_PRODUCT_TYPE, pasar: pasarPricePerKg != null };
@@ -63,7 +62,7 @@ export function NewOrderForm({
   // typed like before).
   const [priceSource, setPriceSource] = useState<MiePriceSource | "pasar" | "none" | null>(first.pasar ? "pasar" : null);
   // "Bekukan harga" (26 Sep 2026, owner's request): a price that came from
-  // harga khusus / harga terakhir / harga umum / harga pasar is LOCKED — it
+  // harga khusus / harga default / harga Mi Pasar is LOCKED — it
   // can't be changed by a stray tap. "Ubah harga" unlocks it for this one
   // pesanan; changing the customer or jenis locks it again on the new price.
   const [unlocked, setUnlocked] = useState(false);
@@ -74,9 +73,8 @@ export function NewOrderForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Autofill: this customer's harga khusus, else their last price for this
-  // product, else the product's owner-set default (see getMieAutofillPrice) —
-  // never for CUSTOM, which is always priced fresh, and never over a price
+  // Autofill: this customer's harga khusus, else the jenis's default price
+  // (getMieAutofillPrice — two layers since 2 Nov 2026) — never for CUSTOM, which is always priced fresh, and never over a price
   // the owner unlocked and typed.
   useEffect(() => {
     if (productType === "CUSTOM" || !customerId || unlocked || pasarPreset) return;
@@ -127,6 +125,11 @@ export function NewOrderForm({
   const locked = !unlocked && productType !== "CUSTOM" && priceSource !== "none";
 
   const customerName = customers.find((c) => c.id === customerId)?.name ?? "";
+  // Anything typed that a stray Batal / Back / menu tap would throw away.
+  const dirty =
+    !saving &&
+    (kg.trim() !== "" || note.trim() !== "" || customLabel.trim() !== "" || unlocked || date !== todayDateStr());
+  const { dialog: leaveDialog, leaveTo } = useUnsavedChangesGuard(dirty);
   const kgNumber = Number(kg.replace(",", "."));
   const kgValid = kg.trim() !== "" && Number.isFinite(kgNumber) && kgNumber > 0;
   const canSave =
@@ -152,9 +155,11 @@ export function NewOrderForm({
       date: dateInputToIso(date),
       note,
     });
-    setSaving(false);
-    if (!result.ok) return setError(result.error);
-    router.push(noteAfterSaveHref("mie", origin, customerId, result.entryId));
+    if (!result.ok) {
+      setSaving(false);
+      return setError(result.error);
+    }
+    leaveTo(noteAfterSaveHref("mie", origin, customerId, result.entryId));
   }
 
   return (
@@ -206,7 +211,7 @@ export function NewOrderForm({
                     type="button"
                     onClick={() => handleProductTypeChange(type)}
                     className={cn(
-                      "rounded-pill h-11 px-4 text-sm font-semibold",
+                      "rounded-pill h-12 px-4 text-sm font-semibold",
                       productType === type && !pasarPreset ? "bg-primary text-white" : "bg-muted text-ink-muted",
                     )}
                   >
@@ -214,16 +219,16 @@ export function NewOrderForm({
                   </button>
                 ))}
                 {/* "Mi Pasar" is the daily market order: the same Mi Keriting
-                    row, but priced from Harga Produk instead of this
-                    customer's last price — so it belongs in this row, as one
+                    row, but always at the Mi Pasar default price (no harga
+                    khusus per pelanggan) — so it belongs in this row, as one
                     more choice, not in a separate card above the form. */}
                 <button
                   type="button"
                   onClick={applyPasarPreset}
                   disabled={pasarPricePerKg == null}
-                  title={pasarPricePerKg == null ? "Harga belum diisi di Harga Produk" : undefined}
+                  title={pasarPricePerKg == null ? "Harga Mi Pasar belum diisi di Manajemen Menu" : undefined}
                   className={cn(
-                    "rounded-pill h-11 px-4 text-sm font-semibold disabled:opacity-50",
+                    "rounded-pill h-12 px-4 text-sm font-semibold disabled:opacity-50",
                     pasarPreset ? "bg-primary text-white" : "bg-muted text-ink-muted",
                   )}
                 >
@@ -233,7 +238,7 @@ export function NewOrderForm({
                   type="button"
                   onClick={() => handleProductTypeChange("CUSTOM")}
                   className={cn(
-                    "rounded-pill h-11 px-4 text-sm font-semibold",
+                    "rounded-pill h-12 px-4 text-sm font-semibold",
                     productType === "CUSTOM" ? "bg-primary text-white" : "bg-muted text-ink-muted",
                   )}
                 >
@@ -242,12 +247,11 @@ export function NewOrderForm({
               </div>
               {pasarPreset && pasarPricePerKg != null && (
                 <span className="text-ink-muted text-sm">
-                  {MIE_PASAR_LABEL}, harga pasar Rp
-                  {pasarPricePerKg.toLocaleString("id-ID")}/kg (dari Harga Produk).
+                  {MIE_PASAR_LABEL}, harga default Rp{pasarPricePerKg.toLocaleString("id-ID")}/kg.
                 </span>
               )}
               {pasarPricePerKg == null && (
-                <span className="text-ink-muted text-sm">Harga Mi Pasar belum diisi di halaman Harga Produk.</span>
+                <span className="text-ink-muted text-sm">Harga Mi Pasar belum diisi di Manajemen Menu.</span>
               )}
             </div>
 
@@ -293,18 +297,16 @@ export function NewOrderForm({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-ink-muted min-w-0 flex-1 basis-48 text-sm" data-testid="price-source">
                     {unlocked
-                      ? "Harga diubah untuk pesanan ini saja."
+                      ? "Harga diubah untuk pesanan ini saja — harga default dan harga khusus tidak berubah."
                       : priceSource === "pasar"
-                        ? "Harga pasar (dari Harga Produk)."
+                        ? "Harga default Mi Pasar."
                         : priceSource === "khusus"
                           ? `Harga khusus ${customerName}.`
-                          : priceSource === "terakhir"
-                            ? `Harga terakhir ${customerName} (belum ada harga khusus).`
-                            : priceSource === "umum"
-                              ? `Harga umum — ${customerName} belum punya harga khusus.`
-                              : priceSource === "none"
-                                ? "Harga umum belum diisi — ketik harga/kg."
-                                : "Memuat harga…"}
+                          : priceSource === "umum"
+                            ? `Harga default — ${customerName} belum punya harga khusus.`
+                            : priceSource === "none"
+                              ? "Harga default belum diisi — ketik harga/kg."
+                              : "Memuat harga…"}
                   </p>
                   {locked && pricePerKg !== "" && (
                     <Button variant="secondary" size="compact" onClick={() => setUnlocked(true)}>
@@ -312,13 +314,6 @@ export function NewOrderForm({
                     </Button>
                   )}
                 </div>
-                <p className="text-ink-faint text-xs">
-                  Ubah harga di sini hanya berlaku untuk pesanan ini.{" "}
-                  <Link href="/admin/menu" className="underline">
-                    Ubah harga default di Manajemen Menu
-                  </Link>
-                  .
-                </p>
               </>
             )}
 
@@ -373,6 +368,7 @@ export function NewOrderForm({
           </Card>
         </div>
       </div>
+      {leaveDialog}
     </div>
   );
 }

@@ -179,7 +179,7 @@ export function NewFrozenOrderForm({
                   : priceState === "terakhir"
                     ? `Harga pengambilan terakhir ${customers.find((c) => c.id === customerId)?.name ?? ""}.`
                     : priceState === "umum"
-                      ? "Harga default Frozen (dari Harga Produk)."
+                      ? "Harga default Frozen (dari Manajemen Menu)."
                       : priceState === "none"
                       ? "Harga default Frozen belum diisi — ketik harga/pcs."
                       : "Memuat harga…"}

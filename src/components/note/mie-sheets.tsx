@@ -98,8 +98,9 @@ export function EditCustomerSheet({
 // Harga khusus — this customer's own Rp/kg per jenis (26 Sep 2026)
 // ---------------------------------------------------------------------------
 
-// Empty field = no special price for that jenis: the order form then falls
-// back to the customer's last price, then harga umum. Saved as a whole set.
+// Empty field = no special price for that jenis: the order form then uses
+// the jenis's default price. Saved as a whole set. Same data as Manajemen
+// Menu's "Harga Khusus Pelanggan" table (MieCustomerPrice).
 // Only new orders are affected — every recorded order keeps its own price.
 export function SpecialPriceSheet({
   customer,
@@ -142,7 +143,7 @@ export function SpecialPriceSheet({
     >
       <div className="flex flex-col gap-3">
         <p className="text-ink-muted text-sm">
-          Dipakai otomatis di Pesanan Baru untuk pelanggan ini. Kosongkan kalau ikut harga biasa. Pesanan yang sudah
+          Dipakai otomatis di Pesanan Baru untuk pelanggan ini. Kosongkan kalau ikut harga default. Pesanan yang sudah
           tercatat tidak berubah.
         </p>
         {MIE_FIXED_PRODUCT_TYPES.map((t) => {
@@ -158,7 +159,7 @@ export function SpecialPriceSheet({
                     id={`special-price-${t}`}
                     value={prices[t]}
                     onChange={(v) => setPrices((prev) => ({ ...prev, [t]: v > 0 ? v : "" }))}
-                    placeholder={general != null ? general.toLocaleString("id-ID") : "Harga biasa"}
+                    placeholder={general != null ? general.toLocaleString("id-ID") : "Harga default"}
                     className="h-12 text-base"
                   />
                 </div>
@@ -174,7 +175,7 @@ export function SpecialPriceSheet({
                 )}
               </div>
               <span className="text-ink-faint text-xs">
-                {general != null ? `Harga umum Rp${general.toLocaleString("id-ID")}/kg` : "Harga umum belum diisi"}
+                {general != null ? `Harga default Rp${general.toLocaleString("id-ID")}/kg` : "Harga default belum diisi"}
               </span>
             </div>
           );

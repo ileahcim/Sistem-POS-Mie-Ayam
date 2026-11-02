@@ -706,8 +706,8 @@ model MieCustomer {
 }
 
 // "Harga khusus" (26 Sep 2026): a fixed Rp/kg agreed with ONE customer for
-// one jenis — the order form's price autofill uses it before this
-// customer's last price and before the general default (getMieAutofillPrice).
+// one jenis — the order form's price autofill uses it first, else the
+// jenis's default (getMieAutofillPrice; two layers since 2 Nov 2026).
 // It only suggests the price of NEW orders; every ledger row keeps its own
 // pricePerKg snapshot, so setting/changing/removing it never touches an old
 // row. No row = no special price. Fixed jenis only (Keriting/Lurus/Pangsit):
@@ -730,7 +730,7 @@ model MieCustomerPrice {
 model MieProductDefault {
   productType       MieProductType @id
   defaultPricePerKg Int?
-  // Modal per kg bahan baku (Reguler) — owner-set from /note/produk, null =
+  // Modal per kg bahan baku (Reguler) — owner-set from Isi HPP → Mi Mentah, null =
   // "belum diisi". Unlike the sale price (snapshotted per ledger row, and
   // different per customer) this is ONE number per jenis that rarely
   // changes, so it is read live, never snapshotted: Ringkasan's margin for
@@ -742,12 +742,12 @@ model MieProductDefault {
 // Singleton for the Note module's own tunables (kept apart from the POS
 // Setting table — Note is a separate world, see CLAUDE.md). pasarPricePerKg
 // is the "Mie Pasar" shortcut price (Mi Keriting) on the new-order form —
-// market prices change often, so it's owner-editable from /note/produk,
+// market prices change often, so it's owner-editable from Manajemen Menu,
 // never a code constant. Null = shortcut shown as "belum diisi".
 model MieSetting {
   id              String @id @default("singleton")
   pasarPricePerKg Int?
-  // Frozen buku's default Rp/pcs (owner-editable from /note/produk, same
+  // Frozen buku's default Rp/pcs (owner-editable from Manajemen Menu, same
   // page as the mi-mentah defaults) — starting suggestion before a customer
   // has any pickup history of their own (see FrozenLedgerEntry's price
   // autofill rule). Seeded 9000 by migration 20260923..._frozen_buku; never

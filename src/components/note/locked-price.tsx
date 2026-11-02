@@ -1,8 +1,9 @@
 import { cn } from "@/components/ui/cn";
 
 // "Bekukan harga" (26 Sep 2026): the price of a new pesanan/pengambilan that
-// came from a price the owner already set (harga khusus, harga umum, harga
-// pasar, or the customer's last price) is shown LOCKED, not as an input — a
+// came from a price the owner already set (Mi Mentah: harga khusus, harga
+// default, harga Mi Pasar; Frozen: the customer's last price or the default)
+// is shown LOCKED, not as an input — a
 // stray tap can't change it. The form puts an "Ubah harga" button next to
 // the note under it; only that turns this back into the normal input.
 export function LockedPrice({ value, unit }: { value: number | ""; unit: "kg" | "pcs" }) {

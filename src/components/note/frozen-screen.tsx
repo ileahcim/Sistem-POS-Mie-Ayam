@@ -8,6 +8,7 @@ import { buttonClassName } from "@/components/ui/button-styles";
 import { FrozenCustomerList } from "./frozen-customer-list";
 import { NoteNav } from "./note-nav";
 import { NOTE_BOOK } from "@/lib/note/books";
+import { notePriceSettingsHref } from "@/lib/note/settings-links";
 
 function SummaryCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
@@ -66,7 +67,7 @@ export function FrozenScreen({
             <LinkButton href={NOTE_BOOK.frozen.newCustomerHref} variant="secondary" className="border-border border">
               + Pelanggan
             </LinkButton>
-            <LinkButton href="/note/produk?dari=frozen" variant="ghost">
+            <LinkButton href={notePriceSettingsHref("frozen")} variant="ghost">
               Harga Produk
             </LinkButton>
             <a href={NOTE_BOOK.frozen.exportHref} className={buttonClassName("ghost", "default", false)}>

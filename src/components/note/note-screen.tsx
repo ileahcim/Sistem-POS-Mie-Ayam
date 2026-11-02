@@ -8,6 +8,7 @@ import { buttonClassName } from "@/components/ui/button-styles";
 import { CustomerList } from "./customer-list";
 import { NoteNav } from "./note-nav";
 import { NOTE_BOOK } from "@/lib/note/books";
+import { notePriceSettingsHref } from "@/lib/note/settings-links";
 
 function SummaryCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
@@ -67,7 +68,7 @@ export function NoteScreen({
             <LinkButton href={NOTE_BOOK.mie.newCustomerHref} variant="secondary" className="border-border border">
               + Pelanggan
             </LinkButton>
-            <LinkButton href="/note/produk" variant="ghost">
+            <LinkButton href={notePriceSettingsHref("note")} variant="ghost">
               Harga Produk
             </LinkButton>
             <a href={NOTE_BOOK.mie.exportHref} className={buttonClassName("ghost", "default", false)}>
