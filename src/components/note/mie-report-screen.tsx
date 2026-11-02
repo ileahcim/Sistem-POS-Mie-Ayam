@@ -24,13 +24,18 @@ import {
   mieOrderMargin,
   type MieCosts,
 } from "@/lib/mie/types";
-import { formatNotePaymentMethod } from "@/lib/note/payment-method";
+import {
+  formatNotePaymentMethod,
+  NOTE_PAYMENT_METHOD_UNKNOWN_LABEL,
+  type NotePaymentMethod,
+} from "@/lib/note/payment-method";
 import { formatRupiah } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { AppHeader } from "@/components/ui/app-header";
 import { NOTE_BOOK } from "@/lib/note/books";
+import { noteCostSettingsHref } from "@/lib/note/settings-links";
 import { NoteNav } from "./note-nav";
 import { BarChart } from "@/components/dashboard/bar-chart";
 import { cn } from "@/components/ui/cn";
@@ -51,7 +56,8 @@ import { EntrySheet } from "./mie-sheets";
 // has none). A retur sits in those lists too, as a minus row, because the
 // numbers are net of retur (bucket-mie.ts) and each list's Total must equal
 // its card. "returns" is the Retur card: who gave mi back, then the rows.
-type Drill = "omzet" | "payments" | "kg" | "margin" | "returns";
+type Drill = "omzet" | "payments" | "cash" | "qris" | "kg" | "margin" | "returns";
+const METHOD_OF_DRILL: Record<"cash" | "qris", NotePaymentMethod> = { cash: "CASH", qris: "QRIS" };
 
 // "−Rp70.000" / "−5 kg" for a retur row in the omzet/kg/margin lists.
 const minus = (text: string) => `−${text}`;
@@ -147,9 +153,38 @@ export function MieReportScreen({
   // total), so the list's own Total line can never disagree with the card.
   const drillPoints = useMemo(() => {
     if (!drill) return [];
-    const source = drill === "payments" ? view.paymentRows : drill === "returns" ? view.returnRows : view.orderRows;
+    const source =
+      drill === "payments"
+        ? view.paymentRows
+        : drill === "cash" || drill === "qris"
+          ? view.paymentRows.filter((p) => p.paymentMethod === METHOD_OF_DRILL[drill])
+          : drill === "returns"
+            ? view.returnRows
+            : view.orderRows;
     return [...source].sort((a, b) => (a.day === b.day ? b.time.localeCompare(a.time) : b.day.localeCompare(a.day)));
   }, [drill, view]);
+
+  // Total Cash / Total QRIS (2 Nov 2026): the same PAYMENT rows as
+  // "Pembayaran diterima", split by method — Retur and Koreksi Saldo are not
+  // payments and were never in paymentRows. Rows recorded before the method
+  // column existed stay "Tidak dicatat": counted in the total, in neither
+  // card, and said so — never guessed as Cash.
+  const byMethod = useMemo(() => {
+    const t = { CASH: 0, QRIS: 0, unknown: 0, unknownCount: 0 };
+    for (const p of view.paymentRows) {
+      if (p.paymentMethod === "CASH") t.CASH += p.amount;
+      else if (p.paymentMethod === "QRIS") t.QRIS += p.amount;
+      else {
+        t.unknown += p.amount;
+        t.unknownCount += 1;
+      }
+    }
+    return t;
+  }, [view]);
+  const unknownMethodNote =
+    byMethod.unknownCount > 0
+      ? `${byMethod.unknownCount} pembayaran (${formatRupiah(byMethod.unknown)}) metodenya ${NOTE_PAYMENT_METHOD_UNKNOWN_LABEL.toLowerCase()} — masuk Pembayaran diterima, tidak masuk Cash maupun QRIS.`
+      : null;
 
   // Pesanan left out of the margin, per jenis — the owner must see that the
   // Margin number is incomplete and why, never a silently bigger margin.
@@ -218,7 +253,7 @@ export function MieReportScreen({
       time: p.time,
       // Payments show their method here — "Tidak dicatat" for rows recorded
       // before the column existed, never silently blank and never guessed.
-      detail: drill === "payments" ? formatNotePaymentMethod(p.paymentMethod) : perKg,
+      detail: drill === "payments" || drill === "cash" || drill === "qris" ? formatNotePaymentMethod(p.paymentMethod) : perKg,
       note: p.note,
       value: drill === "kg" ? (kgLabel ? (isReturn ? minus(kgLabel) : kgLabel) : "—") : isReturn ? minus(formatRupiah(p.amount)) : formatRupiah(p.amount),
       sub: drill === "kg" ? (isReturn ? minus(formatRupiah(p.amount)) : formatRupiah(p.amount)) : null,
@@ -237,6 +272,18 @@ export function MieReportScreen({
       totalLabel: "Total pembayaran",
       totalValue: formatRupiah(view.payments),
       empty: "Tidak ada pembayaran di rentang ini.",
+    },
+    cash: {
+      heading: "Pembayaran Cash",
+      totalLabel: "Total Cash",
+      totalValue: formatRupiah(byMethod.CASH),
+      empty: "Tidak ada pembayaran Cash di rentang ini.",
+    },
+    qris: {
+      heading: "Pembayaran QRIS",
+      totalLabel: "Total QRIS",
+      totalValue: formatRupiah(byMethod.QRIS),
+      empty: "Tidak ada pembayaran QRIS di rentang ini.",
     },
     margin: {
       heading: "Margin per pesanan",
@@ -309,7 +356,7 @@ export function MieReportScreen({
                 <button
                   type="button"
                   onClick={() => setSelectedKey(null)}
-                  className="rounded-pill border-border text-ink bg-surface h-10 border px-4 text-sm font-semibold"
+                  className="rounded-pill border-border text-ink bg-surface h-12 border px-4 text-sm font-semibold"
                 >
                   Semua ({rangeLabel})
                 </button>
@@ -326,8 +373,21 @@ export function MieReportScreen({
               <DrilldownStat
                 label="Pembayaran diterima"
                 value={formatRupiah(view.payments)}
+                hint={byMethod.unknownCount > 0 ? `${formatRupiah(byMethod.unknown)} metode tidak dicatat` : null}
                 open={drill === "payments"}
                 onToggle={() => setDrill(drill === "payments" ? null : "payments")}
+              />
+              <DrilldownStat
+                label="Total Cash"
+                value={formatRupiah(byMethod.CASH)}
+                open={drill === "cash"}
+                onToggle={() => setDrill(drill === "cash" ? null : "cash")}
+              />
+              <DrilldownStat
+                label="Total QRIS"
+                value={formatRupiah(byMethod.QRIS)}
+                open={drill === "qris"}
+                onToggle={() => setDrill(drill === "qris" ? null : "qris")}
               />
               <DrilldownStat
                 label="Margin"
@@ -367,8 +427,8 @@ export function MieReportScreen({
                 );
               })}
               {noCostJenis.some((k) => k !== "CUSTOM") && (
-                <Link href="/note/produk?dari=ringkasan" className="underline">
-                  Isi modal per kg di Harga Produk
+                <Link href={noteCostSettingsHref("ringkasan")} className="underline">
+                  Isi modal per kg di Isi HPP
                 </Link>
               )}
             </div>
@@ -391,7 +451,7 @@ export function MieReportScreen({
               totalLabel={DRILL_META[drill].totalLabel}
               totalValue={DRILL_META[drill].totalValue}
               emptyText={DRILL_META[drill].empty}
-              footnote="Ketuk nama pelanggan untuk membuka riwayat lengkapnya. Jam yang tampil adalah jam pencatatan. Edit dan hapus di sini sama persis dengan yang ada di halaman pelanggan — saldo berjalan baris sesudahnya ikut berubah, dan baris yang dihapus hilang permanen."
+              footnote={`${(drill === "cash" || drill === "qris" || drill === "payments") && unknownMethodNote ? `${unknownMethodNote} ` : ""}Ketuk nama pelanggan untuk membuka riwayat lengkapnya. Jam yang tampil adalah jam pencatatan. Edit dan hapus di sini sama persis dengan yang ada di halaman pelanggan — saldo berjalan baris sesudahnya ikut berubah, dan baris yang dihapus hilang permanen.`}
               onEdit={(id) => openEntry(id, "edit")}
               onDelete={(id) => openEntry(id, "delete")}
               onClose={() => setDrill(null)}
