@@ -10,7 +10,7 @@ import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
 import { formatAddonWithQty } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PriceText } from "@/components/ui/price-text";
+import { ItemLine } from "@/components/ui/item-line";
 import { QtyStepper } from "@/components/ui/qty-stepper";
 import { CategoryTabs } from "@/components/kasir/category-tabs";
 import { ProductGrid } from "@/components/kasir/product-grid";
@@ -230,15 +230,14 @@ export function AddItemsPanel({
           <div className="divide-border flex flex-col divide-y">
             {sortOrderLines(pendingItems, portionPriceOf).map((item) => (
               <div key={item.localId} className="flex flex-col gap-1 py-2">
-                <div className="flex justify-between gap-2 text-sm">
-                  <span className="text-ink font-medium">
-                    {item.qty}x {item.productName}
-                    {item.addons.length > 0 && (
-                      <span className="text-ink-faint"> ({item.addons.map(formatAddonWithQty).join(", ")})</span>
-                    )}
-                  </span>
-                  <PriceText amount={cartItemLineTotal(item)} weight="secondary" />
-                </div>
+                <ItemLine
+                  size="small"
+                  qty={item.qty}
+                  name={item.productName}
+                  unitPrice={portionPriceOf(item)}
+                  lineTotal={cartItemLineTotal(item)}
+                  detail={[item.addons.map(formatAddonWithQty).join(", "), item.notes].filter(Boolean).join(" · ") || null}
+                />
                 {/* Not saved yet — − at 1 just drops the line (field problem
                     2 Nov 2026: a mis-tapped extra couldn't be taken back). */}
                 <QtyStepper

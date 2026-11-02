@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import { ItemLine } from "@/components/ui/item-line";
 import { AppHeader } from "@/components/ui/app-header";
 import { LinkButton } from "@/components/ui/link-button";
 import { formatId } from "@/lib/timezone";
@@ -186,26 +187,26 @@ export function RiwayatDetail({
           <div className="divide-border flex flex-col divide-y">
             {order.items.map((item) => (
               <div key={item.id} className="flex flex-col gap-0.5 p-3">
-                <div className="flex justify-between gap-3">
-                  <span className="text-base font-semibold text-ink">
-                    {item.qty}x {item.productName}
-                    {/* Owner-visible marker for a manually-typed price (22
-                        Sep 2026) — see CLAUDE.md "+ Item Custom". */}
-                    {item.isCustom && (
+                <ItemLine
+                  qty={item.qty}
+                  name={item.productName}
+                  unitPrice={Math.round(item.lineTotal / item.qty)}
+                  lineTotal={item.lineTotal}
+                  detail={
+                    [groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
+                      .filter(Boolean)
+                      .join(" · ") || null
+                  }
+                  badge={
+                    // Owner-visible marker for a manually-typed price (22 Sep
+                    // 2026) — see CLAUDE.md "+ Item Custom".
+                    item.isCustom && (
                       <span className="ml-2 inline-block align-middle">
                         <Badge variant="warning">Custom</Badge>
                       </span>
-                    )}
-                  </span>
-                  <PriceText amount={item.lineTotal} weight="secondary" />
-                </div>
-                {(item.addons.length > 0 || item.notes) && (
-                  <span className="text-ink-muted text-sm">
-                    {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                )}
+                    )
+                  }
+                />
               </div>
             ))}
           </div>

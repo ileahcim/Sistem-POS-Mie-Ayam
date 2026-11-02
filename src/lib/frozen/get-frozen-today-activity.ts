@@ -35,7 +35,7 @@ export async function getFrozenTodayActivity(): Promise<TodayActivity<FrozenLedg
     kindLabel: e.kind === "ORDER" ? "Pengambilan" : e.kind === "RETURN" ? "Retur" : "Pembayaran",
     detail: frozenEntryHasItems(e.kind)
       ? e.pcs != null
-        ? `${e.pcs.toLocaleString("id-ID")} pcs`
+        ? `${e.pcs.toLocaleString("id-ID")} pcs${e.pricePerPcs != null ? ` × Rp${e.pricePerPcs.toLocaleString("id-ID")}/pcs` : ""}`
         : null
       : formatNotePaymentMethod(e.paymentMethod),
     qty: frozenEntryHasItems(e.kind) ? e.pcs : null,

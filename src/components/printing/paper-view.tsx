@@ -61,22 +61,25 @@ function PaperLine({ line }: { line: LayoutLine }) {
       return <div className="whitespace-pre">{line.text}</div>;
     case "meta":
       return <MetaRow label={line.label} value={line.value} bold={line.bold} />;
-    case "pair":
-      // justify-between lands the value on the right edge, where escpos.ts
-      // pads it to with spaces. Total is bold end to end; a daftar packing
-      // row bolds only the qty — the same two shapes escpos.ts emits.
+    case "cols": {
+      // The same pre-laid-out row the printer gets, spaces kept, so the
+      // price columns line up here exactly as on paper. "[ ] " of a daftar
+      // packing row is drawn as a box, still four columns wide.
+      const value = line.checkbox ? ` □ ${line.text.slice(3)}` : line.text;
+      const tail = line.boldTail ? value.slice(value.length - line.boldTail) : "";
       return (
-        <div className={cn("flex justify-between gap-[1ch]", line.role === "total" && "font-bold")}>
-          <span className="whitespace-pre">
-            {line.checkbox ? "□ " : ""}
-            {line.left}
-          </span>
-          <span className={cn(line.role === "qty" && "font-bold")}>{line.right}</span>
+        <div className={cn("whitespace-pre", line.bold && "font-bold")}>
+          {tail ? (
+            <>
+              {value.slice(0, value.length - tail.length)}
+              <span className="font-bold">{tail}</span>
+            </>
+          ) : (
+            value
+          )}
         </div>
       );
-    case "sub":
-      // One leading space on paper, so one column of indent here.
-      return <div className={cn("pl-[1ch]", line.bold && "font-bold")}>{line.text}</div>;
+    }
   }
 }
 

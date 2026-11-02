@@ -37,7 +37,9 @@ export async function getMieTodayActivity(): Promise<TodayActivity<MieLedgerEntr
       kind: e.kind as "ORDER" | "PAYMENT" | "RETURN",
       kindLabel: e.kind === "ORDER" ? "Pesanan" : e.kind === "RETURN" ? "Retur" : "Pembayaran",
       detail: mieEntryHasItems(e.kind)
-        ? `${formatMieJenisLabel({ ...e, productType })}${e.kg != null ? ` · ${e.kg.toLocaleString("id-ID")} kg` : ""}`
+        ? `${formatMieJenisLabel({ ...e, productType })}${e.kg != null ? ` · ${e.kg.toLocaleString("id-ID")} kg` : ""}${
+            e.pricePerKg != null ? ` × Rp${e.pricePerKg.toLocaleString("id-ID")}/kg` : ""
+          }`
         : formatNotePaymentMethod(e.paymentMethod),
       qty: mieEntryHasItems(e.kind) ? e.kg : null,
       amount: e.amount,

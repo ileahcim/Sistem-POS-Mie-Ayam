@@ -8,7 +8,7 @@ import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { addItemsToOrder, removeOrderItem } from "@/app/order-aktif/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PriceText } from "@/components/ui/price-text";
+import { ItemLine } from "@/components/ui/item-line";
 import { QtyStepper } from "@/components/ui/qty-stepper";
 
 // One more portion of exactly this line: same product, add-ons and note (a
@@ -93,24 +93,23 @@ export function SavedOrderItemRow({
 
   return (
     <div className="flex flex-col gap-0.5 p-3">
-      <div className="flex justify-between gap-3">
-        <span className="text-base font-semibold text-ink">
-          {item.qty}x {item.productName}
-          {item.isCustom && (
+      <ItemLine
+        qty={item.qty}
+        name={item.productName}
+        unitPrice={Math.round(item.lineTotal / item.qty)}
+        lineTotal={item.lineTotal}
+        detail={
+          [groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes].filter(Boolean).join(" · ") ||
+          null
+        }
+        badge={
+          item.isCustom && (
             <span className="ml-2 inline-block align-middle">
               <Badge variant="warning">Custom</Badge>
             </span>
-          )}
-        </span>
-        <PriceText amount={item.lineTotal} weight="secondary" />
-      </div>
-      {(item.addons.length > 0 || item.notes) && (
-        <span className="text-ink-muted text-sm">
-          {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
-      )}
+          )
+        }
+      />
 
       {editable && !confirming && (
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">

@@ -8,6 +8,7 @@ import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { sortOrderLines, portionPriceOf } from "@/lib/orders/line-order";
 import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { ListRow } from "@/components/ui/list-row";
+import { ItemLine } from "@/components/ui/item-line";
 import { LinkButton } from "@/components/ui/link-button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/components/ui/cn";
@@ -52,19 +53,18 @@ function ExpandedItems({ orderId, items }: { orderId: string; items: ActiveOrder
     <div className="bg-canvas px-4 pb-3">
       <div className="border-border flex flex-col gap-2 border-t pt-2">
         {items.map((item) => (
-          <div key={item.id} className="text-sm">
-            <span className="text-ink font-medium">
-              {item.qty > 1 ? `${item.qty}x ` : ""}
-              {item.productName}
-            </span>
-            {(item.addons.length > 0 || item.notes) && (
-              <p className="text-ink-muted text-xs">
-                {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            )}
-          </div>
+          <ItemLine
+            key={item.id}
+            size="small"
+            qty={item.qty}
+            name={item.productName}
+            unitPrice={portionPriceOf(item)}
+            lineTotal={portionPriceOf(item) * item.qty}
+            detail={
+              [groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes].filter(Boolean).join(" · ") ||
+              null
+            }
+          />
         ))}
         <LinkButton href={`/order-aktif/${orderId}`} variant="secondary" size="large" fullWidth className="mt-1">
           Buka Detail (Bayar / Edit)

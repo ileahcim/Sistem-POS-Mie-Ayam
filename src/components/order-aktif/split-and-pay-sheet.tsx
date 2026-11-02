@@ -10,7 +10,7 @@ import { HoverTint, ITEM_TAP, sheetItemMotion, useSheetMotionPrefs } from "@/com
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
 import { cn } from "@/components/ui/cn";
-import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
+import { groupAddonsForPrint, formatAddonWithQty, formatRupiah } from "@/lib/printing/format";
 
 type Side = "stay" | "split";
 
@@ -20,8 +20,17 @@ function unitTotalOf(item: OrderDetailItem): number {
   return item.lineTotal / item.qty;
 }
 
+// Harga satuan first (2 Nov 2026 — every item list shows it), then add-ons
+// and note. The two panels sit side by side, too narrow for a third column,
+// so it's always the phone-style "@Rp18.000 · Bakso" line here.
 function detailLine(item: OrderDetailItem): string {
-  return [groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes].filter(Boolean).join(" · ");
+  return [
+    `@${formatRupiah(unitTotalOf(item))}`,
+    groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "),
+    item.notes,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 const MOVE = { duration: 0.18, ease: "easeOut" } as const;

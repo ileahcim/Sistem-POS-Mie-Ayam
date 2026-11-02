@@ -297,7 +297,7 @@ function TransactionRow<E>({
         <span className="flex min-w-0 items-center gap-1.5">
           <Badge variant={r.kind === "PAYMENT" ? "success" : r.kind === "RETURN" ? "warning" : "info"}>{r.kindLabel}</Badge>
         </span>
-        {r.detail && <span className="text-ink-muted truncate text-xs">{r.detail}</span>}
+        {r.detail && <span className="text-ink-muted text-xs">{r.detail}</span>}
       </span>
       <span className="ml-auto flex items-center gap-2">
         <span className="text-ink text-base font-semibold tabular-nums">{formatRupiah(r.amount)}</span>

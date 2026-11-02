@@ -1,6 +1,7 @@
 import type { CartItem } from "@/lib/cart/types";
 import { cartItemLineTotal } from "@/lib/cart/types";
-import { PriceText } from "@/components/ui/price-text";
+import { ItemLine } from "@/components/ui/item-line";
+import { portionPriceOf } from "@/lib/orders/line-order";
 import { Button } from "@/components/ui/button";
 import { QtyStepper } from "@/components/ui/qty-stepper";
 import { formatAddonWithQty } from "@/lib/printing/format";
@@ -22,18 +23,13 @@ export function CartItemRow({
 
   return (
     <div className="flex flex-col gap-0.5 border-b border-border py-2 last:border-b-0">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-base font-semibold text-ink">
-          {item.qty}x {item.productName}
-        </span>
-        <PriceText amount={cartItemLineTotal(item)} weight="secondary" />
-      </div>
-
-      {hasDetail && (
-        <span className="text-sm text-ink-muted">
-          {[item.addons.map(formatAddonWithQty).join(", "), item.notes].filter(Boolean).join(" · ")}
-        </span>
-      )}
+      <ItemLine
+        qty={item.qty}
+        name={item.productName}
+        unitPrice={portionPriceOf(item)}
+        lineTotal={cartItemLineTotal(item)}
+        detail={hasDetail ? [item.addons.map(formatAddonWithQty).join(", "), item.notes].filter(Boolean).join(" · ") : null}
+      />
 
       <div className="mt-1 flex items-center justify-between gap-2">
         <QtyStepper

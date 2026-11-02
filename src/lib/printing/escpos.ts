@@ -165,15 +165,6 @@ function totalRow(label: string, value: string): Uint8Array[] {
   return [BOLD_ON, line(rightLine(label, value)), BOLD_OFF];
 }
 
-// A daftar packing row: only the qty on the right is bold, so it pops out of
-// the checklist without shouting the product name too. The value is always
-// the tail of the rendered row, so bolding the last value.length characters
-// works whether or not rightLine had to break the row in two.
-function boldTailRow(label: string, value: string): Uint8Array[] {
-  const rendered = rightLine(label, value);
-  return [text(rendered.slice(0, rendered.length - value.length)), BOLD_ON, text(value), BOLD_OFF, text("\n")];
-}
-
 function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined): Uint8Array[] {
   const parts: Uint8Array[] = [];
   let centered = false;
@@ -208,16 +199,16 @@ function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined):
         if (item.bold) parts.push(BOLD_ON, line(metaLine(item.label, item.value)), BOLD_OFF);
         else parts.push(line(metaLine(item.label, item.value)));
         break;
-      case "pair":
+      case "cols":
+        // Already laid out to the paper width by receipt-layout.ts — printed
+        // verbatim. Bold is the whole row, or only its last boldTail chars
+        // (the daftar packing qty).
         align(false);
-        if (item.role === "total") parts.push(...totalRow(item.left, item.right));
-        else if (item.role === "qty") parts.push(...boldTailRow(`[ ] ${item.left}`, item.right));
-        else parts.push(line(rightLine(item.checkbox ? `[ ] ${item.left}` : item.left, item.right)));
-        break;
-      case "sub":
-        align(false);
-        if (item.bold) parts.push(BOLD_ON, line(` ${item.text}`), BOLD_OFF);
-        else parts.push(line(` ${item.text}`));
+        if (item.bold) parts.push(BOLD_ON, line(item.text), BOLD_OFF);
+        else if (item.boldTail) {
+          const head = item.text.slice(0, item.text.length - item.boldTail);
+          parts.push(text(head), BOLD_ON, text(item.text.slice(head.length)), BOLD_OFF, text("\n"));
+        } else parts.push(line(item.text));
         break;
     }
   }

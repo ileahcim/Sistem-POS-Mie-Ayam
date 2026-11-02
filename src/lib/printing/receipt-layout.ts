@@ -12,7 +12,7 @@
 // Pure data + formatting: no React, no ESC/POS, safe to import anywhere.
 
 import type { DepositReceiptData, FrozenReceiptData, KitchenTicketData, PackingListData, ReceiptData, ReceiptPaymentMethod } from "./types";
-import { formatRupiah, mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
+import { mergeReceiptItems, totalItemCount, groupAddonsForPrint, formatAddonWithQty } from "./format";
 import { centeredRule, paperRule, wrapHeading, wrapWords, RECEIPT_CHARS_PER_LINE } from "./paper";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
@@ -30,7 +30,6 @@ export const RECEIPT_LOGO_SRC = "/assets/logo-ctr-thermal.png";
 export const RECEIPT_LOGO_WIDTH_DOTS = 224;
 
 export type TextRole = "title" | "heading" | "small" | "body" | "note";
-export type PairRole = "item" | "plain" | "total" | "qty";
 
 export type LayoutLine =
   // Logo image, or nothing at all when the device could not rasterise it.
@@ -44,12 +43,17 @@ export type LayoutLine =
   // meta block (antrian/tipe/nama/jam) must stand out so the kitchen can
   // match the slip to the right table — every other caller leaves it unset.
   | { kind: "meta"; label: string; value: string; bold?: boolean }
-  // Name on the left, price/qty glued to the right edge.
-  | { kind: "pair"; role: PairRole; left: string; right: string; checkbox?: boolean }
-  // Indented line under an item: add-ons or a note. bold is only ever set by
-  // the kitchen ticket's note line ("catatan dibuat menonjol") — a struk/DP
-  // note stays plain, unaffected by this flag.
-  | { kind: "sub"; text: string; role: "addon" | "note"; bold?: boolean };
+  // A row already laid out in columns, never wider than the paper: an item
+  // ("5x Mie Ayam Bakso   Rp 18.000   Rp 90.000"), its wrapped name/add-on
+  // lines, a money row ("Total            Rp125.000"), a daftar packing row.
+  // Both renderers print `text` verbatim, spaces included, so every column
+  // lines up the same on paper and on screen (2 Nov 2026 — before, each
+  // price was glued to the right edge on its own, so "Rp" wandered from row
+  // to row and a long name wrapped mid-word wherever the printer broke it).
+  //   bold      whole row bold (Total, kitchen note)
+  //   boldTail  only the last N characters bold (daftar packing qty)
+  //   checkbox  the row starts with "[ ] " — the preview draws a box there
+  | { kind: "cols"; text: string; bold?: boolean; boldTail?: number; checkbox?: boolean };
 
 const CHANNEL_LABEL: Record<ReceiptData["channel"], string> = {
   DINE_IN: "Dine In",
@@ -85,13 +89,114 @@ const text = (value: string, align: "left" | "center", role: TextRole): LayoutLi
 });
 const meta = (label: string, value: string, bold = false): LayoutLine => ({ kind: "meta", label, value, bold });
 const rule = (char: "=" | "-"): LayoutLine => ({ kind: "rule", text: paperRule(char) });
-const pair = (role: PairRole, left: string, right: string, checkbox = false): LayoutLine => ({
-  kind: "pair",
-  role,
-  left,
-  right,
-  checkbox,
-});
+const cols = (value: string, bold = false): LayoutLine => ({ kind: "cols", text: value, bold });
+
+// ---------------------------------------------------------------------------
+// Price columns. Every amount on one printout is drawn the same width:
+// "Rp" first, then the number right-aligned in as many characters as the
+// biggest number on that printout needs —
+//   Rp 18.000
+//   Rp  5.000
+//   Rp125.000
+// so "Rp" sits in one straight column and the digits line up on the right,
+// down the item rows AND the Subtotal/Ongkir/Total/Bayar rows below them.
+// ---------------------------------------------------------------------------
+
+// Spaces between the harga satuan column and the line-total column.
+const PRICE_COLUMN_GAP = 2;
+
+type MoneyColumns = { width: number; money: (amount: number) => string };
+
+function digitsOf(amount: number): string {
+  const digits = Math.abs(amount).toLocaleString("id-ID");
+  return amount < 0 ? `-${digits}` : digits;
+}
+
+// `amounts` = every number this printout may show (a superset is fine — it
+// only ever makes the column as wide as the biggest one).
+function moneyColumns(amounts: number[]): MoneyColumns {
+  const digits = Math.max(1, ...amounts.map((a) => digitsOf(a).length));
+  return { width: 2 + digits, money: (amount) => `Rp${digitsOf(amount).padStart(digits)}` };
+}
+
+// "Subtotal ......... Rp 95.000": label on the left, the amount in the
+// line-total column. A label too long for the space (never in practice, but
+// it is built from data) wraps per word below, the amount stays on row one.
+function moneyRow(label: string, amount: number, money: MoneyColumns, bold = false): LayoutLine[] {
+  const labelColumns = RECEIPT_CHARS_PER_LINE - money.width;
+  const [first = "", ...rest] = wrapWords(label, labelColumns - 1);
+  return [cols(first.padEnd(labelColumns) + money.money(amount), bold), ...rest.map((chunk) => cols(chunk, bold))];
+}
+
+type PricedRow = {
+  prefix: string; // "5x" — padded so every name starts in the same column
+  name: string;
+  unitPrice: number; // harga satuan: one portion, add-ons included
+  total: number;
+  subs: string[]; // add-ons, a quoted note — under the name, never priced
+};
+
+// "5x Mie Ayam Bakso     Rp 18.000   Rp 90.000" — qty, name, harga satuan,
+// total, all on the FIRST row. A name too long for its column is wrapped per
+// word (never mid-word) and continues on the rows below, indented to line up
+// with the name; add-ons and notes follow at the same indent.
+function pricedRows(rows: PricedRow[], money: MoneyColumns): LayoutLine[] {
+  const prefixWidth = Math.max(0, ...rows.map((r) => (r.prefix ? r.prefix.length + 1 : 0)));
+  const nameWidth = RECEIPT_CHARS_PER_LINE - 2 * money.width - PRICE_COLUMN_GAP - 1 - prefixWidth;
+  const indent = " ".repeat(prefixWidth);
+  const lines: LayoutLine[] = [];
+  for (const row of rows) {
+    const [first = "", ...rest] = wrapWords(row.name, nameWidth);
+    lines.push(
+      cols(
+        `${row.prefix.padEnd(prefixWidth)}${first.padEnd(nameWidth)} ${money.money(row.unitPrice)}${" ".repeat(PRICE_COLUMN_GAP)}${money.money(row.total)}`,
+      ),
+    );
+    for (const chunk of rest) lines.push(cols(indent + chunk));
+    for (const sub of row.subs) {
+      for (const chunk of wrapWords(sub, RECEIPT_CHARS_PER_LINE - prefixWidth)) lines.push(cols(indent + chunk));
+    }
+  }
+  return lines;
+}
+
+// Unpriced item rows (kertas dapur): same per-word wrap and indent as above.
+function plainItemRows(
+  rows: { prefix: string; name: string; subs: { text: string; bold?: boolean }[] }[],
+): LayoutLine[] {
+  const prefixWidth = Math.max(0, ...rows.map((r) => r.prefix.length + 1));
+  const indent = " ".repeat(prefixWidth);
+  const lines: LayoutLine[] = [];
+  for (const row of rows) {
+    const [first = "", ...rest] = wrapWords(row.name, RECEIPT_CHARS_PER_LINE - prefixWidth);
+    lines.push(cols(row.prefix.padEnd(prefixWidth) + first));
+    for (const chunk of rest) lines.push(cols(indent + chunk));
+    for (const sub of row.subs) {
+      for (const chunk of wrapWords(sub.text, RECEIPT_CHARS_PER_LINE - prefixWidth)) {
+        lines.push(cols(indent + chunk, sub.bold ?? false));
+      }
+    }
+  }
+  return lines;
+}
+
+// One portion's price of a (merged) receipt line, add-ons included.
+function unitPriceOf(item: { qty: number; lineTotal: number }): number {
+  return item.qty > 0 ? Math.round(item.lineTotal / item.qty) : item.lineTotal;
+}
+
+function receiptPricedRows(items: ReceiptData["items"]): PricedRow[] {
+  return items.map((item) => ({
+    prefix: `${item.qty}x`,
+    name: item.productName,
+    unitPrice: unitPriceOf(item),
+    total: item.lineTotal,
+    subs: [
+      ...(item.addons.length > 0 ? [groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", ")] : []),
+      ...(item.notes ? [`"${item.notes}"`] : []),
+    ],
+  }));
+}
 
 // Logo block + store identity, shared by struk and daftar packing. Store name,
 // address and phone come from Setting (never hardcoded here). `heading` is the
@@ -135,6 +240,21 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
     data.channel === "DINE_IN" && data.tableLabel
       ? `${CHANNEL_LABEL[data.channel]} - ${data.tableLabel}`
       : CHANNEL_LABEL[data.channel];
+  const deposits = data.deposits ?? [];
+  const position = depositPosition(data.total, deposits.map((d) => d.amount));
+  const money = moneyColumns([
+    ...items.flatMap((i) => [unitPriceOf(i), i.lineTotal]),
+    data.subtotal,
+    data.deliveryFee,
+    data.total,
+    data.splitCashAmount ?? 0,
+    data.splitQrisAmount ?? 0,
+    data.cashTendered ?? 0,
+    data.changeGiven ?? 0,
+    ...deposits.map((d) => d.amount),
+    position.excess,
+    position.remainder,
+  ]);
 
   // No queue number on a struk: the order is paid, the queue only matters
   // before payment (it is on the daftar packing).
@@ -150,87 +270,79 @@ export function buildReceiptLayout(data: ReceiptData): LayoutLine[] {
     meta("Kasir", data.kasirName),
     meta("Tipe", tipe),
     rule("="),
+    ...pricedRows(receiptPricedRows(items), money),
+    rule("="),
+    text(`${totalItemCount(items)} item`, "left", "body"),
+    ...moneyRow("Subtotal", data.subtotal, money),
   ];
-
-  for (const item of items) {
-    lines.push(pair("item", `${item.qty}x ${item.productName}`, formatRupiah(item.lineTotal)));
-    if (item.addons.length > 0) {
-      lines.push({ kind: "sub", role: "addon", text: groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", ") });
-    }
-    if (item.notes) lines.push({ kind: "sub", role: "note", text: `"${item.notes}"` });
-  }
-
-  lines.push(rule("="), text(`${totalItemCount(items)} item`, "left", "body"), pair("plain", "Subtotal", formatRupiah(data.subtotal)));
-  if (data.deliveryFee > 0) lines.push(rule("-"), pair("plain", "Ongkir", formatRupiah(data.deliveryFee)));
-  lines.push(rule("-"), pair("total", "Total", formatRupiah(data.total)), rule("-"));
-  const deposits = data.deposits ?? [];
+  if (data.deliveryFee > 0) lines.push(rule("-"), ...moneyRow("Ongkir", data.deliveryFee, money));
+  lines.push(rule("-"), ...moneyRow("Total", data.total, money, true), rule("-"));
   if (data.paymentMethod === null) {
     // Piutang: nothing was collected. Bold, right where "Bayar (...)" would
     // be, so the paper can't be read as settled.
-    lines.push(pair("total", "Belum dibayar", formatRupiah(data.total)));
+    lines.push(...moneyRow("Belum dibayar", data.total, money, true));
   } else if (deposits.length === 0) {
     if (data.paymentMethod === "SPLIT") {
-      // Split payment (CLAUDE.md-worthy brief, 22 Sep 2026): two lines, one
-      // per method actually collected — never the single "Bayar (...)" line.
+      // Split payment (22 Sep 2026): two lines, one per method actually
+      // collected — never the single "Bayar (...)" line.
       lines.push(
-        pair("plain", "Bayar (Cash)", formatRupiah(data.splitCashAmount ?? 0)),
-        pair("plain", "Bayar (QRIS)", formatRupiah(data.splitQrisAmount ?? 0)),
+        ...moneyRow("Bayar (Cash)", data.splitCashAmount ?? 0, money),
+        ...moneyRow("Bayar (QRIS)", data.splitQrisAmount ?? 0, money),
       );
     } else if (data.cashTendered != null) {
       // "Hitung kembalian" (26 Sep 2026): what was handed over and what went
       // back, in place of "Bayar (Cash)".
-      lines.push(...tenderedLines(data.cashTendered, data.changeGiven));
+      lines.push(...tenderedLines(data.cashTendered, data.changeGiven, money));
     } else {
-      // An ordinary order: byte for byte what it printed before DP existed.
-      lines.push(pair("plain", `Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, formatRupiah(data.total)));
+      lines.push(...moneyRow(`Bayar (${PAYMENT_LABEL[data.paymentMethod]})`, data.total, money));
     }
   } else {
-    lines.push(...depositLines(deposits, data.total, data.paymentMethod, data.splitCashAmount, data.splitQrisAmount));
-    if (data.cashTendered != null) lines.push(...tenderedLines(data.cashTendered, data.changeGiven));
+    lines.push(...depositLines(deposits, position, data.paymentMethod, data.splitCashAmount, data.splitQrisAmount, money));
+    if (data.cashTendered != null) lines.push(...tenderedLines(data.cashTendered, data.changeGiven, money));
   }
   lines.push(rule("="), { kind: "rule", text: centeredRule(data.footerNote ?? "Terima kasih!") });
   return lines;
 }
 
-// The DP block of a struk lunas: each DP with the day and method it was paid,
-// then what was actually collected now — or, when the order shrank below the DP,
-// what has to go back to the customer. Never a silent Rp0.
 // "Tunai" / "Kembali" of a cash payment taken with "Hitung kembalian" — the
 // struk, the sisa after DP, and the Bukti Uang Muka all print the same pair.
-function tenderedLines(cashTendered: number, changeGiven: number | null | undefined): LayoutLine[] {
-  return [pair("plain", "Tunai", formatRupiah(cashTendered)), pair("plain", "Kembali", formatRupiah(changeGiven ?? 0))];
+function tenderedLines(cashTendered: number, changeGiven: number | null | undefined, money: MoneyColumns): LayoutLine[] {
+  return [...moneyRow("Tunai", cashTendered, money), ...moneyRow("Kembali", changeGiven ?? 0, money)];
 }
 
 // Heading of a piutang's struk (see ReceiptData.paymentMethod).
 export const RECEIPT_UNPAID_HEADING = "BELUM LUNAS";
 
+// The DP block of a struk lunas: each DP with the day and method it was paid,
+// then what was actually collected now — or, when the order shrank below the DP,
+// what has to go back to the customer. Never a silent Rp0.
 function depositLines(
   deposits: NonNullable<ReceiptData["deposits"]>,
-  total: number,
+  position: ReturnType<typeof depositPosition>,
   paymentMethod: ReceiptPaymentMethod,
   splitCashAmount: number | null | undefined,
   splitQrisAmount: number | null | undefined,
+  money: MoneyColumns,
 ): LayoutLine[] {
-  const position = depositPosition(total, deposits.map((d) => d.amount));
-  const lines: LayoutLine[] = deposits.map((d) =>
-    pair("plain", `DP ${formatTanggalPendek(d.receivedAt)}, ${PAYMENT_LABEL[d.method]}`, formatRupiah(d.amount)),
+  const lines: LayoutLine[] = deposits.flatMap((d) =>
+    moneyRow(`DP ${formatTanggalPendek(d.receivedAt)}, ${PAYMENT_LABEL[d.method]}`, d.amount, money),
   );
   lines.push(rule("-"));
   if (position.excess > 0) {
-    lines.push(pair("plain", "Kembalikan", formatRupiah(position.excess)));
+    lines.push(...moneyRow("Kembalikan", position.excess, money));
   } else if (position.remainder > 0) {
     if (paymentMethod === "SPLIT") {
       // Split applies to the SISA only — the DP lines above are untouched.
       lines.push(
-        pair("plain", "Bayar (Cash)", formatRupiah(splitCashAmount ?? 0)),
-        pair("plain", "Bayar (QRIS)", formatRupiah(splitQrisAmount ?? 0)),
+        ...moneyRow("Bayar (Cash)", splitCashAmount ?? 0, money),
+        ...moneyRow("Bayar (QRIS)", splitQrisAmount ?? 0, money),
       );
     } else {
-      lines.push(pair("plain", `Sisa dibayar (${PAYMENT_LABEL[paymentMethod]})`, formatRupiah(position.remainder)));
+      lines.push(...moneyRow(`Sisa dibayar (${PAYMENT_LABEL[paymentMethod]})`, position.remainder, money));
     }
   } else {
     // Fully covered by DP: nothing was collected, so no method to name.
-    lines.push(pair("plain", "Sisa dibayar", formatRupiah(0)));
+    lines.push(...moneyRow("Sisa dibayar", 0, money));
   }
   return lines;
 }
@@ -256,6 +368,18 @@ export function buildDepositReceiptLayout(data: DepositReceiptData): LayoutLine[
       ? `${CHANNEL_LABEL[data.channel]} - ${data.tableLabel}`
       : CHANNEL_LABEL[data.channel];
   const position = depositPosition(data.total, data.deposits.map((d) => d.amount));
+  const money = moneyColumns([
+    ...items.flatMap((i) => [unitPriceOf(i), i.lineTotal]),
+    data.subtotal,
+    data.deliveryFee,
+    data.total,
+    ...data.deposits.map((d) => d.amount),
+    data.cashTendered ?? 0,
+    data.changeGiven ?? 0,
+    position.held,
+    position.excess,
+    position.remainder,
+  ]);
 
   const lines: LayoutLine[] = [
     ...headerLines(data, "BUKTI UANG MUKA"),
@@ -267,42 +391,37 @@ export function buildDepositReceiptLayout(data: DepositReceiptData): LayoutLine[
     meta("Tipe", tipe),
     meta("Kirim", `${formatTanggal(data.scheduledFor)}, ${formatJam(data.scheduledFor)}`),
     rule("="),
+    ...pricedRows(receiptPricedRows(items), money),
+    rule("="),
+    text(`${totalItemCount(items)} item`, "left", "body"),
+    ...moneyRow("Subtotal", data.subtotal, money),
   ];
-
-  for (const item of items) {
-    lines.push(pair("item", `${item.qty}x ${item.productName}`, formatRupiah(item.lineTotal)));
-    if (item.addons.length > 0) {
-      lines.push({ kind: "sub", role: "addon", text: groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", ") });
-    }
-    if (item.notes) lines.push({ kind: "sub", role: "note", text: `"${item.notes}"` });
-  }
-
-  lines.push(rule("="), text(`${totalItemCount(items)} item`, "left", "body"), pair("plain", "Subtotal", formatRupiah(data.subtotal)));
-  if (data.deliveryFee > 0) lines.push(rule("-"), pair("plain", "Ongkir", formatRupiah(data.deliveryFee)));
-  lines.push(rule("-"), pair("total", "Total", formatRupiah(data.total)), rule("-"));
+  if (data.deliveryFee > 0) lines.push(rule("-"), ...moneyRow("Ongkir", data.deliveryFee, money));
+  lines.push(rule("-"), ...moneyRow("Total", data.total, money, true), rule("-"));
 
   for (const d of data.deposits) {
-    lines.push(pair("plain", `DP ${formatTanggalPendek(d.receivedAt)}, ${PAYMENT_LABEL[d.method]}`, formatRupiah(d.amount)));
+    lines.push(...moneyRow(`DP ${formatTanggalPendek(d.receivedAt)}, ${PAYMENT_LABEL[d.method]}`, d.amount, money));
   }
   // This proof's own DP is the last row above; its Tunai/Kembali sit under it.
-  if (data.cashTendered != null) lines.push(...tenderedLines(data.cashTendered, data.changeGiven));
-  if (data.deposits.length > 1) lines.push(rule("-"), pair("plain", "Total DP", formatRupiah(position.held)));
+  if (data.cashTendered != null) lines.push(...tenderedLines(data.cashTendered, data.changeGiven, money));
+  if (data.deposits.length > 1) lines.push(rule("-"), ...moneyRow("Total DP", position.held, money));
   lines.push(rule("-"));
-  if (position.excess > 0) lines.push(pair("total", "Dikembalikan saat diambil", formatRupiah(position.excess)));
-  else lines.push(pair("total", "Sisa dibayar saat diambil", formatRupiah(position.remainder)));
+  if (position.excess > 0) lines.push(...moneyRow("Dikembalikan saat diambil", position.excess, money, true));
+  else lines.push(...moneyRow("Sisa dibayar saat diambil", position.remainder, money, true));
 
   lines.push(rule("="), { kind: "rule", text: centeredRule(data.footerNote ?? "Terima kasih!") });
   return lines;
 }
 
 // "BUKTI PENGAMBILAN/PEMBAYARAN FROZEN" — the Buku Frozen's own small proof-
-// of-transaction receipt (CLAUDE.md-worthy brief, 22 Sep 2026). Store header
-// from Setting like a normal struk, but no queue number/order number at all
-// (this isn't a POS order) — just who, when, what happened this time, and
-// the balance after it, with an explicit bold "Belum dibayar"/"Sisa" line so
-// it's never mistaken for a closed-out debt.
+// of-transaction receipt (22 Sep 2026). Store header from Setting like a
+// normal struk, but no queue number/order number at all (this isn't a POS
+// order) — just who, when, what happened this time, and the balance after
+// it, with an explicit bold "Belum dibayar"/"Sisa" line so it's never
+// mistaken for a closed-out debt.
 export function buildFrozenReceiptLayout(data: FrozenReceiptData): LayoutLine[] {
   const title = data.kind === "PENGAMBILAN" ? "BUKTI PENGAMBILAN FROZEN" : "BUKTI PEMBAYARAN FROZEN";
+  const money = moneyColumns([data.pricePerPcs ?? 0, data.pickupTotal ?? 0, data.amountPaid ?? 0, data.debtAfter]);
   const lines: LayoutLine[] = [
     ...headerLines(data, title),
     ...metaWrapped("Pelanggan", data.customerName),
@@ -313,18 +432,21 @@ export function buildFrozenReceiptLayout(data: FrozenReceiptData): LayoutLine[] 
 
   if (data.kind === "PENGAMBILAN") {
     lines.push(
-      pair("item", `${data.pcs ?? 0} pcs`, formatRupiah(data.pickupTotal ?? 0)),
-      { kind: "sub", role: "addon", text: `${formatRupiah(data.pricePerPcs ?? 0)}/pcs` },
+      // Harga/pcs in the harga satuan column, like a struk item row.
+      ...pricedRows(
+        [{ prefix: "", name: `${data.pcs ?? 0} pcs`, unitPrice: data.pricePerPcs ?? 0, total: data.pickupTotal ?? 0, subs: [] }],
+        money,
+      ),
       rule("-"),
-      pair("total", "Total", formatRupiah(data.pickupTotal ?? 0)),
+      ...moneyRow("Total", data.pickupTotal ?? 0, money, true),
       rule("-"),
-      pair("total", "Belum dibayar", formatRupiah(data.debtAfter)),
+      ...moneyRow("Belum dibayar", data.debtAfter, money, true),
     );
   } else {
     lines.push(
-      pair("plain", "Dibayar", formatRupiah(data.amountPaid ?? 0)),
+      ...moneyRow("Dibayar", data.amountPaid ?? 0, money),
       rule("-"),
-      pair("total", "Sisa", formatRupiah(data.debtAfter)),
+      ...moneyRow("Sisa", data.debtAfter, money, true),
     );
   }
 
@@ -332,7 +454,9 @@ export function buildFrozenReceiptLayout(data: FrozenReceiptData): LayoutLine[] 
   return lines;
 }
 
-// Antar-only checklist printed BEFORE payment: no prices, no total.
+// Antar-only checklist printed BEFORE payment: no prices, no total (owner,
+// confirmed again 2 Nov 2026). "[ ] Mie Ayam ... x5" with the qty bold on the
+// right edge; a long name wraps per word and continues under itself.
 export function buildPackingListLayout(data: PackingListData): LayoutLine[] {
   const lines: LayoutLine[] = [
     ...headerLines(data, "DAFTAR PACKING"),
@@ -344,10 +468,24 @@ export function buildPackingListLayout(data: PackingListData): LayoutLine[] {
     rule("="),
   ];
 
-  for (const item of sortOrderLines(data.items, (i) => i.portionPrice ?? 0)) {
-    lines.push(pair("qty", item.productName, `x${item.qty}`, true));
-    if (item.addons.length > 0) lines.push({ kind: "sub", role: "addon", text: item.addons.join(", ") });
-    if (item.notes) lines.push({ kind: "sub", role: "note", text: `"${item.notes}"` });
+  const items = sortOrderLines(data.items, (i) => i.portionPrice ?? 0);
+  const box = "[ ] ";
+  const indent = " ".repeat(box.length);
+  const qtyWidth = Math.max(0, ...items.map((i) => `x${i.qty}`.length));
+  const nameWidth = RECEIPT_CHARS_PER_LINE - box.length - 1 - qtyWidth;
+  for (const item of items) {
+    const [first = "", ...rest] = wrapWords(item.productName, nameWidth);
+    lines.push({
+      kind: "cols",
+      text: `${box}${first.padEnd(nameWidth)} ${`x${item.qty}`.padStart(qtyWidth)}`,
+      boldTail: qtyWidth,
+      checkbox: true,
+    });
+    for (const chunk of rest) lines.push(cols(indent + chunk));
+    const subs = [...(item.addons.length > 0 ? [item.addons.join(", ")] : []), ...(item.notes ? [`"${item.notes}"`] : [])];
+    for (const sub of subs) {
+      for (const chunk of wrapWords(sub, RECEIPT_CHARS_PER_LINE - box.length)) lines.push(cols(indent + chunk));
+    }
   }
 
   lines.push(rule("="), text("Bukan bukti bayar", "center", "note"));
@@ -381,15 +519,28 @@ export function buildKitchenTicketLayout(data: KitchenTicketData): LayoutLine[] 
     rule("="),
   ];
 
-  const { entries } = layoutOrderLines(sortOrderLines(data.items, (i) => i.portionPrice ?? 0));
+  const sorted = sortOrderLines(data.items, (i) => i.portionPrice ?? 0);
+  // One qty column for the whole slip, so every name starts in the same column.
+  const prefixOf = (item: { qty: number }) => `${item.qty}x`;
+  const prefixWidth = Math.max(0, ...sorted.map((i) => prefixOf(i).length));
+  const { entries } = layoutOrderLines(sorted);
   for (const entry of entries) {
     if (entry.kind === "line") {
       const item = entry.line;
-      lines.push(text(`${item.qty}x ${item.productName}`, "left", "body"));
-      if (item.addons.length > 0) lines.push({ kind: "sub", role: "addon", text: item.addons.join(", ") });
-      // The only prominent line on this ticket besides the meta block — a
-      // cook glancing at a stack of tickets must not miss "pedas banget".
-      if (item.notes) lines.push({ kind: "sub", role: "note", text: `>> ${item.notes} <<`, bold: true });
+      lines.push(
+        ...plainItemRows([
+          {
+            prefix: prefixOf(item).padEnd(prefixWidth),
+            name: item.productName,
+            subs: [
+              ...(item.addons.length > 0 ? [{ text: item.addons.join(", ") }] : []),
+              // The only prominent line on this ticket besides the meta block —
+              // a cook glancing at a stack of tickets must not miss "pedas banget".
+              ...(item.notes ? [{ text: `>> ${item.notes} <<`, bold: true }] : []),
+            ],
+          },
+        ]),
+      );
     } else if (entry.kind === "groupTotal") {
       lines.push(text(`${entry.productName}: ${entry.portions} porsi`, "left", "heading"));
     } else {
