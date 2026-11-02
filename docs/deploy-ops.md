@@ -74,7 +74,13 @@ Workflow sudah menguji restore setiap hari (langkah "Restore test"), tapi dengan
 
 - **Gejala:** email "Run failed: Backup database harian" setiap hari. Ke-40 run terjadwal gagal dalam ±7 detik. Folder `daily/` di `pos-mi-ayam-backups` cuma berisi `.gitkeep`, artinya **tidak pernah ada satu pun backup sampai 2 Nov 2026**.
 - **Penyebab pasti** (dari `gh run view <id> --log-failed`, run pertama 23 Sep sampai run terakhir 1 Nov, error yang sama): langkah pertama (`actions/checkout`) berhenti dengan `##[error]Input required and not supplied: token`. `gh secret list` di repo ini kosong, dan environment "Production" (dibuat Vercel) juga tidak punya secret. **Ketiga secret (`BACKUP_DB_URL`, `BACKUP_AGE_PUBLIC_KEY`, `BACKUP_REPO_TOKEN`) tidak pernah diisi**: langkah setup no. 3 di atas belum pernah dijalankan. Bukan masalah versi pg_dump, pooler, atau SSL, karena run tidak pernah sampai ke langkah itu.
-- **Perbaikan:** pemilik mengisi ketiga secret. Workflow sekalian dikeraskan (lihat "Workflow" di atas), karena langkah-langkah sesudah checkout belum pernah sekali pun teruji:
+- **Bukti run sukses pertama:** 2 Nov 2026 ±20.11 WIB, run manual `41450835602` (workflow_dispatch, hijau). Isinya:
+  - Server Postgres 17, pg_dump 18.6;
+  - dump 1.566.654 byte berisi 24 tabel (23 model `schema.prisma` + `_prisma_migrations`, lengkap);
+  - tersimpan `daily/backup-20261102.sql.age` (1.567.222 byte, commit `77d03e7` di `pos-mi-ayam-backups`);
+  - "Uji restore OK: 24 tabel, jumlah baris semuanya cocok dengan dump".
+  - **Belum dibuktikan:** file `.age` bisa dibuka dengan private key pemilik (uji manual langkah 2 di atas).
+- **Perbaikan:** pemilik mengisi ketiga secret (2 Nov 2026). Workflow sekalian dikeraskan (lihat "Workflow" di atas), karena langkah-langkah sesudah checkout belum pernah sekali pun teruji:
   - cek secret di awal dengan pesan yang menyebut nama secret yang kosong, dan tolak port 6543 serta private key yang salah tempel;
   - cek versi pg_dump dibanding server;
   - validasi dump;
