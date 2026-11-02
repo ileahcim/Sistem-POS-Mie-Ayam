@@ -1,61 +1,203 @@
 name: Backup database harian
 
-# CLAUDE.md "Backup & Pemulihan" — dump schema public, enkripsi dengan age
-# (asymmetric: runner cuma pegang public key, tidak pernah bisa membuka
+# docs/deploy-ops.md "Backup & Pemulihan" — dump schema public, enkripsi dengan
+# age (asymmetric: runner cuma pegang public key, tidak pernah bisa membuka
 # hasilnya sendiri), simpan di repo PRIVATE terpisah (pos-mi-ayam-backups),
 # bukan di repo ini (yang public). Gagal = GitHub otomatis kirim email ke
-# pemilik repo (perilaku bawaan untuk scheduled workflow yang gagal) — tidak
-# ada langkah notifikasi tambahan yang perlu ditulis di sini.
+# pemilik repo (perilaku bawaan untuk scheduled workflow yang gagal).
+#
+# Repo ini PUBLIC, jadi log Actions-nya bisa dibaca siapa pun: jangan pernah
+# mencetak isi data, jumlah baris per tabel, atau connection string di sini.
+# Yang boleh dicetak: versi, ukuran file, nama tabel (sudah ada di
+# schema.prisma), dan hasil cocok/tidak cocok.
 on:
   schedule:
-    # 20:00 UTC = 03:00 WIB — jauh dari jam operasional warung.
+    # 20:00 UTC = 03:00 WIB — jauh dari jam operasional warung. (GitHub
+    # sering menunda jadwal 2-4 jam; tetap jauh sebelum warung buka.)
     - cron: "0 20 * * *"
   workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash # = bash -eo pipefail
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # Throwaway Postgres that lives only for this job: every backup is
+      # restored into it to prove the file is usable. Never production.
+      restoretest:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: restoretest
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGSSLMODE: require
+      PGCONNECT_TIMEOUT: "30"
     steps:
+      # 23 Sep – 1 Nov 2026 every run died here with "Input required and not
+      # supplied: token" because no secret had ever been set. Check all three
+      # up front so the email says exactly which one is missing.
+      - name: Check required secrets
+        env:
+          BACKUP_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+          BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          missing=()
+          [ -n "$BACKUP_DB_URL" ] || missing+=(BACKUP_DB_URL)
+          [ -n "$BACKUP_AGE_PUBLIC_KEY" ] || missing+=(BACKUP_AGE_PUBLIC_KEY)
+          [ -n "$BACKUP_REPO_TOKEN" ] || missing+=(BACKUP_REPO_TOKEN)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Secret belum diisi di Settings → Secrets and variables → Actions: ${missing[*]}"
+            exit 1
+          fi
+          case "$BACKUP_AGE_PUBLIC_KEY" in
+            age1*) ;;
+            *) echo "::error::BACKUP_AGE_PUBLIC_KEY harus public key age (diawali age1...), BUKAN private key AGE-SECRET-KEY-..."; exit 1 ;;
+          esac
+          case "$BACKUP_DB_URL" in
+            *:6543/*) echo "::error::BACKUP_DB_URL memakai port 6543 (transaction pooler). Pakai session pooler port 5432 (nilai DIRECT_URL)."; exit 1 ;;
+          esac
+          echo "Semua secret terisi."
+
       - name: Checkout backup repo (destination)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ileahcim/pos-mi-ayam-backups
           token: ${{ secrets.BACKUP_REPO_TOKEN }}
           path: backups-repo
 
       - name: Install postgresql-client and age
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client age
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client age
+          pg_dump --version
+          age --version
+
+      # pg_dump refuses to dump a server newer than itself — say so plainly
+      # instead of a cryptic "server version mismatch".
+      - name: Check pg_dump version vs server
+        env:
+          BACKUP_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+        run: |
+          server_num=$(psql "$BACKUP_DB_URL" -At -c "SHOW server_version_num")
+          server_major=$((server_num / 10000))
+          client_major=$(pg_dump --version | grep -oE '[0-9]+' | head -n1)
+          echo "Server Postgres major: $server_major, pg_dump major: $client_major"
+          if [ "$client_major" -lt "$server_major" ]; then
+            echo "::error::pg_dump $client_major lebih tua dari server $server_major — ganti cara install postgresql-client."
+            exit 1
+          fi
 
       - name: Dump database (session pooler, port 5432 — schema public only)
         env:
           BACKUP_DB_URL: ${{ secrets.BACKUP_DB_URL }}
         run: pg_dump "$BACKUP_DB_URL" --schema=public --format=plain --no-owner --no-privileges --file=backup.sql
 
+      # A dump that "succeeded" but is empty or cut short is worse than a
+      # red run — fail loudly instead of storing it.
+      - name: Validate dump
+        run: |
+          size=$(stat -c %s backup.sql)
+          echo "Ukuran dump: $size byte"
+          [ "$size" -gt 10000 ] || { echo "::error::Dump terlalu kecil ($size byte)."; exit 1; }
+          tail -n 5 backup.sql | grep -q "PostgreSQL database dump complete" \
+            || { echo "::error::Dump tidak lengkap (penutup pg_dump tidak ada)."; exit 1; }
+          for t in User Setting Product Category Shift Order OrderItem MieCustomer MieLedgerEntry FrozenCustomer FrozenLedgerEntry _prisma_migrations; do
+            grep -qE "^CREATE TABLE public\.\"?$t\"? \(" backup.sql \
+              || { echo "::error::Tabel $t tidak ada di dump."; exit 1; }
+          done
+          # Key tables must actually carry rows (counts are NOT printed).
+          for t in User Product _prisma_migrations; do
+            n=$(awk -v tbl="$t" '
+              $1=="COPY" { name=$2; gsub(/"/,"",name); inblk=(name=="public." tbl); next }
+              inblk && $0=="\\." { inblk=0; next }
+              inblk { c++ }
+              END { print c+0 }' backup.sql)
+            [ "$n" -gt 0 ] || { echo "::error::Tabel $t kosong di dump."; exit 1; }
+          done
+          echo "Jumlah tabel: $(grep -cE '^CREATE TABLE public\.' backup.sql)"
+          echo "Tabel: $(grep -oE '^CREATE TABLE public\.[^ ]+' backup.sql | sed 's/CREATE TABLE public\.//; s/"//g' | tr '\n' ' ')"
+
+      # File name = WIB date the backup was taken (early morning), i.e. it
+      # holds everything up to the night before.
       - name: Encrypt backup
         env:
           BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
-        run: age -r "$BACKUP_AGE_PUBLIC_KEY" -o "backup-$(date -u +%Y%m%d).sql.age" backup.sql
+        run: |
+          out="backup-$(TZ=Asia/Jakarta date +%Y%m%d).sql.age"
+          age -r "$BACKUP_AGE_PUBLIC_KEY" -o "$out" backup.sql
+          head -c 21 "$out" | grep -q "age-encryption.org/v1" || { echo "::error::Hasil enkripsi tidak valid."; exit 1; }
+          echo "File terenkripsi: $out ($(stat -c %s "$out") byte)"
+          echo "BACKUP_FILE=$out" >> "$GITHUB_ENV"
 
       - name: Store backup, prune to the newest 30
         run: |
-          set -e
           mkdir -p backups-repo/daily
-          mv backup-*.sql.age backups-repo/daily/
+          mv "$BACKUP_FILE" backups-repo/daily/
           cd backups-repo
           git config user.name "pos-mi-ayam-backup-bot"
           git config user.email "actions@users.noreply.github.com"
           git add daily/
-          # Keep only the 30 newest daily-*.sql.age files by filename (dates
+          # Keep only the 30 newest backup-*.sql.age files by filename (dates
           # sort lexicographically) — everything older gets git-rm'd so the
           # repo doesn't grow forever.
           ls -1 daily | grep '^backup-.*\.sql\.age$' | sort | head -n -30 | xargs -r -I{} git rm -q daily/{}
           if git diff --cached --quiet; then
-            echo "Nothing changed (backup identical to a kept file?) — skipping commit."
+            echo "Nothing changed — skipping commit."
           else
-            git commit -m "Backup $(date -u +%Y-%m-%d)"
-            git push
+            git commit -q -m "Backup $(TZ=Asia/Jakarta date +%Y-%m-%d)"
+            git push -q
           fi
+          echo "Tersimpan: daily/$BACKUP_FILE — total $(ls -1 daily | grep -c '\.sql\.age$') file backup."
+
+      # Runs AFTER the backup is stored: a failure here still keeps the file,
+      # but turns the run red (= email) because an unrestorable backup is no
+      # backup. Restores into the throwaway service DB above, never Supabase.
+      - name: Restore test (throwaway Postgres, not production)
+        env:
+          RESTORE_URL: postgresql://postgres:restoretest@localhost:55432/postgres
+          PGSSLMODE: disable
+        run: |
+          # Supabase roles a dump may mention; harmless in a throwaway DB.
+          psql "$RESTORE_URL" -q -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN
+            CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN;
+            EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;"
+          psql "$RESTORE_URL" -q -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE;"
+          grep -qE '^CREATE SCHEMA public;' backup.sql || psql "$RESTORE_URL" -q -c "CREATE SCHEMA public;"
+          psql "$RESTORE_URL" -q -v ON_ERROR_STOP=1 -f backup.sql > /dev/null
+          # Every table's row count after restore must equal the COPY block
+          # in the dump. Only the mismatch count is printed.
+          awk '
+            $1=="COPY" { name=$2; n=0; inblk=1; next }
+            inblk && $0=="\\." { print name "\t" n; inblk=0; next }
+            inblk { n++ }' backup.sql > expected.tsv
+          bad=0; total=0
+          while IFS=$'\t' read -r tbl n; do
+            total=$((total + 1))
+            got=$(psql "$RESTORE_URL" -At -c "SELECT count(*) FROM $tbl")
+            if [ "$got" != "$n" ]; then echo "::error::Jumlah baris tidak cocok: $tbl"; bad=$((bad + 1)); fi
+          done < expected.tsv
+          rm -f expected.tsv
+          [ "$bad" -eq 0 ] || exit 1
+          echo "Uji restore OK: $total tabel, jumlah baris semuanya cocok dengan dump."
 
       - name: Wipe the plaintext dump from the runner
         if: always()
-        run: rm -f backup.sql
+        run: rm -f backup.sql expected.tsv
