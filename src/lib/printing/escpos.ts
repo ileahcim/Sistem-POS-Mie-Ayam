@@ -215,11 +215,28 @@ function renderLayout(lines: LayoutLine[], logo: LogoRaster | null | undefined):
   return parts;
 }
 
+// Cash drawer kick: ESC p m t1 t2 — pulse the drawer solenoid on connector
+// pin m (0 = pin 2, 1 = pin 5) for t1×2 ms, then wait t2×2 ms. Sent to BOTH
+// pins: drawers are wired to one or the other, and a pulse on the unused pin
+// does nothing — so no setting is needed for how the cable is wired. 50 ms on
+// / 500 ms off is the common default that every 24V drawer opens with.
+export const DRAWER_KICK = Uint8Array.from([ESC, 0x70, 0, 25, 250, ESC, 0x70, 1, 25, 250]);
+
+export function buildDrawerKickBytes(): Uint8Array {
+  return concat(INIT, DRAWER_KICK);
+}
+
 // After the last line: feed the paper up so the cut/tear edge clears the print.
 const END_FEED_LINES = 5;
 
 export function buildReceiptBytes(data: ReceiptData): Uint8Array {
-  return concat(INIT, ...renderLayout(buildReceiptLayout(data), data.logoRaster), feed(END_FEED_LINES));
+  // Drawer first: the cashier needs the drawer for change while paper prints.
+  return concat(
+    INIT,
+    ...(data.kickDrawer ? [DRAWER_KICK] : []),
+    ...renderLayout(buildReceiptLayout(data), data.logoRaster),
+    feed(END_FEED_LINES),
+  );
 }
 
 export function buildDepositReceiptBytes(data: DepositReceiptData): Uint8Array {

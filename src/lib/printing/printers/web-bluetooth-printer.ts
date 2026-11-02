@@ -27,7 +27,7 @@
 // a failed print must never block a completed order.
 
 import type { DepositReceiptData, FrozenReceiptData, KitchenTicketData, PackingListData, Printer, PrintResult, ReceiptData } from "../types";
-import { buildDepositReceiptBytes, buildFrozenReceiptBytes, buildKitchenTicketBytes, buildPackingListBytes, buildReceiptBytes } from "../escpos";
+import { buildDepositReceiptBytes, buildDrawerKickBytes, buildFrozenReceiptBytes, buildKitchenTicketBytes, buildPackingListBytes, buildReceiptBytes } from "../escpos";
 import { withLogo } from "../logo-raster";
 
 // Well-known BLE serial / ESC-POS-over-BLE service UUIDs to probe first.
@@ -230,7 +230,18 @@ async function writeChunked(bytes: Uint8Array): Promise<void> {
   }
 }
 
-async function writeBytes(bytes: Uint8Array): Promise<PrintResult> {
+// One GATT write sequence at a time: a drawer kick and a struk (or two quick
+// taps) sent together would otherwise interleave on the same characteristic
+// and Chrome rejects the second ("GATT operation already in progress").
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+function writeBytes(bytes: Uint8Array): Promise<PrintResult> {
+  const run = writeQueue.then(() => writeBytesNow(bytes));
+  writeQueue = run.catch(() => undefined);
+  return run;
+}
+
+async function writeBytesNow(bytes: Uint8Array): Promise<PrintResult> {
   try {
     await ensureConnected();
     if (!writeCharacteristic) throw new Error("Belum ada printer terhubung.");
@@ -261,5 +272,8 @@ export const webBluetoothPrinter: Printer = {
   },
   async printBytes(bytes: Uint8Array): Promise<PrintResult> {
     return writeBytes(bytes);
+  },
+  async openDrawer(): Promise<PrintResult> {
+    return writeBytes(buildDrawerKickBytes());
   },
 };

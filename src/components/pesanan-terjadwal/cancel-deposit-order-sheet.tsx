@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { cancelOrderWithDeposit, type DepositDisposition } from "@/app/pesanan-terjadwal/deposit-actions";
+import { openCashDrawer } from "@/lib/printing/cash-drawer";
+import type { PrinterDriver } from "@/lib/printing/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/cn";
 import { ReasonSheet } from "@/components/order-aktif/reason-sheet";
@@ -45,10 +47,12 @@ export function CancelDepositOrderButton({
   orderId,
   deposits,
   onCancelled,
+  printerDriver,
 }: {
   orderId: string;
   deposits: { method: DepositMethod; amount: number }[];
   onCancelled: () => void;
+  printerDriver: PrinterDriver;
 }) {
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<DepositDisposition | null>(null);
@@ -96,7 +100,13 @@ export function CancelDepositOrderButton({
             />
           </div>
         }
-        onSubmit={(reason) => cancelOrderWithDeposit(orderId, choice!, reason)}
+        onSubmit={async (reason) => {
+          const result = await cancelOrderWithDeposit(orderId, choice!, reason);
+          // Pengembalian DP tunai comes out of the drawer — open it (never
+          // blocks: the cancellation is already saved).
+          if (result.ok && choice === "REFUND" && cashPart > 0) await openCashDrawer(printerDriver);
+          return result;
+        }}
         onClose={() => {
           setOpen(false);
           setChoice(null);

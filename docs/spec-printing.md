@@ -46,6 +46,20 @@ Isi struk, aturan cetak ESC/POS, printer Blueprint ECO80D, logo, kertas dapur. B
 - **Alat diagnostik (Pengaturan, OWNER):** Tes Cetak (struk contoh dengan data warung asli dari `Setting`; baris "Tunai"/"Kembali" ikut tercetak persis kalau saklar "Hitung kembalian" nyala — sama seperti struk Cash sungguhan, lihat "Hitung kembalian" di bagian Pembayaran) dan Tes Lebar Kolom. `/print-preview` (konsol dev: preview + cetak ke driver terpilih) **OWNER only, dicek di server**.
 - Potong kertas: struk tidak mengirim `GS V`; ada feed 5 baris di akhir untuk sobek manual. (Halaman produk Blueprint menyebut "Auto Cut = YES" sementara catatan lama bilang cutter manual — belum diuji.)
 
+## Laci uang (cash drawer) — dibangun 2 Nov 2026
+
+Laci tersambung ke port cash drawer di belakang Blueprint ECO80D; dibuka dengan perintah ESC/POS lewat driver cetak yang sedang aktif (Web Bluetooth / RawBT / mock) — tidak ada perangkat atau koneksi kedua.
+
+- **Perintah:** `ESC p m t1 t2` ke **dua pin sekaligus** (`1B 70 00 19 FA` pin 2, lalu `1B 70 01 19 FA` pin 5: nyala 50 ms, jeda 500 ms) — `DRAWER_KICK` di `escpos.ts`. Laci tersambung ke salah satu pin; pulsa di pin yang tidak dipakai tidak berefek, jadi tidak perlu pengaturan kabel. `Printer.openDrawer()` di ketiga driver (`buildDrawerKickBytes` = `ESC @` + kick, tidak mencetak apa pun; mock = sukses + pemberitahuan "mode simulasi").
+- **Kapan terbuka otomatis** (keputusan pemilik 2 Nov 2026: "semua uang laci") — **setelah** transaksi tersimpan, saat konfirmasi:
+  - Pembayaran **Cash** dan **Cash + QRIS** (`pembayaran-screen.tsx`, `drawerMoves`) — termasuk sisa pre-order ber-DP, pelunasan piutang **ke laci** (pilihan "kantong" tidak membuka), dan "Kembalikan" kelebihan DP kalau ada DP tunai. **Walaupun struk tidak dicetak.** Cetak otomatis nyala → kick ditaruh di AWAL aliran byte struk yang sama (`ReceiptData.kickDrawer`, satu intent RawBT / satu rangkaian tulis BLE — dua intent RawBT berturut-turut bisa hilang satu); cetak otomatis mati → kick dikirim sendiri sebelum pertanyaan "Cetak struk?". Cetak ulang dari Riwayat tidak pernah membuka laci.
+  - **DP tunai** (`deposit-card.tsx`, sebelum "Cetak bukti?") dan **pengembalian DP tunai** saat membatalkan pre-order ber-DP (`cancel-deposit-order-sheet.tsx`).
+  - **QRIS saja dan "Belum Bayar" tidak pernah membuka laci.** Pengeluaran juga tidak (pakai tombol manual).
+- **Manual:** tombol **"Buka Laci"** di layar Kasir untuk semua role (OWNER & CASHIER) — di tablet landscape di judul kolom "Keranjang", di layar lebih sempit di baris header atas sebelah Order Aktif. **"Tes Buka Laci"** di Pengaturan → kartu printer, memakai driver yang sedang dipilih di kartu itu. Satu komponen `OpenDrawerButton`. Tidak ada log siapa membuka laci (tidak diminta).
+- **Gagal tidak pernah membatalkan transaksi** — semua jalur memanggil laci SETELAH server action sukses, lewat `openCashDrawer`/`reportDrawerResult` (`src/lib/printing/cash-drawer.ts`) yang tidak pernah throw. Hasilnya tampil sebagai pemberitahuan kecil di atas layar (`DrawerNoticeHost`, dipasang sekali di `app/layout.tsx` supaya tetap terlihat walau Pembayaran langsung pindah ke Order Aktif): sukses "Laci dibuka" hilang sendiri ±2,5 detik; gagal **"Laci tidak terbuka"** + penyebab dari driver + "Transaksi tetap tersimpan. Buka laci dengan kunci, atau tekan Buka Laci lagi." — tetap tampil sampai ditutup (×, 48px).
+- **Tulis BLE sekarang antre satu per satu** (`writeQueue` di `web-bluetooth-printer.ts`): kick + struk, atau dua tap cepat, tidak lagi bertabrakan di characteristic yang sama ("GATT operation already in progress").
+- Diverifikasi byte (2 Nov 2026): struk dengan `kickDrawer` diawali `1B 40 1B 70 00 19 FA 1B 70 01 19 FA` lalu isi struk yang sama persis (selisih tepat 10 byte); struk tanpa flag tidak memuat `1B 70` sama sekali. **Belum dites di laci + ECO80D sungguhan.**
+
 ## Kertas dapur (kitchen ticket) — dibangun 22 Sep 2026
 
 Tiket untuk dapur: dicetak di printer yang sama lalu disobek dan ditempel dekat kompor — beda tujuan dari struk (bukti bayar) dan daftar packing (checklist Antar sebelum bayar).

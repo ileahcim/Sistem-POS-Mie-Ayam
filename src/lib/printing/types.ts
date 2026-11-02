@@ -87,6 +87,11 @@ export type ReceiptData = {
   // `paymentMethod` is the method of that remainder.
   deposits?: ReceiptDeposit[];
   footerNote?: string;
+  // Cash went into (or out of) the drawer with this payment: the drawer kick
+  // is sent at the very start of the SAME byte stream as the struk, so a
+  // RawBT intent or one BLE session does both (lib/printing/cash-drawer.ts).
+  // Never set on a reprint.
+  kickDrawer?: boolean;
 };
 
 // "BUKTI UANG MUKA" — handed to the customer when a DP is taken, printed
@@ -226,4 +231,7 @@ export interface Printer {
   // Raw ESC/POS bytes, for hardware diagnostics only (Tes Lebar Kolom) — real
   // receipts always go through printReceipt/printPackingList.
   printBytes(bytes: Uint8Array): Promise<PrintResult>;
+  // Cash drawer kick (ESC p) through the printer's drawer port — see
+  // lib/printing/cash-drawer.ts for when it fires. Never prints anything.
+  openDrawer(): Promise<PrintResult>;
 }

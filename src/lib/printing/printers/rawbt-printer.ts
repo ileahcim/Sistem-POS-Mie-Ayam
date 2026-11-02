@@ -19,7 +19,7 @@
 // has no watermark — which is exactly why web bluetooth is the default.
 
 import type { DepositReceiptData, FrozenReceiptData, KitchenTicketData, PackingListData, Printer, PrintResult, ReceiptData } from "../types";
-import { buildDepositReceiptBytes, buildFrozenReceiptBytes, buildKitchenTicketBytes, buildPackingListBytes, buildReceiptBytes } from "../escpos";
+import { buildDepositReceiptBytes, buildDrawerKickBytes, buildFrozenReceiptBytes, buildKitchenTicketBytes, buildPackingListBytes, buildReceiptBytes } from "../escpos";
 import { withLogo } from "../logo-raster";
 
 function isAndroid(): boolean {
@@ -77,5 +77,9 @@ export const rawBtPrinter: Printer = {
 
   async printBytes(bytes: Uint8Array): Promise<PrintResult> {
     return transmitToRawBt(bytes);
+  },
+
+  async openDrawer(): Promise<PrintResult> {
+    return transmitToRawBt(buildDrawerKickBytes());
   },
 };

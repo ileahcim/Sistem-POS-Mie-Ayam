@@ -54,4 +54,11 @@ export class MockPrinter implements Printer {
   async printBytes(): Promise<PrintResult> {
     return { ok: false, error: "Tes ini butuh printer fisik — pilih mode Bluetooth atau RawBT dulu." };
   }
+
+  // No drawer on screen: report success so the flow (and its "Laci dibuka"
+  // notice, marked as simulasi by cash-drawer.ts) can be checked without
+  // hardware.
+  async openDrawer(): Promise<PrintResult> {
+    return { ok: true };
+  }
 }

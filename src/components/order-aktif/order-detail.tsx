@@ -372,6 +372,7 @@ export function OrderDetail({
                 orderId={order.id}
                 deposits={order.deposits}
                 onCancelled={() => router.push("/order-aktif")}
+                printerDriver={printerDriver}
               />
             ) : (
               <p className="text-ink-muted text-center text-sm">

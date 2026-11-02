@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { MockPrinterOverlay } from "@/components/printing/mock-printer-overlay";
+import { DrawerNoticeHost } from "@/components/printing/drawer-notice-host";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { SheetMotionProvider } from "@/components/ui/sheet-motion";
 import { getSheetBlurEnabled } from "@/lib/settings/get-settings";
@@ -60,6 +61,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <SheetMotionProvider blurEnabled={sheetBlurEnabled}>
           {children}
           <MockPrinterOverlay />
+          <DrawerNoticeHost />
         </SheetMotionProvider>
         <ServiceWorkerRegister />
       </body>

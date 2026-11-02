@@ -6,6 +6,7 @@ import { AnimatePresence } from "motion/react";
 import type { OrderDetail } from "@/lib/orders/get-order-detail";
 import type { PrinterDriver } from "@/lib/printing/types";
 import { recordDeposit, getDepositReceipt } from "@/app/pesanan-terjadwal/deposit-actions";
+import { openCashDrawer } from "@/lib/printing/cash-drawer";
 import { printDepositReceiptSafely } from "@/lib/printing/print-deposit";
 import { DEPOSIT_METHOD_LABEL } from "@/lib/deposits/settle";
 import { formatRupiah } from "@/lib/printing/format";
@@ -74,6 +75,9 @@ export function DepositCard({
         return;
       }
       closeSheet();
+      // DP tunai goes into the drawer: open it now, before "Cetak bukti?"
+      // (lib/printing/cash-drawer.ts). QRIS never touches the drawer.
+      if (draft.method === "CASH") await openCashDrawer(printerDriver);
       await handleRecorded(result.receipt);
     } finally {
       setSaving(false);

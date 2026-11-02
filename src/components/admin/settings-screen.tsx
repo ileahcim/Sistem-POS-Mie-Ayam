@@ -26,6 +26,7 @@ import { printColumnTest, printTest } from "@/lib/printing/test-print";
 import { PREORDER_REMINDER_CHOICES } from "@/lib/settings/preorder-reminder";
 import { POPULAR_COMBO_MIN_SALES_CHOICES } from "@/lib/settings/popular-combo";
 import { Card } from "@/components/ui/card";
+import { OpenDrawerButton } from "@/components/printing/open-drawer-button";
 import { Button } from "@/components/ui/button";
 import { ListRow } from "@/components/ui/list-row";
 import { AppHeader } from "@/components/ui/app-header";
@@ -465,6 +466,9 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
         >
           Tes Lebar Kolom
         </Button>
+        {/* Laci uang on the printer's drawer port (2 Nov 2026) — result in the
+            notice at the top of the screen (DrawerNoticeHost). */}
+        <OpenDrawerButton printerDriver={driver} label="Tes Buka Laci" size="default" />
         {isWebBt && connectedName && <p className="text-primary-strong text-sm font-medium">Terhubung: {connectedName}</p>}
         {savedFlash && <p className="text-primary-strong text-sm font-medium">Tersimpan ✓</p>}
       </div>

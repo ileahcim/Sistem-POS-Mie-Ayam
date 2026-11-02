@@ -32,6 +32,7 @@ export function CartPanel({
   footerExtra,
   variant = "sidebar",
   onClose,
+  headerAction,
 }: {
   items: CartItem[];
   channel: ChannelType | null;
@@ -51,6 +52,8 @@ export function CartPanel({
   footerExtra?: ReactNode;
   variant?: "sidebar" | "sheet";
   onClose?: () => void;
+  // Right side of the sidebar's "Keranjang" header (Kasir: "Buka Laci").
+  headerAction?: ReactNode;
 }) {
   const totals = computeOrderTotals(items, channel);
   const canSave =
@@ -156,8 +159,9 @@ export function CartPanel({
 
   return (
     <div className="border-border bg-surface shadow-panel relative z-10 flex h-full w-full flex-col border-l">
-      <div className="border-border border-b px-3 py-2">
+      <div className="border-border flex min-h-12 items-center justify-between gap-2 border-b px-3 py-1">
         <h2 className="text-base font-bold text-ink">Keranjang</h2>
+        {headerAction}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4">

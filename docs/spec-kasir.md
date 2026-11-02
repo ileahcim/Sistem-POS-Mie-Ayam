@@ -47,6 +47,8 @@ Kasus rombongan yang duduk di satu meja tapi mau bayar terpisah:
 - Kasir pilih metode — **Cash**, **QRIS**, **Cash + QRIS** (split, lihat di bawah), atau **Belum Bayar** — lalu tap "Bayar". QRIS tetap satu tap tanpa isian apa pun. **Cash penuh meminta "Uang diterima" selama saklar "Hitung kembalian" nyala** (default, lihat di bawah); kalau saklar dimatikan, Cash kembali satu tap seperti dulu.
 - **PERUBAHAN ATURAN 26 Sep 2026 — "Hitung kembalian".** Dulu sengaja tidak ada input uang dan tidak ada kalkulasi kembalian (kembalian dihitung di kepala, struk tidak pernah mencetak "Kembali"). Pemakai di lapangan meminta seperti kasir pada umumnya, jadi keputusan itu diganti — lihat subbagian "Hitung kembalian" di bawah. Baris "Tunai"/"Kembali" di struk sekarang **SAH**.
 
+- **Laci uang terbuka otomatis — 2 Nov 2026.** Bayar Cash / Cash + QRIS (juga sisa ber-DP, pelunasan piutang ke laci), DP tunai, dan pengembalian DP tunai membuka laci setelah tersimpan, walaupun struk tidak dicetak; QRIS saja dan Belum Bayar tidak. Gagal buka laci hanya memunculkan pemberitahuan, transaksi tetap tersimpan. Tombol "Buka Laci" di Kasir untuk semua role. Detail: spec-printing.md "Laci uang (cash drawer)".
+
 ### "Hitung kembalian" (uang diterima & kembalian) — dibangun 26 Sep 2026
 
 - **Saklar `Setting.cashChangeEnabled` ("Hitung kembalian" di Pengaturan), DEFAULT NYALA.** Mati = alur pembayaran persis seperti sebelum fitur ini (Cash: pilih metode, Bayar).

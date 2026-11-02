@@ -7,6 +7,7 @@ import type { MenuCategory } from "@/lib/menu/get-active-menu";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver, ReceiptData } from "@/lib/printing/types";
 import { getPrinter } from "@/lib/printing/get-printer";
+import { openCashDrawer, reportDrawerResult } from "@/lib/printing/cash-drawer";
 import { formatRupiah } from "@/lib/printing/format";
 import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
 import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list";
@@ -120,6 +121,15 @@ export function PembayaranScreen({
   const splitQris = method === "SPLIT" && typeof splitCash === "number" ? Math.max(0, amountDue - splitCash) : 0;
   const cashLike = method === "CASH" || method === "SPLIT";
   const needsDrawerChoice = settlingReceivable && cashLike;
+  // Does cash physically move through the drawer at this confirmation? Cash
+  // or the cash slice of Cash + QRIS coming in (a piutang only when settled
+  // into the drawer, not the owner's pocket), or the DP excess going back
+  // out when one of the DPs was cash. QRIS alone, and "Belum Bayar", never.
+  const drawerMoves =
+    choice !== "LATER" &&
+    (nothingToCollect
+      ? order.refundDue > 0 && order.deposits.some((d) => d.method === "CASH")
+      : cashLike && (!settlingReceivable || cashToDrawer === true));
   const asksTendered = cashChangeEnabled && method === "CASH" && !nothingToCollect;
   const tenderedOk = typeof tendered === "number" && validateCashTendered(tendered, amountDue) === null;
   const canPay =
@@ -177,8 +187,14 @@ export function PembayaranScreen({
         setError(result.error);
         return;
       }
+      // Laci (2 Nov 2026): the payment is saved — now open the drawer when
+      // cash moved. With auto-print the kick rides in front of the struk in
+      // the same transmission (one RawBT intent / one BLE write sequence);
+      // otherwise it goes out on its own right now, before "Cetak struk?".
       if (autoPrintReceipt) {
-        const failure = await tryPrint(result.receipt);
+        const receipt: ReceiptData = drawerMoves ? { ...result.receipt, kickDrawer: true } : result.receipt;
+        const failure = await tryPrint(receipt);
+        if (drawerMoves) reportDrawerResult(printerDriver, failure === null ? { ok: true } : { ok: false, error: failure });
         if (failure === null) {
           router.push(doneHref);
           return;
@@ -187,7 +203,11 @@ export function PembayaranScreen({
         // reason on screen (instead of leaving silently, as before) so the
         // cashier can retry or skip, and the real cause becomes visible.
         setPrintError(failure);
+        // "Coba Lagi" resends the kick too — it failed with the paper.
+        setPendingReceipt(receipt);
+        return;
       }
+      if (drawerMoves) await openCashDrawer(printerDriver);
       setPendingReceipt(result.receipt);
     } finally {
       setPaying(false);

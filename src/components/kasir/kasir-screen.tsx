@@ -26,6 +26,7 @@ import { ComboShortcutRow } from "./combo-shortcut-row";
 import { AddonSheet, type AddonSheetResult } from "./addon-sheet";
 import { CustomItemSheet } from "./custom-item-sheet";
 import { CartPanel } from "./cart-panel";
+import { OpenDrawerButton } from "@/components/printing/open-drawer-button";
 import { CartBar } from "./cart-bar";
 import { saveOrder } from "@/app/kasir/actions";
 
@@ -226,7 +227,11 @@ export function KasirScreen({
             onCustomerNameChange={setCustomerName}
           />
         </div>
-        <div className="order-3">
+        <div className="order-3 flex items-center gap-2">
+          {/* Below lg the cart is a sheet, so "Buka Laci" lives up here; on
+              the tablet it sits in the cart column's header instead (the
+              header row is full there). */}
+          <OpenDrawerButton printerDriver={printerDriver} className="lg:hidden" />
           <OrderAktifButton activeCount={nav.activeCount} lateCount={nav.lateCount} />
         </div>
       </header>
@@ -262,6 +267,7 @@ export function KasirScreen({
             onChangeQty={setItemQty}
             onAddCustomItem={() => setCustomItemSheetOpen(true)}
             onSave={handleSave}
+            headerAction={<OpenDrawerButton printerDriver={printerDriver} />}
           />
         </div>
       </div>
