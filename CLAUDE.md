@@ -40,7 +40,7 @@ Versi lengkap: `docs/working-rules.md`.
 - **Pre-order** boleh dibuat tanpa shift; `shiftId`/`queueNumber` baru diisi saat dibayar. DP: omzet diakui penuh di hari kirim, DP hanya menggeser laci (ledger `PreorderDeposit`).
 - Piutang (`RECEIVABLE`) tidak dihitung penjualan; pelunasan dihitung ke shift yang terbuka saat dibayar (`settledShiftId`); pelunasan tunai wajib pilih laci/kantong.
 - **Struk:** isi ditentukan SATU tempat (`src/lib/printing/receipt-layout.ts`); MockPrinter = acuan; 48 kolom Font A; penekanan tebal saja (tanpa ukuran ganda); raster MSB = titik paling kiri. Cetak tidak pernah memblokir transaksi tapi kegagalan wajib terlihat. Urutan baris layar & kertas: `sortOrderLines`.
-- **Note** (Mi Mentah & Frozen) = dunia terpisah dari POS (tidak pernah menyentuh Shift/Order/omzet), OWNER only, tidak butuh shift. Saldo = jumlah baris ledger, tidak pernah kolom tersimpan; koreksi = baris baru; nonaktif bukan hapus (saldo tetap ikut Total Piutang); metode bayar lama yang NULL tidak pernah di-backfill.
+- **Note** (Mi Mentah & Frozen) = dunia terpisah dari POS (tidak pernah menyentuh Shift/Order/omzet), OWNER only, tidak butuh shift. Saldo = jumlah baris ledger, tidak pernah kolom tersimpan; koreksi = baris baru; nonaktif bukan hapus (saldo tetap ikut Total Piutang); metode bayar lama yang NULL tidak pernah di-backfill. Harga Mi Mentah **dua lapis**: harga khusus pelanggan → harga default per jenis (tanpa "harga terakhir"); Mi Pasar selalu harga default Mi Pasar. Harga jual diatur di Manajemen Menu → "Mi Mentah", modal per kg di Isi HPP.
 - **PWA:** service worker hanya cache shell; **jangan pernah** antrian transaksi offline atau cache halaman data.
 
 ## Dokumentasi di `docs/` — kapan dibaca
@@ -59,6 +59,7 @@ Semua isi CLAUDE.md lama dipindah **verbatim** dengan judul bagian yang sama (ko
 | `docs/spec-note-frozen.md` | Buku Frozen (modul Note) | menyentuh `/note/frozen`, `src/lib/frozen`, bukti Frozen (baca juga spec Mi Mentah) |
 | `docs/deploy-ops.md` | PWA — Tahap 12 · Deploy Vercel · Backup & Pemulihan · Prosedur Pemulihan (restore) | mengubah `sw.js`, manifest, matcher `src/proxy.ts`, setting Vercel, workflow backup, atau melakukan restore |
 | `docs/progress-log.md` | GO-LIVE 22 Sep 2026 + checklist go-live (password masih `1234`, HPP belum diisi, tes cetak tersisa, auto-deploy) | butuh konteks go-live / pekerjaan yang masih terbuka |
+| `docs/archive/CATATAN_OPENCODE.md` | Log opencode 14 Okt 2026 (section Mi Mentah/Frozen di Manajemen Menu & Isi HPP); isi pentingnya sudah di `spec-note-mi-mentah.md` | hanya untuk sejarah perubahan itu |
 | `docs/archive/CLAUDE.full-backup.md` | Salinan utuh CLAUDE.md sebelum dirapikan (173.9k) | hanya kalau curiga ada yang hilang |
 
 Riwayat per fitur (tanggal dibangun, nama schema uji, jumlah pemeriksaan, data produksi yang pernah dikoreksi atas izin pemilik) menempel di bagian fiturnya masing-masing di `docs/spec-*.md`.
