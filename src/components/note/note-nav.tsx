@@ -19,14 +19,14 @@ const SECTIONS: { section: NoteSection; label: string }[] = [
 export function NoteNav({ book, section }: { book: NoteBook; section: NoteSection }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-pill bg-muted flex h-12 w-fit items-center p-1" role="group" aria-label="Pilih buku">
+      <div className="rounded-pill bg-muted flex h-14 w-fit items-center p-1" role="group" aria-label="Pilih buku">
         {(["mie", "frozen"] as const).map((b) => (
           <Link
             key={b}
             href={noteSectionHref(b, section)}
             aria-current={book === b ? "page" : undefined}
             className={cn(
-              "rounded-pill flex h-10 items-center px-4 text-sm font-semibold",
+              "rounded-pill flex h-12 items-center px-4 text-sm font-semibold",
               book === b ? "bg-primary text-white" : "text-ink-muted",
             )}
           >

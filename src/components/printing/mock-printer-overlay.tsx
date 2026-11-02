@@ -54,7 +54,7 @@ export function MockPrinterOverlay() {
               <button
                 type="button"
                 onClick={() => setJob(null)}
-                className="text-ink-muted hover:bg-muted rounded px-2 py-1 text-sm"
+                className="text-ink-muted hover:bg-muted rounded-pill flex h-12 min-w-12 items-center justify-center px-4 text-sm font-semibold"
               >
                 Tutup
               </button>

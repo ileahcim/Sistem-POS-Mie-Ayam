@@ -48,7 +48,7 @@ export function OmzetSection({ history }: { history: OmzetShiftPoint[] }) {
                 setSelectedKey(null);
               }}
               className={cn(
-                "rounded-pill h-9 px-3 text-sm font-semibold",
+                "rounded-pill h-12 px-4 text-sm font-semibold",
                 granularity === opt.value ? "bg-ink text-white" : "bg-muted text-ink",
               )}
             >

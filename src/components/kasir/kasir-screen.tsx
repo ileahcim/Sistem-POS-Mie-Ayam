@@ -200,7 +200,7 @@ export function KasirScreen({
           <span className="text-base font-bold">Kasir belum dibuka — pesanan tidak bisa disimpan</span>
           <Link
             href="/shift/buka"
-            className="rounded-pill bg-surface text-danger flex h-10 items-center px-4 text-sm font-bold"
+            className="rounded-pill bg-surface text-danger flex h-12 items-center px-4 text-sm font-bold"
           >
             Buka Shift
           </Link>

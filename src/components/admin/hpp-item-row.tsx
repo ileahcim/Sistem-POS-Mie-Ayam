@@ -84,7 +84,7 @@ export function HppItemRow({ item }: { item: HppItem }) {
             value={costPriceStr}
             onChange={(e) => setCostPriceStr(e.target.value.replace(/[^\d]/g, ""))}
             placeholder="0"
-            className="rounded-input border-border h-11 w-28 border px-2 text-base"
+            className="rounded-input border-border h-12 w-28 border px-2 text-base"
           />
         </label>
         <span className="text-ink-muted text-sm">
@@ -97,18 +97,18 @@ export function HppItemRow({ item }: { item: HppItem }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="rounded-pill bg-muted flex h-9 items-center p-0.5 text-xs font-semibold">
+        <div className="rounded-pill bg-muted flex h-13 items-center p-0.5 text-sm font-semibold">
           <button
             type="button"
             onClick={() => setEstimated(true)}
-            className={cn("rounded-pill h-8 px-3", estimated ? "bg-surface text-ink shadow-card" : "text-ink-muted")}
+            className={cn("rounded-pill h-12 px-4", estimated ? "bg-surface text-ink shadow-card" : "text-ink-muted")}
           >
             Estimasi
           </button>
           <button
             type="button"
             onClick={() => setEstimated(false)}
-            className={cn("rounded-pill h-8 px-3", !estimated ? "bg-surface text-ink shadow-card" : "text-ink-muted")}
+            className={cn("rounded-pill h-12 px-4", !estimated ? "bg-surface text-ink shadow-card" : "text-ink-muted")}
           >
             Pasti
           </button>

@@ -79,9 +79,9 @@ export function PengeluaranForm({ initialExpenses, nav }: { initialExpenses: Shi
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Keterangan (mis. Beli gas)"
-          className="rounded-input border-border h-11 border px-3 text-sm"
+          className="rounded-input border-border h-12 border px-3 text-sm"
         />
-        <RupiahInput value={amount} onChange={setAmount} placeholder="Nominal" className="h-11 text-sm" />
+        <RupiahInput value={amount} onChange={setAmount} placeholder="Nominal" className="h-12 text-sm" />
         {error && <p className="text-danger text-sm">{error}</p>}
         <Button variant="primary" size="large" fullWidth disabled={saving || !description.trim() || !amount} onClick={handleAdd}>
           + Tambah Pengeluaran

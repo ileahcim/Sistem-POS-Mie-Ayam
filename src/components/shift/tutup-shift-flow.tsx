@@ -82,7 +82,7 @@ function UnpaidOrderRow({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Nama untuk piutang"
-            className="rounded-input border-border h-11 border px-3 text-sm"
+            className="rounded-input border-border h-12 border px-3 text-sm"
           />
           {error && <p className="text-danger text-sm">{error}</p>}
           <div className="flex gap-2">
@@ -312,9 +312,9 @@ export function TutupShiftFlow({
               value={expenseDesc}
               onChange={(e) => setExpenseDesc(e.target.value)}
               placeholder="Keterangan (mis. Beli gas)"
-              className="rounded-input border-border h-11 border px-3 text-sm"
+              className="rounded-input border-border h-12 border px-3 text-sm"
             />
-            <RupiahInput value={expenseAmount} onChange={setExpenseAmount} placeholder="Nominal" className="h-11 text-sm" />
+            <RupiahInput value={expenseAmount} onChange={setExpenseAmount} placeholder="Nominal" className="h-12 text-sm" />
             {expenseError && <p className="text-danger text-sm">{expenseError}</p>}
             <Button
               variant="secondary"

@@ -58,7 +58,7 @@ export function PrintPreviewScreen({ settings }: { settings: StoreSettings }) {
         yang dipilih — sama seperti yang dipakai pembayaran/daftar packing di aplikasi.
       </p>
 
-      <div role="group" aria-label="Driver cetak" className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold">
+      <div role="group" aria-label="Driver cetak" className="rounded-pill bg-muted flex h-13 items-center p-0.5 text-sm font-semibold">
         {DRIVER_OPTIONS.map((option) => (
           <button
             key={option.value}
@@ -66,7 +66,7 @@ export function PrintPreviewScreen({ settings }: { settings: StoreSettings }) {
             onClick={() => setDriver(option.value)}
             aria-pressed={driver === option.value}
             className={cn(
-              "rounded-pill h-10 flex-1 px-2",
+              "rounded-pill h-12 flex-1 px-2",
               driver === option.value ? "bg-surface text-ink shadow-card" : "text-ink-muted",
             )}
           >

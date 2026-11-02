@@ -142,7 +142,7 @@ export function ChangePaymentMethodButton({
                         onClick={() => setSplitCash(preset)}
                         aria-pressed={splitCash === preset}
                         className={cn(
-                          "rounded-pill h-11 px-4 text-sm font-semibold",
+                          "rounded-pill h-12 px-4 text-sm font-semibold",
                           splitCash === preset ? "bg-primary text-white" : "bg-muted text-ink",
                         )}
                       >

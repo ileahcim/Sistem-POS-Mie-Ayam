@@ -238,7 +238,7 @@ export function FrozenReportScreen({
                 <button
                   type="button"
                   onClick={() => setSelectedKey(null)}
-                  className="rounded-pill border-border text-ink bg-surface h-10 border px-4 text-sm font-semibold"
+                  className="rounded-pill border-border text-ink bg-surface h-12 border px-4 text-sm font-semibold"
                 >
                   Semua ({rangeLabel})
                 </button>

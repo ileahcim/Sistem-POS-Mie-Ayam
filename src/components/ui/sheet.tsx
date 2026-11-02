@@ -34,7 +34,7 @@ export function Sheet({
         <div className="h-1 w-10 rounded-pill bg-border" aria-hidden />
       </div>
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <button type="button" onClick={onClose} className="h-10 w-10 shrink-0 text-2xl text-ink-muted" aria-label="Tutup">
+        <button type="button" onClick={onClose} className="-ml-2 h-12 w-12 shrink-0 text-2xl text-ink-muted" aria-label="Tutup">
           &#8592;
         </button>
         <h2 className="text-base font-semibold text-ink">{title}</h2>

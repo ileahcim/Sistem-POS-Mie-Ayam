@@ -38,7 +38,7 @@ export function ReportGranularityToggle({
           aria-pressed={value === opt.value}
           onClick={() => onChange(opt.value)}
           className={cn(
-            "rounded-pill h-10 px-4 text-sm font-semibold",
+            "rounded-pill h-12 px-4 text-sm font-semibold",
             value === opt.value ? "bg-surface text-ink shadow-card" : "text-ink-muted",
           )}
         >

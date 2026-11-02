@@ -77,7 +77,7 @@ export function BaksoUsageSettingsForm({ initial }: { initial: BaksoUsageSetting
               onChange={(e) =>
                 setValues((v) => ({ ...v, [f.key]: e.target.value.replace(/[^\d]/g, "") }))
               }
-              className="rounded-input border-border h-11 w-20 border px-2 text-center text-base"
+              className="rounded-input border-border h-12 w-20 border px-2 text-center text-base"
             />
           </label>
         ))}

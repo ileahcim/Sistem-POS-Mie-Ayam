@@ -101,7 +101,7 @@ export function CustomerList({ customers }: { customers: MieCustomerRow[] }) {
               aria-pressed={sort === mode}
               onClick={() => setSort(mode)}
               className={cn(
-                "rounded-pill h-10 px-4 text-sm font-semibold",
+                "rounded-pill h-12 px-4 text-sm font-semibold",
                 sort === mode ? "bg-surface text-ink shadow-card" : "text-ink-muted",
               )}
             >
