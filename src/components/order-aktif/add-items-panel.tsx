@@ -11,6 +11,7 @@ import { formatAddonWithQty } from "@/lib/printing/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PriceText } from "@/components/ui/price-text";
+import { QtyStepper } from "@/components/ui/qty-stepper";
 import { CategoryTabs } from "@/components/kasir/category-tabs";
 import { ProductGrid } from "@/components/kasir/product-grid";
 import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-sheet";
@@ -137,6 +138,12 @@ export function AddItemsPanel({
     setSheetProduct(null);
   }
 
+  function setPendingQty(localId: string, qty: number) {
+    setPendingItems((items) =>
+      qty <= 0 ? items.filter((i) => i.localId !== localId) : items.map((i) => (i.localId === localId ? { ...i, qty } : i)),
+    );
+  }
+
   async function handleConfirmAdd() {
     if (pendingItems.length === 0) return;
     setSaving(true);
@@ -219,16 +226,28 @@ export function AddItemsPanel({
 
       {pendingItems.length > 0 && (
         <div className="border-border border-t p-3">
-          <div className="flex flex-col gap-2">
+          <p className="text-ink-muted mb-1 text-sm font-semibold">Akan ditambahkan</p>
+          <div className="divide-border flex flex-col divide-y">
             {sortOrderLines(pendingItems, portionPriceOf).map((item) => (
-              <div key={item.localId} className="flex justify-between text-sm">
-                <span className="text-ink font-medium">
-                  {item.qty}x {item.productName}
-                  {item.addons.length > 0 && (
-                    <span className="text-ink-faint"> ({item.addons.map(formatAddonWithQty).join(", ")})</span>
-                  )}
-                </span>
-                <PriceText amount={cartItemLineTotal(item)} weight="secondary" />
+              <div key={item.localId} className="flex flex-col gap-1 py-2">
+                <div className="flex justify-between gap-2 text-sm">
+                  <span className="text-ink font-medium">
+                    {item.qty}x {item.productName}
+                    {item.addons.length > 0 && (
+                      <span className="text-ink-faint"> ({item.addons.map(formatAddonWithQty).join(", ")})</span>
+                    )}
+                  </span>
+                  <PriceText amount={cartItemLineTotal(item)} weight="secondary" />
+                </div>
+                {/* Not saved yet — − at 1 just drops the line (field problem
+                    2 Nov 2026: a mis-tapped extra couldn't be taken back). */}
+                <QtyStepper
+                  qty={item.qty}
+                  label={item.productName}
+                  onDecrement={() => setPendingQty(item.localId, item.qty - 1)}
+                  onIncrement={() => setPendingQty(item.localId, item.qty + 1)}
+                  disabled={saving}
+                />
               </div>
             ))}
           </div>

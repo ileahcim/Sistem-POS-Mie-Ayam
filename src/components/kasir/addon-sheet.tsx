@@ -240,7 +240,7 @@ export function AddonSheet({
           <button
             type="button"
             onClick={() => setQty((q) => Math.max(1, q - 1))}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-xl text-ink"
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-border text-xl text-ink"
             aria-label="Kurangi"
           >
             −
@@ -249,7 +249,7 @@ export function AddonSheet({
           <button
             type="button"
             onClick={() => setQty((q) => q + 1)}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-xl text-ink"
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-border text-xl text-ink"
             aria-label="Tambah"
           >
             +

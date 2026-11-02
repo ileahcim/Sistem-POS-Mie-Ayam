@@ -7,7 +7,7 @@ import type { MenuCategory } from "@/lib/menu/get-active-menu";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver, ReceiptData } from "@/lib/printing/types";
 import { getPrinter } from "@/lib/printing/get-printer";
-import { formatRupiah, groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
+import { formatRupiah } from "@/lib/printing/format";
 import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
 import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import { cn } from "@/components/ui/cn";
 import { AppHeader } from "@/components/ui/app-header";
 import { LinkButton } from "@/components/ui/link-button";
 import { AddItemsPanel } from "@/components/order-aktif/add-items-panel";
+import { SavedOrderItemRow } from "@/components/order-aktif/saved-order-item-row";
+import { useKitchenTicketPrompt } from "@/components/printing/use-kitchen-ticket-prompt";
 import { SplitAndPayButton } from "@/components/order-aktif/split-and-pay-sheet";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
 import { formatId } from "@/lib/timezone";
@@ -92,6 +94,8 @@ export function PembayaranScreen({
   // bar (add-items-panel.tsx) — paying with picked items unsaved is impossible.
   const [addingItems, setAddingItems] = useState(false);
   const [footerEl, setFooterEl] = useState<HTMLDivElement | null>(null);
+  const { offer: offerKitchenTicket, prompt: kitchenTicketPrompt } = useKitchenTicketPrompt({ printerDriver });
+  const totalQty = order.items.reduce((sum, i) => sum + i.qty, 0);
 
   // RECEIVABLE (piutang) is still payable — settling it later is the whole
   // point. Only PAID/VOID actually block the payment UI.
@@ -221,6 +225,7 @@ export function PembayaranScreen({
       />
 
       <div className="flex-1 overflow-y-auto p-4">
+        {kitchenTicketPrompt}
         {pendingReceipt ? (
           <div className="flex flex-col items-center gap-4 py-8 text-center">
             {choice === "LATER" ? (
@@ -276,23 +281,20 @@ export function PembayaranScreen({
                   lines={sortOrderLines(order.items, portionPriceOf)}
                   keyOf={(item) => item.id}
                   divided
-                  inset="px-4"
+                  inset="px-3"
                   renderLine={(item) => (
-                  <div className="flex flex-col gap-1 p-4">
-                    <div className="flex justify-between gap-3">
-                      <span className="text-base font-semibold text-ink">
-                        {item.qty}x {item.productName}
-                      </span>
-                      <PriceText amount={item.lineTotal} weight="secondary" />
-                    </div>
-                    {(item.addons.length > 0 || item.notes) && (
-                      <span className="text-ink-muted text-sm">
-                        {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    )}
-                  </div>
+                    // A forgotten extra added here is saved at once, so a
+                    // mis-tap must be undoable here too (2 Nov 2026). Only an
+                    // OPEN order is editable — a piutang being settled is not,
+                    // and the server refuses anything but OPEN regardless.
+                    <SavedOrderItemRow
+                      orderId={order.id}
+                      item={item}
+                      editable={order.status === "OPEN" && !addingItems && !paying}
+                      canRemove={totalQty > 1}
+                      onChanged={() => router.refresh()}
+                      onKitchenTicket={kitchenTicketEnabled ? offerKitchenTicket : undefined}
+                    />
                   )}
                 />
               </div>

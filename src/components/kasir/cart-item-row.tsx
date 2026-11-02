@@ -1,16 +1,22 @@
 import type { CartItem } from "@/lib/cart/types";
 import { cartItemLineTotal } from "@/lib/cart/types";
 import { PriceText } from "@/components/ui/price-text";
+import { Button } from "@/components/ui/button";
+import { QtyStepper } from "@/components/ui/qty-stepper";
 import { formatAddonWithQty } from "@/lib/printing/format";
 
+// One line of the Kasir / Pre-order Baru cart. [ − ] qty [ + ] fixes a
+// mis-tap without reopening anything (− at 1 takes the line out — it isn't
+// saved yet, re-tapping the product brings it back); Edit reopens the add-on
+// sheet for a wrong topping or note.
 export function CartItemRow({
   item,
   onEdit,
-  onRemove,
+  onChangeQty,
 }: {
   item: CartItem;
   onEdit: () => void;
-  onRemove: () => void;
+  onChangeQty: (qty: number) => void;
 }) {
   const hasDetail = item.addons.length > 0 || !!item.notes;
 
@@ -29,13 +35,16 @@ export function CartItemRow({
         </span>
       )}
 
-      <div className="mt-0.5 flex justify-end gap-4 text-sm font-medium">
-        <button type="button" onClick={onEdit} className="text-primary-strong">
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <QtyStepper
+          qty={item.qty}
+          label={item.productName}
+          onDecrement={() => onChangeQty(item.qty - 1)}
+          onIncrement={() => onChangeQty(item.qty + 1)}
+        />
+        <Button variant="secondary" size="compact" onClick={onEdit}>
           Edit
-        </button>
-        <button type="button" onClick={onRemove} className="text-danger">
-          Hapus
-        </button>
+        </Button>
       </div>
     </div>
   );

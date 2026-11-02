@@ -54,7 +54,7 @@ export function KasirScreen({
   kitchenTicketEnabled: boolean;
 }) {
   const router = useRouter();
-  const { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, clear } = useCartDraft();
+  const { draft, setChannel, setTableLabel, setCustomerName, upsertItem, setItemQty, clear } = useCartDraft();
   const { offer: offerKitchenTicket, prompt: kitchenTicketPrompt } = useKitchenTicketPrompt({ printerDriver });
   const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? "");
   const [sheetTarget, setSheetTarget] = useState<SheetTarget | null>(null);
@@ -259,7 +259,7 @@ export function KasirScreen({
             saveError={saveError}
             lastAddedLocalId={lastAddedLocalId}
             onEdit={handleEditItem}
-            onRemove={removeItem}
+            onChangeQty={setItemQty}
             onAddCustomItem={() => setCustomItemSheetOpen(true)}
             onSave={handleSave}
           />
@@ -279,7 +279,7 @@ export function KasirScreen({
             saveError={saveError}
             lastAddedLocalId={lastAddedLocalId}
             onEdit={handleEditItem}
-            onRemove={removeItem}
+            onChangeQty={setItemQty}
             onAddCustomItem={() => setCustomItemSheetOpen(true)}
             onSave={handleSave}
             onClose={() => setCartSheetOpen(false)}

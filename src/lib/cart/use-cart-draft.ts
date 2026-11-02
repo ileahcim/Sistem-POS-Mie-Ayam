@@ -98,9 +98,21 @@ export function useCartDraft(storageKey: string = DEFAULT_STORAGE_KEY) {
     setDraft((d) => ({ ...d, items: d.items.filter((i) => i.localId !== localId) }));
   }, []);
 
+  // The cart row's [ − ] qty [ + ]. Only the qty changes — never the line's
+  // identity — so no merge check is needed; 0 takes the line out.
+  const setItemQty = useCallback((localId: string, qty: number) => {
+    setDraft((d) => ({
+      ...d,
+      items:
+        qty <= 0
+          ? d.items.filter((i) => i.localId !== localId)
+          : d.items.map((i) => (i.localId === localId ? { ...i, qty } : i)),
+    }));
+  }, []);
+
   const clear = useCallback(() => {
     setDraft(emptyCartDraft());
   }, []);
 
-  return { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, clear };
+  return { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, setItemQty, clear };
 }

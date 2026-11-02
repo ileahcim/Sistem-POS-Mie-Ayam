@@ -40,7 +40,7 @@ export function PreOrderScreen({
   nav: HeaderNav;
 }) {
   const router = useRouter();
-  const { draft, setChannel, setTableLabel, setCustomerName, upsertItem, removeItem, clear } =
+  const { draft, setChannel, setTableLabel, setCustomerName, upsertItem, setItemQty, clear } =
     useCartDraft(PREORDER_STORAGE_KEY);
   const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? "");
   const [sheetTarget, setSheetTarget] = useState<SheetTarget | null>(null);
@@ -225,7 +225,7 @@ export function PreOrderScreen({
             saveError={saveError}
             lastAddedLocalId={lastAddedLocalId}
             onEdit={handleEditItem}
-            onRemove={removeItem}
+            onChangeQty={setItemQty}
             onSave={handleSave}
             saveLabel="Simpan Pre-order"
           />
@@ -245,7 +245,7 @@ export function PreOrderScreen({
             saveError={saveError}
             lastAddedLocalId={lastAddedLocalId}
             onEdit={handleEditItem}
-            onRemove={removeItem}
+            onChangeQty={setItemQty}
             onSave={handleSave}
             saveLabel="Simpan Pre-order"
             onClose={() => setCartSheetOpen(false)}

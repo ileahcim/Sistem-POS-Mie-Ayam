@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { AppHeader } from "@/components/ui/app-header";
 import { formatId } from "@/lib/timezone";
 import { formatQueueLabel } from "@/lib/orders/queue-label";
-import { groupAddonsForPrint, formatAddonWithQty } from "@/lib/printing/format";
 import { DEPOSIT_ORDER_CHANGE_REFUSAL, formatPaymentMethodDetail } from "@/lib/orders/payment-method-label";
 import { formatTenderedNote } from "@/lib/orders/cash-change";
 import { portionPriceOf, sortOrderLines } from "@/lib/orders/line-order";
@@ -31,7 +30,8 @@ import { ChangePaymentMethodButton } from "./change-payment-method-sheet";
 import { ChangeChannelButton } from "./change-channel-sheet";
 import { DepositCard } from "@/components/pesanan-terjadwal/deposit-card";
 import { CancelDepositOrderButton } from "@/components/pesanan-terjadwal/cancel-deposit-order-sheet";
-import { markServed, removeOrderItem, editOrderItem } from "@/app/order-aktif/actions";
+import { markServed, editOrderItem } from "@/app/order-aktif/actions";
+import { SavedOrderItemRow } from "./saved-order-item-row";
 import { buildKitchenTicketData } from "@/lib/orders/build-kitchen-ticket-data";
 import { printKitchenTicketSafely } from "@/lib/printing/print-kitchen-ticket";
 import { useKitchenTicketPrompt } from "@/components/printing/use-kitchen-ticket-prompt";
@@ -44,108 +44,6 @@ const CHANNEL_LABEL: Record<OrderDetailData["channel"], string> = {
 
 function formatScheduledFor(iso: string): string {
   return formatId(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
-}
-
-// One line of a saved order. While the order is still unpaid it can be
-// corrected in place (a mis-tapped drink used to be impossible to undo):
-// "Edit" reopens the addon sheet pre-filled (wrong topping — used to mean
-// Hapus + tambah ulang), "− 1 porsi" for a multi-qty line, "Hapus" for the
-// whole line. Deleting asks once inline (no extra sheet) since it's the
-// destructive one; the server recomputes the order total either way.
-function OrderItemRow({
-  orderId,
-  item,
-  editable,
-  canRemove,
-  onChanged,
-  onEdit,
-}: {
-  orderId: string;
-  item: OrderDetailData["items"][number];
-  editable: boolean;
-  canRemove: boolean;
-  onChanged: () => void;
-  onEdit: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function run(mode: "one" | "all") {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await removeOrderItem(orderId, item.id, mode);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setConfirming(false);
-      onChanged();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-0.5 p-3">
-      <div className="flex justify-between gap-3">
-        <span className="text-base font-semibold text-ink">
-          {item.qty}x {item.productName}
-          {item.isCustom && (
-            <span className="ml-2 inline-block align-middle">
-              <Badge variant="warning">Custom</Badge>
-            </span>
-          )}
-        </span>
-        <PriceText amount={item.lineTotal} weight="secondary" />
-      </div>
-      {(item.addons.length > 0 || item.notes) && (
-        <span className="text-ink-muted text-sm">
-          {[groupAddonsForPrint(item.addons).map(formatAddonWithQty).join(", "), item.notes]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
-      )}
-
-      {editable && !confirming && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          {/* A custom item ("+ Item Custom") has no real Product behind it
-              to reopen an addon sheet for — Hapus + tambah ulang covers the
-              correction case instead (owner's scope, 22 Sep 2026). */}
-          {!item.isCustom && (
-            <Button variant="secondary" disabled={busy} onClick={onEdit}>
-              Edit
-            </Button>
-          )}
-          {canRemove && (
-            <>
-              {item.qty > 1 && (
-                <Button variant="secondary" disabled={busy} onClick={() => run("one")}>
-                  − 1 porsi
-                </Button>
-              )}
-              <Button variant="secondary" disabled={busy} onClick={() => setConfirming(true)}>
-                Hapus
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-      {editable && confirming && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">Hapus baris ini?</span>
-          <Button variant="danger" disabled={busy} onClick={() => run("all")}>
-            {busy ? "Menghapus..." : "Ya, hapus"}
-          </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
-            Batal
-          </Button>
-        </div>
-      )}
-      {error && <p className="text-danger mt-1 text-sm">{error}</p>}
-    </div>
-  );
 }
 
 export function OrderDetail({
@@ -317,7 +215,7 @@ export function OrderDetail({
               divided
               inset="px-3"
               renderLine={(item) => (
-                <OrderItemRow
+                <SavedOrderItemRow
                   orderId={order.id}
                   item={item}
                   editable={canEditItems}
@@ -327,6 +225,7 @@ export function OrderDetail({
                     setEditError(null);
                     setEditingItem(item);
                   }}
+                  onKitchenTicket={kitchenTicketEnabled ? offerKitchenTicket : undefined}
                 />
               )}
             />

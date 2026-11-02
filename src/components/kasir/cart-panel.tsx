@@ -25,7 +25,7 @@ export function CartPanel({
   saveError,
   lastAddedLocalId,
   onEdit,
-  onRemove,
+  onChangeQty,
   onAddCustomItem,
   onSave,
   saveLabel = "Simpan Pesanan",
@@ -40,7 +40,8 @@ export function CartPanel({
   saveError: string | null;
   lastAddedLocalId: string | null;
   onEdit: (item: CartItem) => void;
-  onRemove: (localId: string) => void;
+  // [ − ] qty [ + ] on a row; 0 removes the line.
+  onChangeQty: (localId: string, qty: number) => void;
   // Undefined on Pesanan Terjadwal's cart — "+ Item Custom" is Kasir- and
   // "+ Tambah Item"-only (owner's explicit scope, 22 Sep 2026).
   onAddCustomItem?: () => void;
@@ -76,7 +77,7 @@ export function CartPanel({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.2 }}
             >
-              <CartItemRow item={item} onEdit={() => onEdit(item)} onRemove={() => onRemove(item.localId)} />
+              <CartItemRow item={item} onEdit={() => onEdit(item)} onChangeQty={(qty) => onChangeQty(item.localId, qty)} />
             </motion.div>
           )}
         />
