@@ -7,6 +7,7 @@ import { getReceivableOrders } from "@/lib/orders/get-receivable-orders";
 import { getBaksoUsageSetting } from "@/lib/settings/get-bakso-usage-setting";
 import { getHeaderNav } from "@/lib/header/get-header-nav";
 import { DashboardScreen } from "@/components/dashboard/dashboard-screen";
+import { getSelfUseRows } from "@/lib/stock/get-ice-cream";
 
 // OWNER only, checked server-side here (not just a hidden menu item) — see
 // CLAUDE.md "Server-side authorization". This page has no client-invokable
@@ -18,13 +19,14 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "OWNER") redirect("/kasir");
 
-  const [shifts, omzetHistory, sales, timings, baksoUsageSetting, receivables, nav] = await Promise.all([
+  const [shifts, omzetHistory, sales, timings, baksoUsageSetting, receivables, selfUse, nav] = await Promise.all([
     getShiftHistory(),
     getOmzetHistory(),
     getDashboardOrders(),
     getDashboardOrderTimings(),
     getBaksoUsageSetting(),
     getReceivableOrders(),
+    getSelfUseRows(),
     getHeaderNav(),
   ]);
 
@@ -37,6 +39,7 @@ export default async function DashboardPage() {
       baksoUsageSetting={baksoUsageSetting}
       today={sales.today}
       receivables={receivables}
+      selfUse={selfUse}
       nav={nav}
     />
   );

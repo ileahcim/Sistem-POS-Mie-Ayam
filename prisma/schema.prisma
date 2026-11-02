@@ -45,6 +45,7 @@ model User {
   mieLedgerEntriesCreated MieLedgerEntry[]
   frozenLedgerEntriesCreated FrozenLedgerEntry[]
   depositEntriesCreated   PreorderDeposit[]
+  stockMovementsCreated   StockMovement[]
 }
 
 // ---------------------------------------------------------------------------
@@ -210,8 +211,22 @@ model Product {
   sortOrder Int     @default(0)
   isActive  Boolean @default(true) // soft delete only — old orders reference this row forever
 
-  addonGroups ProductAddonGroup[]
-  orderItems  OrderItem[]
+  // Stok per pcs — Es Krim only (docs/spec-es-krim.md, 2 Nov 2026). Every
+  // other product keeps tracksStock=false and never touches these columns.
+  // `stock` is a running counter changed ONLY through lib/stock/apply.ts,
+  // always in the same DB transaction as the StockMovement row that explains
+  // it, and only by a conditional update (stock >= qty) — so it can never go
+  // negative even with two tablets tapping at once. unitsPerBox/boxPrice are
+  // the latest "Barang Masuk" values; costPrice above = round(boxPrice ÷
+  // unitsPerBox), set by the server at each Barang Masuk.
+  tracksStock Boolean @default(false)
+  stock       Int     @default(0)
+  unitsPerBox Int?
+  boxPrice    Int?
+
+  addonGroups    ProductAddonGroup[]
+  orderItems     OrderItem[]
+  stockMovements StockMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -490,6 +505,7 @@ model Order {
   items    OrderItem[]
   deposits PreorderDeposit[]
   paymentMethodChanges PaymentMethodChange[]
+  stockMovements StockMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -871,4 +887,54 @@ model MieLedgerEntry {
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Stok Es Krim (docs/spec-es-krim.md, 2 Nov 2026). Append-only history of
+// every change to Product.stock — never edited or deleted; a mistake is
+// fixed with a new CORRECTION row. Nothing here touches Shift/Expense/cash:
+// "Ambil Sendiri" is stock leaving without a sale, so it is never omzet and
+// never in the drawer formula.
+// ---------------------------------------------------------------------------
+
+enum StockMovementKind {
+  RESTOCK // "Barang Masuk" — boxes bought from the distributor
+  SALE // "Terjual" — item went into an order (or a qty bump on one)
+  SALE_RETURN // "Batal/Void" — item reduced/removed, order cancelled or voided
+  CORRECTION // "Koreksi" — manual +/−, reason required (rusak, meleleh, salah hitung)
+  SELF_USE // "Ambil Sendiri" — eaten by the family, not sold
+}
+
+model StockMovement {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  kind       StockMovementKind
+  qtyChange  Int // signed pcs: + into stock, − out of stock, never 0
+  stockAfter Int // Product.stock right after this row — makes the history readable without re-summing
+
+  // RESTOCK only: what was bought. qtyChange = boxes × unitsPerBox.
+  boxes       Int?
+  unitsPerBox Int?
+  boxPrice    Int?
+  // Modal per pcs at the moment of the movement (Product.costPrice snapshot).
+  // Values "Ambil Sendiri" on the Dashboard without re-reading a price that
+  // may have changed since — same snapshot rule as OrderItem.costPrice.
+  unitCost Int?
+
+  // SALE / SALE_RETURN: the order the item belongs to.
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  takenBy String? // SELF_USE: who took it — optional free text
+  note    String? // CORRECTION: the required reason; otherwise optional
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([kind, createdAt])
+  @@index([orderId])
 }

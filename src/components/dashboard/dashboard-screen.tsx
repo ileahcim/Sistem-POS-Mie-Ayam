@@ -10,6 +10,7 @@ import { ShiftHistorySection } from "./shift-history-section";
 import { OmzetSection } from "./omzet-section";
 import { SalesReportSection } from "./sales-report-section";
 import { PiutangSection } from "./piutang-section";
+import type { SelfUseRow } from "@/lib/stock/types";
 
 // Sections render top-to-bottom in the exact priority order the owner
 // asked for — the one checked most often (shift history/selisih) is the
@@ -24,6 +25,7 @@ export function DashboardScreen({
   baksoUsageSetting,
   today,
   receivables,
+  selfUse,
   nav,
 }: {
   shifts: ShiftHistoryRow[];
@@ -33,6 +35,7 @@ export function DashboardScreen({
   baksoUsageSetting: BaksoUsageSettingValues;
   today: string;
   receivables: ReceivableOrder[];
+  selfUse: SelfUseRow[];
   nav: HeaderNav;
 }) {
   return (
@@ -71,6 +74,7 @@ export function DashboardScreen({
               orders={salesOrders}
               timings={timings}
               baksoUsageSetting={baksoUsageSetting}
+              selfUse={selfUse}
               today={today}
             />
           </FadeIn>

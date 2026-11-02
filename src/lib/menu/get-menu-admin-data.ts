@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ICE_CREAM_CATEGORY_NAME } from "@/lib/stock/types";
 
 export type AdminProduct = {
   id: string;
@@ -32,7 +33,10 @@ export type AdminAddonGroup = {
 // future margin), this page shows EVERYTHING, active and inactive, since
 // "nonaktifkan" needs to see what's already off to turn it back on.
 export async function getMenuAdminData(): Promise<{ categories: AdminCategory[]; addonGroups: AdminAddonGroup[] }> {
+  // Es krim lives on /es-krim (stock, box price, modal per pcs) — kept off
+  // this page so there is one place per concern (docs/spec-es-krim.md).
   const categories = await prisma.category.findMany({
+    where: { name: { not: ICE_CREAM_CATEGORY_NAME } },
     orderBy: { sortOrder: "asc" },
     include: {
       products: {

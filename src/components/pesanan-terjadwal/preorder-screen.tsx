@@ -18,6 +18,7 @@ import { AddonSheet, type AddonSheetResult } from "@/components/kasir/addon-shee
 import { CartPanel } from "@/components/kasir/cart-panel";
 import { CartBar } from "@/components/kasir/cart-bar";
 import { savePreOrder } from "@/app/pesanan-terjadwal/actions";
+import { stockByProductOf } from "@/lib/stock/types";
 
 const PREORDER_STORAGE_KEY = "pos-mi-ayam:preorder-draft";
 
@@ -52,6 +53,11 @@ export function PreOrderScreen({
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? categories[0];
+
+  const stockByProduct = useMemo(
+    () => stockByProductOf(categories.flatMap((c) => c.products)),
+    [categories],
+  );
 
   const cartQtyByProduct = useMemo(() => {
     const map: Record<string, number> = {};
@@ -218,6 +224,7 @@ export function PreOrderScreen({
 
         <div className="hidden w-[340px] shrink-0 lg:block">
           <CartPanel
+            stockByProduct={stockByProduct}
             items={draft.items}
             channel={draft.channel}
             tableLabel={draft.tableLabel}
@@ -237,6 +244,7 @@ export function PreOrderScreen({
       <AnimatePresence>
         {cartSheetOpen && (
           <CartPanel
+            stockByProduct={stockByProduct}
             variant="sheet"
             items={draft.items}
             channel={draft.channel}

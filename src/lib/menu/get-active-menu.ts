@@ -24,6 +24,10 @@ export type MenuProduct = {
   // snapshot it and sort itself — see lib/orders/line-order.ts.
   categorySortOrder: number;
   productSortOrder: number; // Product.sortOrder — the grid order, also the cart order
+  // Pcs left — es krim only (Product.tracksStock); null for every product
+  // that has no stock. A snapshot of page-load time: the server re-checks on
+  // every save (lib/stock/apply.ts), this only drives the card/stepper.
+  stock: number | null;
   addonGroups: MenuAddonGroup[];
 };
 
@@ -90,6 +94,7 @@ export async function getActiveMenu(): Promise<MenuCategory[]> {
         isDeliveryChargeable: category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME,
         categorySortOrder: category.sortOrder,
         productSortOrder: product.sortOrder,
+        stock: product.tracksStock ? product.stock : null,
         addonGroups: product.addonGroups.map((pag) => ({
           id: pag.addonGroup.id,
           name: pag.addonGroup.name,

@@ -23,6 +23,8 @@ import { CustomItemSection } from "./custom-item-section";
 import { ChannelBreakdownSection } from "./channel-breakdown-section";
 import { BusyHoursSection } from "./busy-hours-section";
 import { BaksoUsageSection } from "./bakso-usage-section";
+import { SelfUseSection } from "./self-use-section";
+import { summarizeSelfUse, type SelfUseRow } from "@/lib/stock/types";
 
 function formatDay(day: string): string {
   const [y, m, d] = day.split("-").map(Number);
@@ -52,11 +54,13 @@ export function SalesReportSection({
   orders,
   timings,
   baksoUsageSetting,
+  selfUse,
   today,
 }: {
   orders: DashboardOrder[];
   timings: DashboardOrderTiming[];
   baksoUsageSetting: BaksoUsageSettingValues;
+  selfUse: SelfUseRow[];
   today: string;
 }) {
   const [range, setRange] = useState<DateRange>(
@@ -76,6 +80,7 @@ export function SalesReportSection({
   const channelBreakdown = useMemo(() => computeChannelBreakdown(filtered), [filtered]);
   const customItemGroups = useMemo(() => computeCustomItemGroups(filtered), [filtered]);
   const busyHours = useMemo(() => computeBusyHours(timings, safeRange), [timings, safeRange]);
+  const selfUseSummary = useMemo(() => summarizeSelfUse(selfUse, safeRange), [selfUse, safeRange]);
   const baksoUsage = useMemo(() => computeBaksoUsage(filtered, baksoUsageSetting), [filtered, baksoUsageSetting]);
 
   return (
@@ -117,6 +122,7 @@ export function SalesReportSection({
       <ChannelBreakdownSection rows={channelBreakdown} rangeLabel={rangeLabel} />
       <BusyHoursSection buckets={busyHours} rangeLabel={rangeLabel} />
       <BaksoUsageSection totals={baksoUsage} rangeLabel={rangeLabel} />
+      <SelfUseSection summary={selfUseSummary} rangeLabel={rangeLabel} />
     </div>
   );
 }

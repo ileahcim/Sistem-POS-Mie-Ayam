@@ -8,6 +8,7 @@ import { buildComboKey } from "@/lib/orders/pricing";
 import { DELIVERY_CHARGEABLE_CATEGORY_NAME } from "@/lib/menu/get-active-menu";
 import { CHANNELS, TABLE_LABELS, type ChannelType, type TableLabel } from "@/lib/cart/types";
 import type { KitchenTicketData } from "@/lib/printing/types";
+import { StockError, syncOrderStock } from "@/lib/stock/apply";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -77,9 +78,18 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Acti
   // "No DP" is part of the WHERE for the same reason status is: a pre-order that
   // took DP holds real money, so cancelling it has to say what happens to that
   // money — that is cancelOrderWithDeposit (OWNER), never this plain path.
-  const result = await prisma.order.updateMany({
-    where: { id: orderId, status: "OPEN", deposits: { none: {} } },
-    data: { status: "CANCELLED", cancelReason: trimmed, cancelledById: user.id, cancelledAt: new Date() },
+  // Same transaction as the status change: es krim on the order goes back
+  // into stock exactly once, and only if the cancel itself succeeded.
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({
+      where: { id: orderId, status: "OPEN", deposits: { none: {} } },
+      data: { status: "CANCELLED", cancelReason: trimmed, cancelledById: user.id, cancelledAt: new Date() },
+    });
+    if (updated.count > 0) {
+      const items = await tx.orderItem.findMany({ where: { orderId }, select: { productId: true, qty: true } });
+      await syncOrderStock(tx, { removed: items, orderId, userId: user.id });
+    }
+    return updated;
   });
   if (result.count === 0) {
     const holdsDeposit = await prisma.preorderDeposit.count({ where: { orderId } });
@@ -99,7 +109,7 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Acti
 // below; once the order is PAID neither is available (a paid order is
 // frozen — extra items become a new order).
 export async function addItemsToOrder(orderId: string, items: OrderItemInput[]): Promise<AddItemsResult> {
-  await requireUser();
+  const user = await requireUser();
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) return { ok: false, error: "Order tidak ditemukan." };
@@ -140,14 +150,24 @@ export async function addItemsToOrder(orderId: string, items: OrderItemInput[]):
     else toCreate.push(data);
   }
 
-  await prisma.$transaction([
-    ...bumps.map((bump) =>
-      prisma.orderItem.update({ where: { id: bump.id }, data: { qty: bump.qty, lineTotal: bump.lineTotal } }),
-    ),
-    ...(toCreate.length > 0
-      ? [prisma.order.update({ where: { id: orderId }, data: { items: { create: toCreate } } })]
-      : []),
-  ]);
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Re-checked inside the transaction: a payment landing between the read
+      // above and this write must not get items (or a stock change) added.
+      const stillOpen = await tx.order.count({ where: { id: orderId, status: "OPEN" } });
+      if (stillOpen === 0) throw new StockError("Order ini sudah dibayar/tidak aktif — tidak bisa ditambah item.");
+      for (const bump of bumps) {
+        await tx.orderItem.update({ where: { id: bump.id }, data: { qty: bump.qty, lineTotal: bump.lineTotal } });
+      }
+      if (toCreate.length > 0) {
+        await tx.order.update({ where: { id: orderId }, data: { items: { create: toCreate } } });
+      }
+      await syncOrderStock(tx, { added: itemsData, orderId, userId: user.id });
+    });
+  } catch (e) {
+    if (e instanceof StockError) return { ok: false, error: e.message };
+    throw e;
+  }
 
   // "TAMBAHAN" ticket for exactly the lines just added (display), never the
   // order's pre-existing lines — whether a given line bumped an existing row
@@ -175,7 +195,7 @@ export async function removeOrderItem(
   orderItemId: string,
   mode: "one" | "all",
 ): Promise<ActionResult> {
-  await requireUser();
+  const user = await requireUser();
 
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
@@ -198,6 +218,9 @@ export async function removeOrderItem(
         error: "Order harus menyisakan minimal 1 item. Untuk mengosongkan order, pakai Batalkan Order.",
       };
     }
+
+    // Es krim taken off the order goes back into stock (docs/spec-es-krim.md).
+    await syncOrderStock(tx, { removed: [{ productId: item.productId, qty: removedQty }], orderId, userId: user.id });
 
     if (removedQty >= item.qty) {
       // OrderItemAddon has no cascade in the schema — its snapshot rows go
@@ -235,105 +258,119 @@ export type EditItemResult =
 // addItemsToOrder uses for a fresh add, and upsertCartLine uses client-side
 // before the order is even saved.
 export async function editOrderItem(orderId: string, orderItemId: string, input: EditItemInput): Promise<EditItemResult> {
-  await requireUser();
+  const user = await requireUser();
   const qty = Math.max(1, Math.floor(input.qty));
   const notes = input.notes.trim() || null;
 
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
-    if (!order) return { ok: false, error: "Order tidak ditemukan." };
-    if (order.status !== "OPEN") {
-      return { ok: false, error: "Order ini sudah dibayar/tidak aktif — tidak bisa diubah." };
-    }
-    const target = order.items.find((i) => i.id === orderItemId);
-    if (!target) return { ok: false, error: "Item tidak ditemukan di order ini." };
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+      if (!order) return { ok: false, error: "Order tidak ditemukan." };
+      if (order.status !== "OPEN") {
+        return { ok: false, error: "Order ini sudah dibayar/tidak aktif — tidak bisa diubah." };
+      }
+      const target = order.items.find((i) => i.id === orderItemId);
+      if (!target) return { ok: false, error: "Item tidak ditemukan di order ini." };
 
-    const product = await tx.product.findUnique({ where: { id: input.productId }, include: { category: true } });
-    if (!product || !product.isActive) {
-      return { ok: false, error: "Produk sudah tidak tersedia. Muat ulang halaman." };
-    }
+      const product = await tx.product.findUnique({ where: { id: input.productId }, include: { category: true } });
+      if (!product || !product.isActive) {
+        return { ok: false, error: "Produk sudah tidak tersedia. Muat ulang halaman." };
+      }
 
-    const distinctAddonIds = [...new Set(input.addonOptionIds)];
-    const addonOptions = await tx.addonOption.findMany({ where: { id: { in: distinctAddonIds }, isActive: true } });
-    if (addonOptions.length !== distinctAddonIds.length) {
-      return { ok: false, error: "Salah satu topping sudah tidak tersedia. Muat ulang halaman." };
-    }
-    const addonById = new Map(addonOptions.map((a) => [a.id, a]));
+      const distinctAddonIds = [...new Set(input.addonOptionIds)];
+      const addonOptions = await tx.addonOption.findMany({ where: { id: { in: distinctAddonIds }, isActive: true } });
+      if (addonOptions.length !== distinctAddonIds.length) {
+        return { ok: false, error: "Salah satu topping sudah tidak tersedia. Muat ulang halaman." };
+      }
+      const addonById = new Map(addonOptions.map((a) => [a.id, a]));
 
-    const isDeliveryChargeable = product.category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME;
-    const isKitchenItem = product.category.isKitchenItem;
-    const unitTotal = product.price + input.addonOptionIds.reduce((sum, id) => sum + addonById.get(id)!.price, 0);
-    const comboKey = buildComboKey(product.id, input.addonOptionIds);
-    const lineTotal = unitTotal * qty;
+      const isDeliveryChargeable = product.category.name === DELIVERY_CHARGEABLE_CATEGORY_NAME;
+      const isKitchenItem = product.category.isKitchenItem;
+      const unitTotal = product.price + input.addonOptionIds.reduce((sum, id) => sum + addonById.get(id)!.price, 0);
+      const comboKey = buildComboKey(product.id, input.addonOptionIds);
+      const lineTotal = unitTotal * qty;
 
-    // Same twin-match rule as addItemsToOrder: product+addons+notes match AND
-    // the per-portion price lines up (a price change since the order opened
-    // gets its own correctly-priced row instead of silently inheriting the
-    // twin's older price).
-    const twin = order.items.find(
-      (i) =>
-        i.id !== target.id &&
-        i.comboKey === comboKey &&
-        (i.notes ?? "") === (notes ?? "") &&
-        i.qty > 0 &&
-        i.lineTotal / i.qty === unitTotal,
-    );
+      // Same twin-match rule as addItemsToOrder: product+addons+notes match AND
+      // the per-portion price lines up (a price change since the order opened
+      // gets its own correctly-priced row instead of silently inheriting the
+      // twin's older price).
+      const twin = order.items.find(
+        (i) =>
+          i.id !== target.id &&
+          i.comboKey === comboKey &&
+          (i.notes ?? "") === (notes ?? "") &&
+          i.qty > 0 &&
+          i.lineTotal / i.qty === unitTotal,
+      );
 
-    const addonCreateData = input.addonOptionIds.map((id) => {
-      const a = addonById.get(id)!;
-      return { addonOptionId: a.id, name: a.name, price: a.price, costPrice: a.costPrice };
+      // Net stock change of the edit: the old line comes off, the new one goes
+      // on (same es krim, qty 2 → 3 = one more pcs sold).
+      await syncOrderStock(tx, {
+        removed: [{ productId: target.productId, qty: target.qty }],
+        added: [{ productId: product.id, qty }],
+        orderId,
+        userId: user.id,
+      });
+
+      const addonCreateData = input.addonOptionIds.map((id) => {
+        const a = addonById.get(id)!;
+        return { addonOptionId: a.id, name: a.name, price: a.price, costPrice: a.costPrice };
+      });
+
+      if (twin) {
+        await tx.orderItemAddon.deleteMany({ where: { orderItemId: target.id } });
+        await tx.orderItem.delete({ where: { id: target.id } });
+        await tx.orderItem.update({
+          where: { id: twin.id },
+          data: { qty: twin.qty + qty, lineTotal: twin.lineTotal + lineTotal },
+        });
+      } else {
+        // OrderItemAddon has no cascade — replace its rows explicitly rather
+        // than trying to diff old vs new selection.
+        await tx.orderItemAddon.deleteMany({ where: { orderItemId: target.id } });
+        await tx.orderItem.update({
+          where: { id: target.id },
+          data: {
+            productId: product.id,
+            productName: product.name,
+            unitPrice: product.price,
+            costPrice: product.costPrice,
+            qty,
+            notes,
+            isDeliveryChargeable,
+            isKitchenItem,
+            comboKey,
+            lineTotal,
+            addons: { create: addonCreateData },
+          },
+        });
+      }
+
+      const kitchenTicket = buildKitchenTicketData(
+        { queueNumber: order.queueNumber, queueSuffix: order.queueSuffix, channel: order.channel, tableLabel: order.tableLabel, customerName: order.customerName },
+        [
+          {
+            productId: product.id,
+            productName: product.name,
+            qty,
+            notes,
+            unitPrice: product.price,
+            addons: addonCreateData.map((a) => ({ name: a.name, price: a.price })),
+            isDeliveryChargeable,
+            isKitchenItem,
+            categorySortOrder: product.category.sortOrder,
+            productSortOrder: product.sortOrder,
+          },
+        ],
+        "MODIFIED",
+      );
+
+      return { ok: true as const, kitchenTicket };
     });
-
-    if (twin) {
-      await tx.orderItemAddon.deleteMany({ where: { orderItemId: target.id } });
-      await tx.orderItem.delete({ where: { id: target.id } });
-      await tx.orderItem.update({
-        where: { id: twin.id },
-        data: { qty: twin.qty + qty, lineTotal: twin.lineTotal + lineTotal },
-      });
-    } else {
-      // OrderItemAddon has no cascade — replace its rows explicitly rather
-      // than trying to diff old vs new selection.
-      await tx.orderItemAddon.deleteMany({ where: { orderItemId: target.id } });
-      await tx.orderItem.update({
-        where: { id: target.id },
-        data: {
-          productId: product.id,
-          productName: product.name,
-          unitPrice: product.price,
-          costPrice: product.costPrice,
-          qty,
-          notes,
-          isDeliveryChargeable,
-          isKitchenItem,
-          comboKey,
-          lineTotal,
-          addons: { create: addonCreateData },
-        },
-      });
-    }
-
-    const kitchenTicket = buildKitchenTicketData(
-      { queueNumber: order.queueNumber, queueSuffix: order.queueSuffix, channel: order.channel, tableLabel: order.tableLabel, customerName: order.customerName },
-      [
-        {
-          productId: product.id,
-          productName: product.name,
-          qty,
-          notes,
-          unitPrice: product.price,
-          addons: addonCreateData.map((a) => ({ name: a.name, price: a.price })),
-          isDeliveryChargeable,
-          isKitchenItem,
-          categorySortOrder: product.category.sortOrder,
-          productSortOrder: product.sortOrder,
-        },
-      ],
-      "MODIFIED",
-    );
-
-    return { ok: true, kitchenTicket };
-  });
+  } catch (e) {
+    if (e instanceof StockError) return { ok: false, error: e.message };
+    throw e;
+  }
 }
 
 export type SplitSelection = { orderItemId: string; qty: number };

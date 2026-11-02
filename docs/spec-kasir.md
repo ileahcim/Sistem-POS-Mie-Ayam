@@ -142,6 +142,10 @@ Pesanan borongan sering dibayar sebagian di muka. Keputusan pemilik: **Opsi 1 �
   - **Batalkan** — untuk order salah input / tidak jadi. Sama persis dengan "Batalkan Order" di atas: status `CANCELLED`, boleh CASHIER, wajib alasan. (Dulu ini `VOID` khusus OWNER — diganti karena order belum dibayar tidak menyentuh uang; Void sekarang khusus order `PAID`.)
   - **Tandai Piutang** — order benar-benar belum dibayar pelanggan. Wajib isi nama (`customerName`). Status jadi `RECEIVABLE`, **tidak** dihitung sebagai penjualan cash/non-cash, dan muncul di halaman daftar piutang terpisah supaya bisa dilunasi belakangan. Sejak 25 Sep 2026 piutang juga bisa dibuat langsung di layar Pembayaran ("Belum Bayar", jalur yang sama), dan semua piutang shift ini wajib dicentang di langkah "Piutang dari shift ini" sebelum hitung kas — lihat "Belum Bayar & pelunasan piutang".
 
+## Es Krim — stok per pcs (3 Nov 2026)
+
+Spesifikasi lengkap: `docs/spec-es-krim.md`. Ringkas untuk jalur Kasir/Order: stok es krim **dipotong saat item masuk order** (termasuk pre-order, saat dibuat) dan **kembali** saat item dikurangi/dihapus/diedit turun, order dibatalkan (biasa maupun ber-DP), atau di-void. Bayar/Pisahkan & Bayar/Piutang tidak menyentuh stok. Semua lewat `syncOrderStock` (`src/lib/stock/apply.ts`) di transaksi yang sama dengan perubahan order; stok kurang → seluruh perubahan ditolak dengan pesan "Stok … habis / tidak cukup". Kartu produk menampilkan sisa (badge "sisa N" saat ≤ 5, abu-abu & tak bisa ditekan saat 0). "Ambil Sendiri" (dimakan keluarga) tersedia di Kasir saat tab Es Krim aktif — bukan penjualan, tidak menyentuh shift/kas.
+
 ## Lain-lain
 
 - Produk & add-on option pakai soft delete (`isActive`), tidak pernah hard delete — laporan lama tetap mereferensikan.

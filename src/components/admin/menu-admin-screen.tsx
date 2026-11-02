@@ -122,6 +122,14 @@ export function MenuAdminScreen({
               </div>
             ))}
             <NewProductForm categories={categoryOptions} addonGroups={addonGroupOptions} />
+            <Card padded className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-ink-muted text-sm">
+                Es krim (stok, harga box, modal per pcs) diatur di halaman Stok Es Krim.
+              </p>
+              <LinkButton href="/es-krim" variant="secondary" size="compact">
+                Stok Es Krim
+              </LinkButton>
+            </Card>
           </section>
 
           <section id="add-on" className="flex scroll-mt-4 flex-col gap-2">

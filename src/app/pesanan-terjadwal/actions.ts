@@ -11,6 +11,7 @@ import { validateDeposit } from "@/lib/deposits/validate";
 import type { DepositMethod } from "@/lib/deposits/settle";
 import { getSettings } from "@/lib/settings/get-settings";
 import type { DepositReceiptData } from "@/lib/printing/types";
+import { StockError, syncOrderStock } from "@/lib/stock/apply";
 
 export type SavePreOrderInput = {
   channel: ChannelType;
@@ -93,32 +94,44 @@ export async function savePreOrder(input: SavePreOrderInput): Promise<SavePreOrd
     depositShiftId = openShift?.id ?? null;
   }
 
-  const order = await prisma.order.create({
-    data: {
-      shiftId: null,
-      queueNumber: null,
-      channel: input.channel,
-      tableLabel: input.tableLabel,
-      customerName: input.customerName.trim(),
-      scheduledFor,
-      createdById: user.id,
-      items: { create: itemsData },
-      ...(deposit
-        ? {
-            deposits: {
-              create: {
-                kind: "RECEIVED" as const,
-                method: deposit.method,
-                amount: deposit.amount,
-                shiftId: depositShiftId,
-                createdById: user.id,
-              },
-            },
-          }
-        : {}),
-    },
-    include: { deposits: true },
-  });
+  // Es krim on a pre-order is reserved right away (owner's call, 2 Nov 2026 —
+  // docs/spec-es-krim.md): taken out of stock now, back in if it's cancelled.
+  let order;
+  try {
+    order = await prisma.$transaction(async (tx) => {
+      const created = await tx.order.create({
+        data: {
+          shiftId: null,
+          queueNumber: null,
+          channel: input.channel,
+          tableLabel: input.tableLabel,
+          customerName: input.customerName.trim(),
+          scheduledFor,
+          createdById: user.id,
+          items: { create: itemsData },
+          ...(deposit
+            ? {
+                deposits: {
+                  create: {
+                    kind: "RECEIVED" as const,
+                    method: deposit.method,
+                    amount: deposit.amount,
+                    shiftId: depositShiftId,
+                    createdById: user.id,
+                  },
+                },
+              }
+            : {}),
+        },
+        include: { deposits: true },
+      });
+      await syncOrderStock(tx, { added: itemsData, orderId: created.id, userId: user.id });
+      return created;
+    });
+  } catch (e) {
+    if (e instanceof StockError) return { ok: false, error: e.message };
+    throw e;
+  }
 
   const firstDeposit = order.deposits[0];
   if (!firstDeposit) return { ok: true, orderId: order.id };

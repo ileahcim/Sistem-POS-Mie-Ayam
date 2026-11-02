@@ -10,6 +10,7 @@ import { isDepositMethod, type DepositMethod } from "@/lib/deposits/settle";
 import { getSettings } from "@/lib/settings/get-settings";
 import { changeFor, validateCashTendered } from "@/lib/orders/cash-change";
 import type { DepositReceiptData } from "@/lib/printing/types";
+import { syncOrderStock } from "@/lib/stock/apply";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 export type DepositReceiptResult =
@@ -184,6 +185,9 @@ export async function cancelOrderWithDeposit(
         where: { id: orderId },
         data: { status: "CANCELLED", cancelReason: trimmed, cancelledById: user.id, cancelledAt: new Date() },
       });
+      // Reserved es krim goes back into stock (docs/spec-es-krim.md).
+      const items = await tx.orderItem.findMany({ where: { orderId }, select: { productId: true, qty: true } });
+      await syncOrderStock(tx, { removed: items, orderId, userId: user.id });
     });
   } catch (e) {
     if (e instanceof DepositRefused) return { ok: false, error: e.message };

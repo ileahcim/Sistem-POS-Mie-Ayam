@@ -27,6 +27,7 @@ export function ProductGrid({
           price={product.price}
           imageUrl={product.imageUrl}
           cartQty={cartQtyByProduct[product.id] ?? 0}
+          stock={product.stock}
           onTap={() => onTapProduct(product)}
         />
       ))}

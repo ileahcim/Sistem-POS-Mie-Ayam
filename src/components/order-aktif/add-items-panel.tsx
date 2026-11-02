@@ -19,6 +19,7 @@ import { CustomItemSheet, type CustomItemResult } from "@/components/kasir/custo
 import { addItemsToOrder } from "@/app/order-aktif/actions";
 import type { PrinterDriver } from "@/lib/printing/types";
 import { useKitchenTicketPrompt } from "@/components/printing/use-kitchen-ticket-prompt";
+import { atStockLimit, stockByProductOf } from "@/lib/stock/types";
 
 // Shared by the order detail screen and the payment screen — both need the
 // same "one more forgotten item" affordance on an OPEN order. Confirmed
@@ -70,6 +71,9 @@ export function AddItemsPanel({
     for (const item of pendingItems) map[item.productId] = (map[item.productId] ?? 0) + item.qty;
     return map;
   }, [pendingItems]);
+  // Es krim already on the order is already out of stock — what's left to
+  // add is the live stock minus what is pending here.
+  const stockByProduct = useMemo(() => stockByProductOf(menu.flatMap((c) => c.products)), [menu]);
 
   function handleTapProduct(product: MenuProduct) {
     if (product.addonGroups.length > 0) {
@@ -245,6 +249,7 @@ export function AddItemsPanel({
                   label={item.productName}
                   onDecrement={() => setPendingQty(item.localId, item.qty - 1)}
                   onIncrement={() => setPendingQty(item.localId, item.qty + 1)}
+                  incrementDisabled={atStockLimit(item.productId, stockByProduct, cartQtyByProduct)}
                   disabled={saving}
                 />
               </div>

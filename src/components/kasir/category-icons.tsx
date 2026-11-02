@@ -62,6 +62,16 @@ function FrozenIcon() {
   );
 }
 
+function EsKrimIcon() {
+  return (
+    <svg {...shared}>
+      <path d="M4.6 6.4a3.4 3.4 0 0 1 6.8 0" />
+      <path d="M4 6.4h8L8 14.5 4 6.4Z" />
+      <path d="M6 9.2l2.6 2M7.6 7.6l3 2.4" />
+    </svg>
+  );
+}
+
 // Fixed set matching CLAUDE.md's fixed category list. Icons only — the tab
 // colors are the same neutral/green for every category (category-tabs.tsx).
 export const CATEGORY_META: Record<string, { Icon: () => JSX.Element }> = {
@@ -70,4 +80,5 @@ export const CATEGORY_META: Record<string, { Icon: () => JSX.Element }> = {
   Kulkas: { Icon: KulkasIcon },
   "Lain-lain": { Icon: LainIcon },
   Frozen: { Icon: FrozenIcon },
+  "Es Krim": { Icon: EsKrimIcon },
 };

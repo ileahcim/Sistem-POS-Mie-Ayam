@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/get-current-user";
 import { orderTotalFromLines } from "@/lib/orders/order-total";
 import { validateSplitCashAmount } from "@/lib/orders/validate-split-payment";
 import { DEPOSIT_ORDER_CHANGE_REFUSAL, type ChangeablePaymentMethod } from "@/lib/orders/payment-method-label";
+import { syncOrderStock } from "@/lib/stock/apply";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -27,9 +28,18 @@ export async function voidPaidOrder(orderId: string, reason: string): Promise<Ac
   // Not yet supported for an order that used DP: the DP was settled into a
   // shift that may already be closed, and un-settling it would need its own
   // refund/forfeit step to keep the drawer honest. Refused rather than guessed.
-  const result = await prisma.order.updateMany({
-    where: { id: orderId, status: "PAID", deposits: { none: {} } },
-    data: { status: "VOID", voidReason: trimmed, voidedById: user.id, voidedAt: new Date() },
+  // Es krim on a voided order goes back into stock (owner's brief, 2 Nov 2026 —
+  // docs/spec-es-krim.md), in the same transaction as the status change.
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({
+      where: { id: orderId, status: "PAID", deposits: { none: {} } },
+      data: { status: "VOID", voidReason: trimmed, voidedById: user.id, voidedAt: new Date() },
+    });
+    if (updated.count > 0) {
+      const items = await tx.orderItem.findMany({ where: { orderId }, select: { productId: true, qty: true } });
+      await syncOrderStock(tx, { removed: items, orderId, userId: user.id });
+    }
+    return updated;
   });
   if (result.count === 0) {
     if ((await prisma.preorderDeposit.count({ where: { orderId } })) > 0) {

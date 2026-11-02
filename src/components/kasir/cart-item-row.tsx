@@ -14,10 +14,13 @@ export function CartItemRow({
   item,
   onEdit,
   onChangeQty,
+  atStockLimit = false,
 }: {
   item: CartItem;
   onEdit: () => void;
   onChangeQty: (qty: number) => void;
+  // Es krim: every pcs in stock is already in the cart — [+] is off.
+  atStockLimit?: boolean;
 }) {
   const hasDetail = item.addons.length > 0 || !!item.notes;
 
@@ -37,6 +40,7 @@ export function CartItemRow({
           label={item.productName}
           onDecrement={() => onChangeQty(item.qty - 1)}
           onIncrement={() => onChangeQty(item.qty + 1)}
+          incrementDisabled={atStockLimit}
         />
         <Button variant="secondary" size="compact" onClick={onEdit}>
           Edit

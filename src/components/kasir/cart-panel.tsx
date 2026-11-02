@@ -10,6 +10,7 @@ import { OrderLineList, PortionTotalRow } from "@/components/ui/order-line-list"
 import { PriceText } from "@/components/ui/price-text";
 import { Sheet } from "@/components/ui/sheet";
 import { CartItemRow } from "./cart-item-row";
+import { atStockLimit } from "@/lib/stock/types";
 
 // Two shells around the same cart content: "sidebar" (default) is the
 // always-visible tablet/desktop column; "sheet" is the same content dropped
@@ -33,6 +34,7 @@ export function CartPanel({
   variant = "sidebar",
   onClose,
   headerAction,
+  stockByProduct,
 }: {
   items: CartItem[];
   channel: ChannelType | null;
@@ -54,6 +56,8 @@ export function CartPanel({
   onClose?: () => void;
   // Right side of the sidebar's "Keranjang" header (Kasir: "Buka Laci").
   headerAction?: ReactNode;
+  // Es krim stock (lib/stock/types.ts stockByProductOf) — caps [+] per product.
+  stockByProduct?: Record<string, number>;
 }) {
   const totals = computeOrderTotals(items, channel);
   const canSave =
@@ -63,6 +67,8 @@ export function CartPanel({
   // and on a big order the per-product counts (see line-order.ts). Purely a
   // display order: what gets saved is still draft.items.
   const sortedItems = sortOrderLines(items, portionPriceOf);
+  const qtyByProduct: Record<string, number> = {};
+  for (const item of items) qtyByProduct[item.productId] = (qtyByProduct[item.productId] ?? 0) + item.qty;
 
   const itemList =
     items.length === 0 ? (
@@ -80,7 +86,12 @@ export function CartPanel({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.2 }}
             >
-              <CartItemRow item={item} onEdit={() => onEdit(item)} onChangeQty={(qty) => onChangeQty(item.localId, qty)} />
+              <CartItemRow
+                item={item}
+                onEdit={() => onEdit(item)}
+                onChangeQty={(qty) => onChangeQty(item.localId, qty)}
+                atStockLimit={atStockLimit(item.productId, stockByProduct, qtyByProduct)}
+              />
             </motion.div>
           )}
         />

@@ -24,10 +24,12 @@ export type HppSection = {
 // for no benefit here. Only active rows: a soft-deleted product/option can
 // never be sold again, so its costPrice can't affect any future margin.
 export async function getHppItems(): Promise<{ products: HppSection[]; addons: HppSection[] }> {
+  // Es krim excluded: its modal per pcs is set by Barang Masuk on /es-krim
+  // (harga box ÷ isi), never typed here (docs/spec-es-krim.md).
   const categories = await prisma.category.findMany({
-    where: { products: { some: { isActive: true } } },
+    where: { products: { some: { isActive: true, tracksStock: false } } },
     orderBy: { sortOrder: "asc" },
-    include: { products: { where: { isActive: true }, orderBy: { sortOrder: "asc" } } },
+    include: { products: { where: { isActive: true, tracksStock: false }, orderBy: { sortOrder: "asc" } } },
   });
 
   const products: HppSection[] = categories.map((c) => ({

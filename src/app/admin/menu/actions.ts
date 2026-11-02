@@ -2,8 +2,11 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/get-current-user";
+import { ICE_CREAM_CATEGORY_NAME } from "@/lib/stock/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+const ICE_CREAM_ELSEWHERE = "Es krim diatur dari halaman Stok Es Krim.";
 
 // Manajemen Menu — CLAUDE.md-worthy brief, 22 Sep 2026: the owner asked
 // whether they can add/change/deactivate products and add-ons themselves
@@ -32,6 +35,7 @@ export async function createProduct(input: CreateProductInput): Promise<ActionRe
 
   const category = await prisma.category.findUnique({ where: { id: input.categoryId } });
   if (!category) return { ok: false, error: "Kategori tidak ditemukan." };
+  if (category.name === ICE_CREAM_CATEGORY_NAME) return { ok: false, error: ICE_CREAM_ELSEWHERE };
 
   const last = await prisma.product.findFirst({
     where: { categoryId: input.categoryId },
@@ -70,6 +74,10 @@ export async function updateProduct(productId: string, input: UpdateProductInput
 
   const category = await prisma.category.findUnique({ where: { id: input.categoryId } });
   if (!category) return { ok: false, error: "Kategori tidak ditemukan." };
+  if (category.name === ICE_CREAM_CATEGORY_NAME) return { ok: false, error: ICE_CREAM_ELSEWHERE };
+  const current = await prisma.product.findUnique({ where: { id: productId }, select: { tracksStock: true } });
+  if (!current) return { ok: false, error: "Produk tidak ditemukan." };
+  if (current.tracksStock) return { ok: false, error: ICE_CREAM_ELSEWHERE };
 
   // Renaming/repricing here never touches OrderItem — those already
   // snapshot productName/unitPrice at sale time (CLAUDE.md "Order & status"),

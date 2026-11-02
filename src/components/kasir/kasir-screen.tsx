@@ -29,6 +29,10 @@ import { CartPanel } from "./cart-panel";
 import { OpenDrawerButton } from "@/components/printing/open-drawer-button";
 import { CartBar } from "./cart-bar";
 import { saveOrder } from "@/app/kasir/actions";
+import { Button } from "@/components/ui/button";
+import { SelfUseSheet } from "@/components/es-krim/self-use-sheet";
+import { ICE_CREAM_CATEGORY_NAME } from "@/lib/stock/types";
+import { stockByProductOf } from "@/lib/stock/types";
 
 type SheetTarget = { mode: "add"; product: MenuProduct } | { mode: "edit"; product: MenuProduct; item: CartItem };
 
@@ -66,8 +70,14 @@ export function KasirScreen({
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
   const [noShiftPopup, setNoShiftPopup] = useState(false);
   const [customItemSheetOpen, setCustomItemSheetOpen] = useState(false);
+  const [selfUseOpen, setSelfUseOpen] = useState(false);
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? categories[0];
+
+  const stockByProduct = useMemo(
+    () => stockByProductOf(categories.flatMap((c) => c.products)),
+    [categories],
+  );
 
   const cartQtyByProduct = useMemo(() => {
     const map: Record<string, number> = {};
@@ -176,6 +186,9 @@ export function KasirScreen({
       });
       if (!result.ok) {
         setSaveError(result.error);
+        // A refusal can be "stok habis" — reload so the es krim cards show
+        // the stock that is really left.
+        router.refresh();
         return;
       }
       clear();
@@ -247,6 +260,15 @@ export function KasirScreen({
           {savedNotice && (
             <div className="bg-primary-soft text-primary-strong px-3 py-1.5 text-sm font-medium">{savedNotice}</div>
           )}
+          {activeCategory?.name === ICE_CREAM_CATEGORY_NAME && (
+            // "Ambil Sendiri" right where the es krim is (docs/spec-es-krim.md):
+            // family takes one, it's recorded in two taps, never as a sale.
+            <div className="border-border bg-surface flex items-center justify-end gap-2 border-b px-3 py-1.5">
+              <Button variant="secondary" size="compact" onClick={() => setSelfUseOpen(true)}>
+                Ambil Sendiri
+              </Button>
+            </div>
+          )}
           <ProductGrid
             products={activeCategory?.products ?? []}
             cartQtyByProduct={cartQtyByProduct}
@@ -257,6 +279,7 @@ export function KasirScreen({
 
         <div className="hidden w-[340px] shrink-0 lg:block">
           <CartPanel
+            stockByProduct={stockByProduct}
             items={draft.items}
             channel={draft.channel}
             tableLabel={draft.tableLabel}
@@ -277,6 +300,7 @@ export function KasirScreen({
       <AnimatePresence>
         {cartSheetOpen && (
           <CartPanel
+            stockByProduct={stockByProduct}
             variant="sheet"
             items={draft.items}
             channel={draft.channel}
@@ -329,6 +353,20 @@ export function KasirScreen({
             }
             onConfirm={handleConfirmSheet}
             onClose={() => setSheetTarget(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selfUseOpen && activeCategory && (
+          <SelfUseSheet
+            products={activeCategory.products.map((p) => ({ id: p.id, name: p.name, stock: p.stock ?? 0 }))}
+            onClose={() => setSelfUseOpen(false)}
+            onDone={(message) => {
+              setSelfUseOpen(false);
+              setSavedNotice(message);
+              router.refresh();
+            }}
           />
         )}
       </AnimatePresence>

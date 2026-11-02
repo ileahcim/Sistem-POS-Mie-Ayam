@@ -17,7 +17,9 @@ export async function updateHppItem(
   }
 
   if (kind === "product") {
-    await prisma.product.update({ where: { id }, data });
+    // Es krim's cost comes from Barang Masuk only (docs/spec-es-krim.md).
+    const updated = await prisma.product.updateMany({ where: { id, tracksStock: false }, data });
+    if (updated.count === 0) return { ok: false, error: "Produk tidak ditemukan (HPP es krim diatur dari Barang Masuk)." };
   } else {
     await prisma.addonOption.update({ where: { id }, data });
   }

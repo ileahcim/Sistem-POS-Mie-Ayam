@@ -6,6 +6,7 @@ import { buildOrderItemsCreateData, type OrderItemInput } from "@/lib/orders/bui
 import { buildKitchenTicketData } from "@/lib/orders/build-kitchen-ticket-data";
 import { TABLE_LABELS, type ChannelType, type TableLabel } from "@/lib/cart/types";
 import type { KitchenTicketData } from "@/lib/printing/types";
+import { StockError, syncOrderStock } from "@/lib/stock/apply";
 
 export type SaveOrderInput = {
   channel: ChannelType;
@@ -49,25 +50,34 @@ export async function saveOrder(input: SaveOrderInput): Promise<SaveOrderResult>
     return { ok: false, error: e instanceof Error ? e.message : "Gagal memproses item." };
   }
 
-  const { order, queueNumber } = await prisma.$transaction(async (tx) => {
-    const shift = await tx.shift.update({
-      where: { id: openShift.id },
-      data: { lastQueueNumber: { increment: 1 } },
-    });
+  let order, queueNumber;
+  try {
+    ({ order, queueNumber } = await prisma.$transaction(async (tx) => {
+      const shift = await tx.shift.update({
+        where: { id: openShift.id },
+        data: { lastQueueNumber: { increment: 1 } },
+      });
 
-    const order = await tx.order.create({
-      data: {
-        shiftId: shift.id,
-        queueNumber: shift.lastQueueNumber,
-        channel: input.channel,
-        tableLabel: input.tableLabel,
-        customerName: input.customerName,
-        createdById: user.id,
-        items: { create: itemsData },
-      },
-    });
-    return { order, queueNumber: shift.lastQueueNumber };
-  });
+      const order = await tx.order.create({
+        data: {
+          shiftId: shift.id,
+          queueNumber: shift.lastQueueNumber,
+          channel: input.channel,
+          tableLabel: input.tableLabel,
+          customerName: input.customerName,
+          createdById: user.id,
+          items: { create: itemsData },
+        },
+      });
+      // Es krim leaves the freezer the moment it's on an order (docs/spec-es-krim.md).
+      // Not enough stock throws and rolls back the whole order, queue number included.
+      await syncOrderStock(tx, { added: itemsData, orderId: order.id, userId: user.id });
+      return { order, queueNumber: shift.lastQueueNumber };
+    }));
+  } catch (e) {
+    if (e instanceof StockError) return { ok: false, error: e.message };
+    throw e;
+  }
 
   const kitchenTicket = buildKitchenTicketData(
     { queueNumber, queueSuffix: "", channel: input.channel, tableLabel: input.tableLabel, customerName: input.customerName },

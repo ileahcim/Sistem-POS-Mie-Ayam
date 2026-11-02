@@ -28,6 +28,7 @@ const MENU_ENTRIES: MenuEntry[] = [
   { href: "/admin/settings", label: "Pengaturan", ownerOnly: true },
   { href: "/pesanan-terjadwal", label: "Pesanan Terjadwal" },
   { href: "/piutang", label: "Piutang" },
+  { href: "/es-krim", label: "Stok Es Krim" },
   { href: "/shift/pengeluaran", label: "Pengeluaran" },
   { href: "/shift/tutup", label: "Tutup Shift", warning: true },
 ];
