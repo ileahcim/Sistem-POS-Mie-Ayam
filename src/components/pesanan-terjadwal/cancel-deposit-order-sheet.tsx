@@ -48,11 +48,13 @@ export function CancelDepositOrderButton({
   deposits,
   onCancelled,
   printerDriver,
+  autoOpenDrawer,
 }: {
   orderId: string;
   deposits: { method: DepositMethod; amount: number }[];
   onCancelled: () => void;
   printerDriver: PrinterDriver;
+  autoOpenDrawer: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<DepositDisposition | null>(null);
@@ -104,7 +106,7 @@ export function CancelDepositOrderButton({
           const result = await cancelOrderWithDeposit(orderId, choice!, reason);
           // Pengembalian DP tunai comes out of the drawer — open it (never
           // blocks: the cancellation is already saved).
-          if (result.ok && choice === "REFUND" && cashPart > 0) await openCashDrawer(printerDriver);
+          if (autoOpenDrawer && result.ok && choice === "REFUND" && cashPart > 0) await openCashDrawer(printerDriver);
           return result;
         }}
         onClose={() => {

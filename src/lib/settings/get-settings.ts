@@ -17,6 +17,7 @@ export type StoreSettings = {
   kitchenTicketEnabled: boolean;
   popularComboMinSales: number;
   cashChangeEnabled: boolean;
+  autoOpenDrawer: boolean;
 };
 
 const FALLBACK: StoreSettings = {
@@ -34,6 +35,7 @@ const FALLBACK: StoreSettings = {
   kitchenTicketEnabled: false,
   popularComboMinSales: POPULAR_COMBO_DEFAULT_MIN_SALES,
   cashChangeEnabled: true,
+  autoOpenDrawer: true,
 };
 
 // The singleton row is created by prisma/seed.ts, but fall back gracefully
@@ -58,6 +60,7 @@ export async function getSettings(): Promise<StoreSettings> {
     kitchenTicketEnabled: setting.kitchenTicketEnabled,
     popularComboMinSales: setting.popularComboMinSales,
     cashChangeEnabled: setting.cashChangeEnabled,
+    autoOpenDrawer: setting.autoOpenDrawer,
   };
 }
 

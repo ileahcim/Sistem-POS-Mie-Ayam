@@ -29,12 +29,14 @@ export function DepositCard({
   autoPrint,
   printerDriver,
   cashChangeEnabled,
+  autoOpenDrawer,
 }: {
   order: OrderDetail;
   cashAvailable: boolean;
   autoPrint: boolean;
   printerDriver: PrinterDriver;
   cashChangeEnabled: boolean;
+  autoOpenDrawer: boolean;
 }) {
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -77,7 +79,8 @@ export function DepositCard({
       closeSheet();
       // DP tunai goes into the drawer: open it now, before "Cetak bukti?"
       // (lib/printing/cash-drawer.ts). QRIS never touches the drawer.
-      if (draft.method === "CASH") await openCashDrawer(printerDriver);
+      // Off in Pengaturan ("Buka laci otomatis") = only Buka Laci opens it.
+      if (autoOpenDrawer && draft.method === "CASH") await openCashDrawer(printerDriver);
       await handleRecorded(result.receipt);
     } finally {
       setSaving(false);

@@ -6,6 +6,7 @@ import type { StoreSettings } from "@/lib/settings/get-settings";
 import type { HeaderNav } from "@/lib/header/get-header-nav";
 import type { PrinterDriver, PrintResult } from "@/lib/printing/types";
 import {
+  updateAutoOpenDrawer,
   updateAutoPrintReceipt,
   updateCashChangeEnabled,
   updateKitchenTicketEnabled,
@@ -184,7 +185,7 @@ function ToggleCard({
         <p className="text-ink-muted text-sm">{description}</p>
       </div>
       <div className="flex items-center gap-3">
-        <div role="group" aria-label={title} className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold">
+        <div role="group" aria-label={title} className="rounded-pill bg-muted flex h-13 items-center p-0.5 text-sm font-semibold">
           {[true, false].map((option) => (
             <button
               key={String(option)}
@@ -193,7 +194,7 @@ function ToggleCard({
               disabled={saving}
               aria-pressed={value === option}
               className={cn(
-                "rounded-pill h-10 px-4",
+                "rounded-pill h-12 px-4",
                 value === option ? "bg-surface text-ink shadow-card" : "text-ink-muted",
               )}
             >
@@ -249,7 +250,7 @@ function PreorderReminderCard({ settings }: { settings: StoreSettings }) {
         <div
           role="group"
           aria-label="Pengingat pesanan terjadwal"
-          className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold"
+          className="rounded-pill bg-muted flex h-13 items-center p-0.5 text-sm font-semibold"
         >
           {PREORDER_REMINDER_CHOICES.map((choice) => (
             <button
@@ -259,7 +260,7 @@ function PreorderReminderCard({ settings }: { settings: StoreSettings }) {
               disabled={saving}
               aria-pressed={minutes === choice.minutes}
               className={cn(
-                "rounded-pill h-10 px-3",
+                "rounded-pill h-12 px-3",
                 minutes === choice.minutes ? "bg-surface text-ink shadow-card" : "text-ink-muted",
               )}
             >
@@ -318,7 +319,7 @@ function PopularComboCard({ settings }: { settings: StoreSettings }) {
         <div
           role="group"
           aria-label="Ambang Menu Populer"
-          className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold"
+          className="rounded-pill bg-muted flex h-13 items-center p-0.5 text-sm font-semibold"
         >
           {POPULAR_COMBO_MIN_SALES_CHOICES.map((choice) => (
             <button
@@ -328,7 +329,7 @@ function PopularComboCard({ settings }: { settings: StoreSettings }) {
               disabled={saving}
               aria-pressed={minSales === choice}
               className={cn(
-                "rounded-pill h-10 px-3",
+                "rounded-pill h-12 px-3",
                 minSales === choice ? "bg-surface text-ink shadow-card" : "text-ink-muted",
               )}
             >
@@ -421,7 +422,7 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
         <p className="text-ink-muted text-sm">Mode cetak untuk printer thermal ECO80D. Pilih driver, lalu Tes Cetak untuk memastikan.</p>
       </div>
 
-      <div role="group" aria-label="Mode cetak" className="rounded-pill bg-muted flex h-11 items-center p-0.5 text-sm font-semibold">
+      <div role="group" aria-label="Mode cetak" className="rounded-pill bg-muted flex h-13 items-center p-0.5 text-sm font-semibold">
         {(Object.keys(PRINTER_MODE_LABELS) as PrinterDriver[]).map((option) => (
           <button
             key={option}
@@ -430,7 +431,7 @@ function PrinterCard({ settings }: { settings: StoreSettings }) {
             disabled={saving}
             aria-pressed={driver === option}
             className={cn(
-              "rounded-pill h-10 px-4",
+              "rounded-pill h-12 px-4",
               driver === option ? "bg-surface text-ink shadow-card" : "text-ink-muted",
             )}
           >
@@ -555,6 +556,22 @@ export function SettingsScreen({
           />
 
           <PrinterCard settings={settings} />
+
+          {/* Right under the printer card and its "Tes Buka Laci" — the
+              drawer hangs off the printer. Off: only "Buka Laci" (Kasir) and
+              "Tes Buka Laci" (above) open it. */}
+          <ToggleCard
+            title="Buka laci otomatis"
+            description={
+              <>
+                Nyala: laci terbuka sendiri setiap uang tunai masuk atau keluar — bayar Cash dan Cash + QRIS, DP tunai,
+                pengembalian DP tunai, pelunasan piutang ke laci. Mati: laci tidak pernah terbuka sendiri; buka dengan
+                tombol &ldquo;Buka Laci&rdquo; di Kasir. Berlaku di semua perangkat.
+              </>
+            }
+            initialValue={settings.autoOpenDrawer}
+            onSave={updateAutoOpenDrawer}
+          />
 
           <ToggleCard
             title="Kertas dapur"

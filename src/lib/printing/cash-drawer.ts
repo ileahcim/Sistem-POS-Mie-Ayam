@@ -7,6 +7,10 @@
 //     confirmation: Pembayaran Cash / Cash + QRIS (incl. sisa pre-order and a
 //     piutang settled INTO the drawer), DP tunai, pengembalian DP tunai —
 //     even when the struk isn't printed. QRIS alone never opens it;
+//   - Pengaturan "Buka laci otomatis" (Setting.autoOpenDrawer, default on):
+//     off = none of the above ever opens it — each caller checks the flag
+//     before kicking (pembayaran-screen drawerMoves, deposit-card,
+//     cancel-deposit-order-sheet); the manual buttons below always work;
 //   - "Buka Laci" on the Kasir screen (every role) and "Tes Buka Laci" in
 //     Pengaturan open it by hand;
 //   - a failure NEVER undoes or blocks the transaction (it is already saved

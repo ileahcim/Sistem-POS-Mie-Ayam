@@ -30,6 +30,16 @@ export async function updateCashChangeEnabled(cashChangeEnabled: boolean): Promi
   return { ok: true };
 }
 
+// "Buka laci otomatis": on (default) = the drawer opens by itself whenever
+// cash moves at a confirmation; off = only "Buka Laci" / "Tes Buka Laci"
+// open it (lib/printing/cash-drawer.ts). One value for every device.
+export async function updateAutoOpenDrawer(autoOpenDrawer: boolean): Promise<ActionResult> {
+  await requireRole("OWNER");
+  if (typeof autoOpenDrawer !== "boolean") return { ok: false, error: "Nilai tidak valid." };
+  await prisma.setting.update({ where: { id: "singleton" }, data: { autoOpenDrawer } });
+  return { ok: true };
+}
+
 // Off (default): the kitchen ticket feature is entirely invisible — no print
 // prompt on save/tambah item, no "Cetak Tiket Dapur" button anywhere. See
 // CLAUDE.md "Kertas dapur".

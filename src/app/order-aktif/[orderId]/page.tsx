@@ -40,6 +40,7 @@ export default async function OrderDetailPage({
       autoPrintReceipt={settings.autoPrintReceipt}
       cashChangeEnabled={settings.cashChangeEnabled}
       kitchenTicketEnabled={settings.kitchenTicketEnabled}
+      autoOpenDrawer={settings.autoOpenDrawer}
     />
   );
 }

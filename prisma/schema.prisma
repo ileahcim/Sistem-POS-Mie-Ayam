@@ -161,6 +161,13 @@ model Setting {
   // (or its cash slice), never the money handed over.
   cashChangeEnabled Boolean @default(true)
 
+  // "Buka laci otomatis" (2 Nov 2026): on (default) = the cash drawer opens
+  // by itself whenever cash moves at a confirmation (Cash, Cash + QRIS, DP
+  // tunai, pengembalian DP tunai, pelunasan ke laci — lib/printing/cash-drawer.ts).
+  // Off = it never opens by itself; only "Buka Laci" / "Tes Buka Laci" open
+  // it. Shared by every device, OWNER-only to change.
+  autoOpenDrawer Boolean @default(true)
+
   updatedAt DateTime @updatedAt
 }
 

@@ -59,6 +59,7 @@ export function PembayaranScreen({
   nav,
   kitchenTicketEnabled,
   cashChangeEnabled,
+  autoOpenDrawer,
 }: {
   order: OrderDetail;
   menu: MenuCategory[];
@@ -67,6 +68,8 @@ export function PembayaranScreen({
   nav: HeaderNav;
   kitchenTicketEnabled: boolean;
   cashChangeEnabled: boolean;
+  // Pengaturan "Buka laci otomatis" — off = never kicked here, only by hand.
+  autoOpenDrawer: boolean;
 }) {
   const router = useRouter();
   const [choice, setChoice] = useState<Choice | null>(null);
@@ -126,6 +129,7 @@ export function PembayaranScreen({
   // into the drawer, not the owner's pocket), or the DP excess going back
   // out when one of the DPs was cash. QRIS alone, and "Belum Bayar", never.
   const drawerMoves =
+    autoOpenDrawer &&
     choice !== "LATER" &&
     (nothingToCollect
       ? order.refundDue > 0 && order.deposits.some((d) => d.method === "CASH")
@@ -502,7 +506,7 @@ export function PembayaranScreen({
                       onClick={() => setSplitCash(preset)}
                       aria-pressed={splitCash === preset}
                       className={cn(
-                        "rounded-pill h-11 px-4 text-sm font-semibold",
+                        "rounded-pill h-12 px-4 text-sm font-semibold",
                         splitCash === preset ? "bg-primary text-white" : "bg-muted text-ink",
                       )}
                     >

@@ -30,6 +30,7 @@ export default async function PembayaranPage({
       nav={nav}
       kitchenTicketEnabled={settings.kitchenTicketEnabled}
       cashChangeEnabled={settings.cashChangeEnabled}
+      autoOpenDrawer={settings.autoOpenDrawer}
     />
   );
 }

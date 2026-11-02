@@ -57,6 +57,7 @@ export function OrderDetail({
   autoPrintReceipt,
   kitchenTicketEnabled,
   cashChangeEnabled,
+  autoOpenDrawer,
 }: {
   order: OrderDetailData;
   menu: MenuCategory[];
@@ -75,6 +76,8 @@ export function OrderDetail({
   kitchenTicketEnabled: boolean;
   // "Hitung kembalian" — Catat DP asks "Uang diterima" for a cash DP.
   cashChangeEnabled: boolean;
+  // Pengaturan "Buka laci otomatis" — DP tunai / pengembalian DP tunai.
+  autoOpenDrawer: boolean;
 }) {
   const router = useRouter();
   const [markingServed, setMarkingServed] = useState(false);
@@ -246,6 +249,7 @@ export function OrderDetail({
             autoPrint={autoPrintReceipt}
             printerDriver={printerDriver}
             cashChangeEnabled={cashChangeEnabled}
+            autoOpenDrawer={autoOpenDrawer}
           />
         )}
 
@@ -373,6 +377,7 @@ export function OrderDetail({
                 deposits={order.deposits}
                 onCancelled={() => router.push("/order-aktif")}
                 printerDriver={printerDriver}
+                autoOpenDrawer={autoOpenDrawer}
               />
             ) : (
               <p className="text-ink-muted text-center text-sm">
